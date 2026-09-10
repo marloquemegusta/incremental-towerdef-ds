@@ -1,43 +1,61 @@
 # DESIGN.md - Especificación de Diseño: Tower Defense Incremental DS
 
-## 1. Visión General
-Tower Defense minimalista e incremental para Nintendo DS centrado en la geometría de tiro, la simulación pasiva masiva y la telemetría en tiempo real estilo *Factorio* / *The Tower*.
+Consolidación técnica y de diseño para `towerds` en Nintendo DS. Para la visión en profundidad, consultar [`DESIGN_PHILOSOPHY.md`](file:///c:/codexlocal/towerds/DESIGN_PHILOSOPHY.md).
 
-## 2. Pantallas
-- **Pantalla Superior (Sub-Engine / Telemetría):**
-  - Consola de texto densa (32x24 caracteres).
-  - Métricas en tiempo real:
-    - Estado de Oleada: Vivos / Totales, Bajas acumuladas, Fugas / Daño sufrido.
-    - Salud del Núcleo y Chatarra disponible.
-    - Telemetría de Torretas: Disparos totales, Impactos confirmados, Precisión %, Balas perdidas (*wasted shots* %), Daño infligido y DPS en tiempo real.
-- **Pantalla Inferior (Main-Engine / Simulación Táctil 256x192 px):**
-  - Fondo estilo *radar/blueprint* militar oscuro.
-  - Trazado de camino predefinido con curvas en "S" y Núcleo en la meta.
-  - Enjambre de enemigos renderizado como partículas brillantes de 2x2 píxeles en modo Bitmap.
-  - Torretas geométricas (8x8 px) con cañón móvil visible.
-  - Trazadores de balas rápidas (líneas de 2 px).
+---
 
-## 3. Mecánica de Torretas y Barrido Angular
-- **Sin auto-apuntado:** Cada torreta barre continuamente un sector angular ($\theta \pm \alpha/2$).
-- **Torreta Vulcan (Inicial):**
-  - Apertura $\alpha = 45^\circ$.
-  - Cañón oscilante con velocidad angular $\omega$.
-  - Disparo de trazadores a cadencia fija.
-  - Toda bala disparada hacia un ángulo sin enemigos suma al contador de *Balas Perdidas*.
+## 1. Visión General y Género
+- **Género:** Tower Defense Incremental Roguelite.
+- **Estructura de la Run:** 3 Sectores $\times$ 3 Niveles = **9 Mapas Procedimentales**.
+- **Condición de Derrota:** La ciudad (Sanctum) tiene 20 puntos de integridad acumulados a lo largo de los 9 mapas. Si llega a 0, la run concluye.
+- **Identidad Gráfica:** 16-bit pixel art grimdark con temática Adeptus Mechanicus vs Enjambre Xenos (Tiránidos).
 
-## 4. Controles Táctiles (Fase de Preparación - Sin Puntos Muertos)
-- **Colocación:** Arrastrar desde el dock inferior al mapa. Si se suelta en zona inválida (camino u obstáculo), vuelve automáticamente al dock sin penalización.
-- **Orientación:** Con la torreta seleccionada, arrastrar con el stylus alrededor de ella orienta el ángulo central $\theta$ y proyecta el cono de 45°.
-- **Reubicación:** Arrastrar una torreta ya colocada a otra posición válida. Si se suelta en zona inválida, regresa a su posición previa.
-- **Desmantelar:** Botón `[QUITAR]` en la interfaz devuelve la torreta al dock al 100% de reembolso.
-- **Botón `[START WAVE]`:** Pasa de la Fase de Preparación a la Fase de Simulación.
-- **Hipervelocidad (Fast Forward):** Mantener pulsado el botón `R` o activar botón táctil `[2X]` para acelerar la simulación.
+---
 
-## 5. Ciclo Incremental (Metaprogresión)
-- El enjambre otorga Chatarra por cada baja.
-- Al terminar la oleada (victoria) o caer el Núcleo (derrota), se accede al **Taller**:
-  - Mejoras iniciales comprables:
-    1. *Cadencia Vulcan:* Reduce el cooldown de disparo.
-    2. *Servomotores:* Aumenta la velocidad de oscilación angular.
-    3. *Reciclador de Chatarra:* Multiplicador de chatarra por baja.
-  - Botón `[REINTENTAR / SIGUIENTE OLEADA]`.
+## 2. Las Dos Pantallas
+- **Pantalla Superior (Sub-Engine):**
+  - Matriz táctica y telemetría de baterías en tiempo real.
+  - Banda superior compacta: Integridad de la ciudad (HP %), Oleada (Progreso %) y Diezmo/Chatarra.
+  - Bloque central: Baterías activas agrupadas por tipo (número de emplazamientos, DPS total, barra de % de aporte al daño global de la defensa, bajas).
+  - Bloque inferior: Desglose de tipos de amenazas xenos vivas y resumen de doctrinas activas de la forja.
+- **Pantalla Inferior (Main-Engine Táctil 256x192 px):**
+  - Motor de tilesets de 16x16 px: Suelo de fundición remachado y trinchera balística continua de 32 px de ancho con barandillas de peligro perimetrales.
+  - Baterías de torretas con cono de tiro, cañones masivos con retroceso explosivo no lineal y chispas mecánicas de tungsteno.
+  - Enjambre xenos en movimiento con micro-sprites direccionales (5x5 px) a 60 FPS estables.
+  - Interfaz táctil ergonómica con stylus: colocación, rotación de arco de tiro, desmantelamiento al 100% y acelerador de tiempo `[2X]` (o botón `R`).
+
+---
+
+## 3. Mecánica de Combate y Armadura Plana
+$$\text{Daño Recibido} = \max(1, \text{Daño Bala} - \text{Armadura Enemigo})$$
+
+### Familias de Armas Iniciales:
+1. **Twin Heavy Bolter (Fuego Rápido Antienjambre):**
+   - 2 balas por ráfaga (3 dmg c/u = 6 dmg total).
+   - Cadencia: 4 disparos/segundo (8 balas/s).
+   - $0$ AP. Excepcional para limpiar hordas sin armadura; ineficiente contra blindajes pesados.
+2. **Lascannon (Perforador Anticarro):**
+   - Rayo continuo de rieles (35 dmg plano).
+   - Cadencia: 1 disparo cada 2.5s.
+   - 100% AP (ignora armadura plana) y atraviesa hasta 3 objetivos en línea recta.
+3. **Heavy Flamer (Saturación de Zona):**
+   - Cono continuo de fuego (12 DPS en área).
+   - Ignora 1 punto de armadura por calor y ralentiza un 25% a la horda.
+4. **Missile Pod (Artillería AOE):**
+   - Salvas de micromisiles balísticos (15 dmg en radio de 16 px).
+
+---
+
+## 4. Progresión Incremental (De 20 a 20.000.000)
+- **Densidad de Biomasa (40-120 sprites en pantalla):** En lugar de dibujar miles de sprites que saturen la pantalla y el ARM9, los enemigos evolucionan en masa de biomasa, vida y valor de chatarra (Sector 1: 2 HP / 1 chatarra; Sector 3: 50.000 HP / 25.000 chatarra).
+- **Multiplicadores Compuestos Intra-Run:**
+  $$\text{Ganancia Chatarra} = (\text{Base}) \times (\text{Reciclaje Taller}) \times (\text{Combo Racha}) \times (\text{Interés Diezmo})$$
+- **Árbol de Habilidades Intra-Run:** Las mejoras de chatarra se conservan a lo largo de los 9 niveles de la run, obligando a elegir entre ramas de especialización excluyentes (*Rama Balística Rápida* vs *Rama Artillería Pesada* vs *Rama Logística/Diezmo*).
+
+---
+
+## 5. Metaprogresión Permanente (Riesgo / Recompensa)
+- Al concluir una run, la puntuación se convierte en **Datos STC**.
+- Los Datos STC se canjean en la Forja Central por:
+  1. Nuevas familias de torretas añadidas al pool de la run.
+  2. **Directivas de Asedio (Modificadores activables tipo Heat/Hades):** Aumentan la dificultad (velocidad enemiga, armadura extra, etc.) a cambio de multiplicadores gigantescos de chatarra y puntuación, manteniendo el Sector 1 siempre desafiante e interesante.
