@@ -1,10 +1,10 @@
-﻿BLOCKSDS ?= /opt/wonderful/thirdparty/blocksds/core
+BLOCKSDS ?= /opt/wonderful/thirdparty/blocksds/core
 BLOCKSDSEXT ?= /opt/wonderful/thirdparty/blocksds/external
 WONDERFUL_TOOLCHAIN ?= /opt/wonderful
-NAME := ds-stylophone-blocksds
-GAME_TITLE := DS Stylophone
-GAME_SUBTITLE := BlocksDS debug test
-GAME_AUTHOR := local
+NAME ?= game-blocksds
+GAME_TITLE ?= NDS Game
+GAME_SUBTITLE ?= BlocksDS test
+GAME_AUTHOR ?= Agentic DS Dev
 SOURCEDIRS := arm9/source
 INCLUDEDIRS := arm9/include
 BINDIRS := arm9/assets/samples
