@@ -54,7 +54,7 @@ void game_init(void) {
     g_game.wave_number = 1;
     g_game.core_hp = 20;
     g_game.core_max_hp = 20;
-    g_game.scrap = 0;
+    g_game.scrap = 25; // Initial Mechanicus Tithe Grant
     g_game.fast_forward = 1;
     g_game.turret_dock_count = 1;
     g_game.selected_turret = -1;
@@ -70,6 +70,7 @@ void game_init(void) {
     g_turret.placed = 0;
     g_turret.active = 0;
     g_turret.flash_timer = 0;
+    skills_init();
 }
 
 void game_reset_to_prep(void) {
@@ -92,10 +93,11 @@ void game_reset_to_prep(void) {
     g_turret.fire_cooldown = 0;
     g_turret.flash_timer = 0;
 
-    // Apply Mechanicus Upgrades
-    g_turret.fire_interval = 8 - g_game.upgrades.firerate_lvl;
-    if (g_turret.fire_interval < 3) g_turret.fire_interval = 3;
-    g_turret.sweep_speed = 1 + g_game.upgrades.sweep_lvl;
+    // Apply Mechanicus Skills from Branching Tree
+    int interval = 8 - g_skill_tree.bonus_firerate;
+    if (interval < 3) interval = 3;
+    g_turret.fire_interval = interval;
+    g_turret.sweep_speed = 1;
 }
 
 void game_start_wave(void) {
@@ -302,12 +304,14 @@ void game_update_simulation(void) {
             // Radius hit check
             if (abs(bx - ex) <= 4 && abs(by - ey) <= 4) {
                 hit = 1;
-                g_enemies[e].hp--;
+                int dmg = 1 + g_skill_tree.bonus_damage;
+                g_enemies[e].hp -= dmg;
+                g_turret.damage_dealt += dmg;
                 if (g_enemies[e].hp <= 0) {
                     g_enemies[e].active = 0;
                     g_game.enemies_alive--;
                     g_game.enemies_killed++;
-                    int reward = g_enemy_types[g_enemies[e].variant].scrap_value + g_game.upgrades.scrap_lvl;
+                    int reward = g_enemy_types[g_enemies[e].variant].scrap_value + (g_skill_tree.bonus_ap > 0 ? 1 : 0);
                     g_game.scrap += reward;
 
                     // Xenos ichor / blood splatter
@@ -315,7 +319,6 @@ void game_update_simulation(void) {
                     game_add_splatter(ex, ey, splat_col);
                 }
                 g_turret.hits_confirmed++;
-                g_turret.damage_dealt++;
                 g_bullets[b].active = 0;
                 break;
             }
@@ -371,6 +374,12 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
             g_game.is_dragging_new = 1;
             g_game.drag_x = touch.px;
             g_game.drag_y = touch.py;
+            return;
+        }
+
+        // Dock button touch: open FORGE STC (Branching Skill Tree)
+        if (touch.px >= 160 && touch.px <= 250 && touch.py >= 168) {
+            g_game.mode = MODE_WORKSHOP;
             return;
         }
 
@@ -435,43 +444,11 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
 
 void game_handle_input_workshop(touchPosition touch, int keys_down, int keys_held) {
     if (keys_down & KEY_TOUCH) {
-        // Upgrade 1: Firerate
-        int cost1 = 10 * (g_game.upgrades.firerate_lvl + 1);
-        if (touch.px >= 175 && touch.px <= 239 && touch.py >= 38 && touch.py <= 58) {
-            if (g_game.scrap >= cost1 && g_game.upgrades.firerate_lvl < 5) {
-                g_game.scrap -= cost1;
-                g_game.upgrades.firerate_lvl++;
-            }
-            return;
-        }
-
-        // Upgrade 2: Servos
-        int cost2 = 10 * (g_game.upgrades.sweep_lvl + 1);
-        if (touch.px >= 175 && touch.px <= 239 && touch.py >= 70 && touch.py <= 90) {
-            if (g_game.scrap >= cost2 && g_game.upgrades.sweep_lvl < 5) {
-                g_game.scrap -= cost2;
-                g_game.upgrades.sweep_lvl++;
-            }
-            return;
-        }
-
-        // Upgrade 3: Scrap Protocol
-        int cost3 = 15 * (g_game.upgrades.scrap_lvl + 1);
-        if (touch.px >= 175 && touch.px <= 239 && touch.py >= 102 && touch.py <= 122) {
-            if (g_game.scrap >= cost3 && g_game.upgrades.scrap_lvl < 5) {
-                g_game.scrap -= cost3;
-                g_game.upgrades.scrap_lvl++;
-            }
-            return;
-        }
-
-        // Continue Button: (24..232, 138..172)
-        if (touch.px >= 24 && touch.px <= 232 && touch.py >= 138 && touch.py <= 172) {
+        if (skills_handle_touch(touch.px, touch.py)) {
             if (g_game.core_hp <= 0) {
                 g_game.core_hp = g_game.core_max_hp;
             }
             game_reset_to_prep();
-            return;
         }
     }
 }

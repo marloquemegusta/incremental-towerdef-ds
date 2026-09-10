@@ -341,6 +341,12 @@ void renderer_draw_ui_prep(void) {
     sprintf(dock_label, "BOLTER [%d]", g_game.turret_dock_count);
     renderer_draw_text(30, 177, dock_label, (g_game.turret_dock_count > 0) ? COLOR_HAZARD_YELLOW : COLOR_IRON_LIGHT);
 
+    // Dock button for FORGE STC (Branching Skill Tree): (x: 164..248, y: 171..188)
+    renderer_fill_rect(164, 171, 84, 17, COLOR_HAZARD_BLACK);
+    renderer_draw_rect(164, 171, 84, 17, COLOR_BRASS);
+    renderer_fill_rect(167, 174, 4, 11, COLOR_AMBER);
+    renderer_draw_text(176, 177, "FORGE STC", COLOR_BRASS);
+
     // Dragging ghost preview
     if (g_game.is_dragging_new) {
         int gx = g_game.drag_x;
@@ -354,51 +360,7 @@ void renderer_draw_ui_prep(void) {
 }
 
 void renderer_draw_ui_workshop(void) {
-    renderer_fill_rect(0, 0, SCREEN_W, SCREEN_H, COLOR_DECK_FLOOR);
-
-    // Title banner: REQUISITION TERMINAL
-    renderer_fill_rect(10, 8, 236, 20, COLOR_IRON_PANEL);
-    renderer_draw_rect(10, 8, 236, 20, COLOR_BRASS);
-    renderer_draw_text(38, 14, "++ OMNISSIAH ARMORY WORKSHOP ++", COLOR_BRASS);
-
-    // Card 1: Sacred Firerate
-    renderer_fill_rect(12, 34, 232, 28, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(12, 34, 232, 28, COLOR_IRON_LIGHT);
-    renderer_draw_text(18, 40, "BOLTER FIRERATE RITE", COLOR_WHITE);
-    char buf1[32];
-    sprintf(buf1, "LVL %d", g_game.upgrades.firerate_lvl);
-    renderer_draw_text(18, 50, buf1, COLOR_HAZARD_YELLOW);
-    renderer_fill_rect(175, 38, 64, 20, COLOR_BRASS);
-    renderer_draw_rect(175, 38, 64, 20, COLOR_WHITE);
-    renderer_draw_text(182, 44, "SANCTIFY", COLOR_BLACK);
-
-    // Card 2: Traverse Servos
-    renderer_fill_rect(12, 66, 232, 28, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(12, 66, 232, 28, COLOR_IRON_LIGHT);
-    renderer_draw_text(18, 72, "TRAVERSE MOTOR SERVOS", COLOR_WHITE);
-    char buf2[32];
-    sprintf(buf2, "LVL %d", g_game.upgrades.sweep_lvl);
-    renderer_draw_text(18, 82, buf2, COLOR_HAZARD_YELLOW);
-    renderer_fill_rect(175, 70, 64, 20, COLOR_BRASS);
-    renderer_draw_rect(175, 70, 64, 20, COLOR_WHITE);
-    renderer_draw_text(182, 76, "SANCTIFY", COLOR_BLACK);
-
-    // Card 3: Tithe / Scrap Reclamation
-    renderer_fill_rect(12, 98, 232, 28, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(12, 98, 232, 28, COLOR_IRON_LIGHT);
-    renderer_draw_text(18, 104, "TITHE RECLAMATION PROTOCOL", COLOR_WHITE);
-    char buf3[32];
-    sprintf(buf3, "LVL %d", g_game.upgrades.scrap_lvl);
-    renderer_draw_text(18, 114, buf3, COLOR_HAZARD_YELLOW);
-    renderer_fill_rect(175, 102, 64, 20, COLOR_BRASS);
-    renderer_draw_rect(175, 102, 64, 20, COLOR_WHITE);
-    renderer_draw_text(182, 108, "SANCTIFY", COLOR_BLACK);
-
-    // Bottom Action: [RETURN TO DEFENSE BASTION]
-    renderer_fill_rect(24, 138, 208, 34, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(24, 138, 208, 34, COLOR_HAZARD_YELLOW);
-    renderer_fill_rect(28, 142, 200, 26, COLOR_IRON_PANEL);
-    renderer_draw_text(40, 151, ">> ENGAGE NEXT XENOS WAVE <<", COLOR_HAZARD_YELLOW);
+    skills_draw_tree();
 }
 
 void renderer_present(void) {
