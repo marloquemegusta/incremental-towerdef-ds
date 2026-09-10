@@ -410,6 +410,24 @@ void tiles_render_map(void) {
     }
 }
 
+void tiles_render_sector1_map(void) {
+    for (int ty = 0; ty < MAP_ROWS; ty++) {
+        for (int tx = 0; tx < MAP_COLS; tx++) {
+            uint8_t tid = g_s1_map[ty][tx];
+            const uint16_t *src = g_s1_tiles[tid];
+            int px = tx * TILE_SIZE;
+            int py = ty * TILE_SIZE;
+
+            for (int y = 0; y < TILE_SIZE; y++) {
+                uint16_t *dst = &g_backbuffer[(py + y) * SCREEN_W + px];
+                for (int x = 0; x < TILE_SIZE; x++) {
+                    dst[x] = src[y * TILE_SIZE + x];
+                }
+            }
+        }
+    }
+}
+
 void tiles_draw_turret_base(int cx, int cy, int is_selected) {
     for (int dy = -9; dy <= 9; dy++) {
         for (int dx = -9; dx <= 9; dx++) {

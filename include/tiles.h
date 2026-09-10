@@ -38,8 +38,15 @@ enum {
 
 void tiles_init(void);
 void tiles_render_map(void);
+void tiles_render_sector1_map(void);
 void tiles_draw_turret_base(int cx, int cy, int is_selected);
 void tiles_draw_twin_bolters(int cx, int cy, int angle, int flash, int recoil_l, int recoil_r, int last_barrel);
 void tiles_draw_xenos(int cx, int cy, int dir, int anim_frame);
+
+// Sector 1 Data
+extern const uint16_t g_s1_tiles[17][256];
+extern const uint8_t g_s1_map[12][16];
+extern const uint16_t g_hb_frames[11][1024];
+extern const uint16_t g_las_frames[6][1024];
 
 #endif // TILES_H

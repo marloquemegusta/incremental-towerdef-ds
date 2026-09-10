@@ -7,32 +7,21 @@ Bullet g_bullets[MAX_BULLETS];
 Splatter g_splatters[MAX_SPLATTERS];
 
 const Waypoint g_waypoints[MAX_WAYPOINTS] = {
-    {0, 48},
-    {208, 48},
-    {208, 96},
-    {48, 96},
-    {48, 144},
-    {226, 144}
+    {0, 96},
+    {64, 96},
+    {128, 96},
+    {192, 96},
+    {240, 96},
+    {256, 96}
 };
 
 static int is_pos_valid(int x, int y) {
-    if (y < 18 || y > 165 || x < 12 || x > 244) return 0;
+    // Upper UI / Building roofs reserve
+    if (y < 48 || y > 175 || x < 12 || x > 244) return 0;
     
-    // Bunker collision (Bunker at x: 224..255, y: 128..160)
-    if (x > 215 && y > 120) return 0;
+    // Cannot place directly on highway (y between 72 and 112)
+    if (y >= 72 && y <= 112) return 0;
 
-    // Check distance to trench corridors (corridor width is 32 px)
-    for (int i = 0; i < MAX_WAYPOINTS - 1; i++) {
-        int x0 = g_waypoints[i].x, y0 = g_waypoints[i].y;
-        int x1 = g_waypoints[i + 1].x, y1 = g_waypoints[i + 1].y;
-        if (x0 == x1) {
-            int minY = (y0 < y1) ? y0 : y1, maxY = (y0 < y1) ? y1 : y0;
-            if (y >= minY - 8 && y <= maxY + 8 && abs(x - x0) <= 18) return 0;
-        } else {
-            int minX = (x0 < x1) ? x0 : x1, maxX = (x0 < x1) ? x1 : x0;
-            if (x >= minX - 8 && x <= maxX + 8 && abs(y - y0) <= 18) return 0;
-        }
-    }
     return 1;
 }
 
