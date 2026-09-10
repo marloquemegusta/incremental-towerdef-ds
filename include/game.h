@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "skills.h"
 
 #define SCREEN_W 256
 #define SCREEN_H 192

@@ -1,0 +1,29 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 30, "capture": "boot_prep"},
+    {"tap": {"x": 200, "y": 178}, "frames": 10},
+    {"release": true, "frames": 10, "capture": "workshop_tree_initial"},
+    {"tap": {"x": 90, "y": 40}, "frames": 10},
+    {"release": true, "frames": 10},
+    {"tap": {"x": 200, "y": 146}, "frames": 10},
+    {"release": true, "frames": 10, "capture": "workshop_tree_purchased"},
+    {"tap": {"x": 128, "y": 170}, "frames": 10},
+    {"release": true, "frames": 10},
+    {"drag": {"from": {"x": 30, "y": 180}, "to": {"x": 80, "y": 140}, "frames": 20}},
+    {"release": true, "frames": 10},
+    {"tap": {"x": 80, "y": 96}, "frames": 10},
+    {"release": true, "frames": 5},
+    {"tap": {"x": 200, "y": 10}, "frames": 5},
+    {"release": true, "frames": 10},
+    {"button_down": "R", "frames": 5},
+    {"button_up": "R", "frames": 80, "capture": "combat_mid_wave"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "boot_prep",
+      "to": "workshop_tree_initial",
+      "min_changed_pixels": 100
+    }
+  }
+}

@@ -2,74 +2,94 @@
 
 void telemetry_init_palette(void) {
     // Deep CRT phosphor dark background
-    BG_PALETTE_SUB[0] = RGB15(0, 2, 1) | BIT(15);
+    BG_PALETTE_SUB[0] = RGB15(1, 2, 2) | BIT(15);
 
-    // Bright phosphor green for standard console text
-    for (int i = 1; i < 16; i++) {
-        BG_PALETTE_SUB[i] = RGB15(7, 31, 11) | BIT(15);
+    // Standard console text colors (ANSI 30..37)
+    BG_PALETTE_SUB[1] = RGB15(31, 4, 3)   | BIT(15); // [31m Red Alert
+    BG_PALETTE_SUB[2] = RGB15(5, 31, 10)  | BIT(15); // [32m Phosphor Green
+    BG_PALETTE_SUB[3] = RGB15(31, 25, 4)  | BIT(15); // [33m Amber Gold
+    BG_PALETTE_SUB[4] = RGB15(6, 12, 24)  | BIT(15); // [34m Dark Steel Blue
+    BG_PALETTE_SUB[5] = RGB15(26, 8, 20)  | BIT(15); // [35m Xenos Magenta
+    BG_PALETTE_SUB[6] = RGB15(6, 28, 31)  | BIT(15); // [36m Plasma Cyan
+    BG_PALETTE_SUB[7] = RGB15(31, 31, 30) | BIT(15); // [37m Bone White
+}
+
+static void make_bar(char *buf, int val, int max_val, int len, char fill_ch, char empty_ch) {
+    int filled = (max_val > 0) ? (val * len) / max_val : 0;
+    if (filled < 0) filled = 0;
+    if (filled > len) filled = len;
+    for (int i = 0; i < len; i++) {
+        buf[i] = (i < filled) ? fill_ch : empty_ch;
     }
-    // High-contrast accents
-    BG_PALETTE_SUB[3] = RGB15(31, 26, 0) | BIT(15); // Amber
-    BG_PALETTE_SUB[1] = RGB15(31, 4, 4) | BIT(15);  // Alert Red
+    buf[len] = '\0';
 }
 
 void telemetry_render_top(void) {
-    printf("\x1b[0;0H\x1b[32m");
+    printf("\x1b[0;0H");
 
-    const char *st = "STANDBY - READY       ";
-    if (g_game.mode == MODE_WAVE) {
-        st = (g_game.fast_forward == 2) ? "PURGING XENOS [2X]    " : "PURGING XENOS [1X]    ";
-    } else if (g_game.mode == MODE_WORKSHOP) {
-        st = (g_game.core_hp <= 0) ? "SANCTUM BREACHED!     " : "SECTOR SANCTIFIED!    ";
-    }
-
+    // Tactical calculations
     int shots = g_turret.shots_fired;
     int hits = g_turret.hits_confirmed;
-    int wasted = g_turret.wasted_shots;
-    
     int acc_int = (shots > 0) ? (hits * 100) / shots : 0;
     int acc_dec = (shots > 0) ? ((hits * 1000) / shots) % 10 : 0;
-    int wst_int = (shots > 0) ? (wasted * 100) / shots : 0;
+    int wasted_pct = (shots > 0) ? (g_turret.wasted_shots * 100) / shots : 0;
 
-    int dps_int = 0;
-    int dps_dec = 0;
+    int dps_int = 0, dps_dec = 0;
     if (g_game.sim_ticks_elapsed > 10) {
         int dps_scaled = (g_turret.damage_dealt * 600) / g_game.sim_ticks_elapsed;
         dps_int = dps_scaled / 10;
         dps_dec = dps_scaled % 10;
     }
 
-    printf("\x1b[33m++ AUSPEX COGITATOR - M41.82 ++\x1b[32m\n");
-    printf("===============================\n");
-    printf(" BASTION SECTOR: THETA-7       \n");
-    printf(" HULL INTEGRITY: [%02d/%02d]      \n", g_game.core_hp, g_game.core_max_hp);
-    printf(" SACRED TITHE:   \x1b[33m%-5d\x1b[32m         \n", g_game.scrap);
-    printf(" STATUS: %s\n", st);
-    printf("-------------------------------\n");
-    printf(" XENOS BIO-MASS DETECTIONS:    \n");
-    printf("  Active Organisms: %3d/%-3d   \n", g_game.enemies_alive, TOTAL_WAVE_ENEMIES);
-    printf("  Confirmed Purges: %-3d       \n", g_game.enemies_killed);
-    printf("  Bastion Breaches: %-3d       \n", g_game.enemies_breached);
-    printf("-------------------------------\n");
-    printf(" HEAVY BOLTER SERVO-BATTERY:   \n");
-    printf("  Munitions Fired:  %-5d      \n", shots);
-    printf("  Confirmed Impacts:%-5d      \n", hits);
-    printf("  Target Accuracy:  %3d.%d%%    \n", acc_int, acc_dec);
-    printf("  Wasted Rounds:    %-4d (%2d%%)\n", wasted, wst_int);
-    printf("  Bio-Mass Purged:  %-5d      \n", g_turret.damage_dealt);
-    printf("  Purge Rate:       %3d.%d DPS \n", dps_int, dps_dec);
-    printf("===============================\n");
+    char hull_bar[12];
+    make_bar(hull_bar, g_game.core_hp, g_game.core_max_hp, 10, '#', '-');
+
+    char swarm_bar[12];
+    make_bar(swarm_bar, g_game.enemies_killed, TOTAL_WAVE_ENEMIES, 10, '#', '-');
+    int swarm_pct = (TOTAL_WAVE_ENEMIES > 0) ? (g_game.enemies_killed * 100) / TOTAL_WAVE_ENEMIES : 0;
+
+    const char *doctrine = skills_get_active_doctrine_name();
+    int rps = (g_turret.fire_interval > 0) ? (60 / g_turret.fire_interval) : 10;
+
+    // Header Status
+    const char *st_short = (g_game.core_hp <= 0) ? "BREACH" :
+                          (g_game.mode == MODE_WAVE) ? "PURGE " :
+                          (g_game.mode == MODE_WORKSHOP) ? "FORGE " : "READY ";
+
+    printf("\x1b[1;2H\x1b[33m+----------------------------+");
+    printf("\x1b[2;2H| ++ AUSPEX COGITATOR M41 ++ |");
+    printf("\x1b[3;2H| BASTION:THETA-7 WAVE:%02d/09 |", g_game.wave_number);
+    printf("\x1b[4;2H\x1b[32m| HULL: [%s] %02d/%02d |", hull_bar, g_game.core_hp, g_game.core_max_hp);
+    printf("\x1b[5;2H| TITHE:%-5dSC  STAT:\x1b[37m%-6s\x1b[32m|", g_game.scrap, st_short);
+    printf("\x1b[6;2H\x1b[33m+----------------------------+");
+    printf("\x1b[7;2H| >> XENOS SWARM AUSPEX <<   |\x1b[32m");
+    printf("\x1b[8;2H| PURGED: [%s] %3d%%  |", swarm_bar, swarm_pct);
+    printf("\x1b[9;2H| ACTIVE:%-3d   KILLED:%-3d   |", g_game.enemies_alive, g_game.enemies_killed);
+    printf("\x1b[10;2H| BREACH:%-3d   THREAT:T0..T2 |", g_game.enemies_breached);
+    printf("\x1b[11;2H\x1b[33m+----------------------------+");
+    printf("\x1b[12;2H| >> BATTERY DOCTRINE <<     |\x1b[32m");
+    printf("\x1b[13;2H| RITE:\x1b[37m%-22s\x1b[32m|", doctrine);
+    printf("\x1b[14;2H| PURGE RATE: %3d.%d DPS     |", dps_int, dps_dec);
+    printf("\x1b[15;2H| ACC:%3d.%d%%  HITS:%-4d    |", acc_int, acc_dec, hits);
+    printf("\x1b[16;2H| SHOTS:%-5d WASTED:%2d%%     |", shots, wasted_pct);
+    printf("\x1b[17;2H| CADENCE:%2d/s DMG:+%d AP:+%d |", rps, g_skill_tree.bonus_damage, g_skill_tree.bonus_ap);
+    printf("\x1b[18;2H\x1b[33m+----------------------------+");
+    printf("\x1b[19;2H| >> BASTION ORDERS <<       |\x1b[32m");
 
     if (g_game.mode == MODE_PREPARATION) {
-        printf(" [PURGE WAVE] = ENGAGE RITES  \n");
-        printf(" Stylus: Position & Aim Arc   \n");
+        printf("\x1b[20;2H| [PURGE] = ENGAGE RITES     |");
+        printf("\x1b[21;2H| Stylus: Emplace & Aim Arc  |");
     } else if (g_game.mode == MODE_WAVE) {
-        printf(" Rites of Destruction active...\n");
-        printf(" [R] / [COG 2X] = Fast Compute \n");
+        printf("\x1b[20;2H| Destruction Rites Active   |");
+        printf("\x1b[21;2H| [COG 2X] / [R] Fast Compute|");
     } else {
-        printf(" OMNISSIAH REQUISITION FORGE   \n");
-        printf(" Sanctify Upgrades & Re-engage \n");
+        printf("\x1b[20;2H| OMNISSIAH ARSENAL FORGE    |");
+        printf("\x1b[21;2H| Sanctify Rites & Re-engage |");
     }
+
+    const char *spd_str = (g_game.fast_forward == 2) ? "[COG 2X VELOZ]" : "[1X ESTANDAR] ";
+    printf("\x1b[22;2H| COMPUTE: \x1b[33m%-18s\x1b[32m|", spd_str);
+    printf("\x1b[23;2H\x1b[33m+----------------------------+\x1b[32m");
 }
 
 int main(void) {
