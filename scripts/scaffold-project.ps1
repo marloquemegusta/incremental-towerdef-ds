@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][string]$ProjectPath)
-$ErrorActionPreference = 'Stop'
+if (-not (Test-Path -LiteralPath $ProjectPath)) { New-Item -ItemType Directory -Force -Path $ProjectPath | Out-Null }
 $root = (Resolve-Path -LiteralPath $ProjectPath).Path
 foreach ($dir in @('source','include','tests','scenarios','tools','artifacts','.ds-game-dev','docs')) { New-Item -ItemType Directory -Force -Path (Join-Path $root $dir) | Out-Null }
 if (-not (Test-Path (Join-Path $root '.ds-game-dev\project.json'))) {
