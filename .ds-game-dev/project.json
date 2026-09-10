@@ -1,0 +1,19 @@
+{
+    "hostTests": [],
+    "blocksdsImage": "skylyrac/blocksds:slim-latest",
+    "romUploadName": "game.nds",
+    "copy": [
+        {
+            "source": "source",
+            "destination": "arm9/source"
+        },
+        {
+            "source": "include",
+            "destination": "arm9/include"
+        }
+    ],
+    "scenarioDirectory": "scenarios",
+    "buildTemplate": "skill-default",
+    "rom": "game.nds",
+    "outputRom": "game-blocksds.nds"
+}

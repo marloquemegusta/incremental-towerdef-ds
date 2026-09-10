@@ -1,0 +1,25 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 40, "capture": "boot_prep"},
+    {"drag": {"from": {"x": 30, "y": 180}, "to": {"x": 120, "y": 70}, "frames": 20}},
+    {"release": true, "frames": 10, "capture": "turret_placed"},
+    {"tap": {"x": 120, "y": 120}, "frames": 10},
+    {"release": true, "frames": 5, "capture": "turret_aimed"},
+    {"tap": {"x": 200, "y": 10}, "frames": 5},
+    {"release": true, "frames": 120, "capture": "wave_simulating"},
+    {"button_down": "R", "frames": 5},
+    {"button_up": "R", "frames": 180, "capture": "wave_fast_forward"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "boot_prep",
+      "to": "wave_simulating",
+      "min_changed_pixels": 50
+    },
+    "screen_changes": [
+      {"from": "boot_prep", "to": "turret_placed", "min_changed_pixels": 20},
+      {"from": "turret_placed", "to": "wave_simulating", "min_changed_pixels": 50}
+    ]
+  }
+}
