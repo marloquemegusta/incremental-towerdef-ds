@@ -1,0 +1,12 @@
+{
+  "rom": "ds-stylophone.nds",
+  "steps": [
+    {"frames": 300, "capture": "before"},
+    {"button_down": "START", "frames": 2},
+    {"button_up": "START", "frames": 2, "capture": "after_start"},
+    {"drag": {"from": {"x": 10, "y": 80}, "to": {"x": 50, "y": 80}, "frames": 8}, "capture": "after_drag"}
+  ],
+  "assertions": {
+    "screen_changed": {"from": "before", "to": "after_start", "min_changed_pixels": 1}
+  }
+}

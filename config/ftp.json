@@ -1,0 +1,8 @@
+{
+  "host": "192.168.1.151",
+  "port": 5000,
+  "remoteDirectory": "/roms/nds",
+  "remoteName": "game.nds",
+  "user": "anonymous",
+  "password": ""
+}
