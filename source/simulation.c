@@ -2,7 +2,7 @@
 #include "enemy_data.h"
 
 GameContext g_game;
-Turret g_turret;
+Turret g_turrets[MAX_TURRETS];
 Enemy g_enemies[MAX_ENEMIES];
 Bullet g_bullets[MAX_BULLETS];
 Splatter g_splatters[MAX_SPLATTERS];
@@ -45,7 +45,7 @@ void game_add_splatter(int x, int y, uint16_t color) {
 
 void game_init(void) {
     memset(&g_game, 0, sizeof(g_game));
-    memset(&g_turret, 0, sizeof(g_turret));
+    memset(g_turrets, 0, sizeof(g_turrets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_splatters, 0, sizeof(g_splatters));
@@ -56,20 +56,37 @@ void game_init(void) {
     g_game.core_max_hp = 20;
     g_game.scrap = 25; // Initial Mechanicus Tithe Grant
     g_game.fast_forward = 1;
-    g_game.turret_dock_count = 1;
-    g_game.selected_turret = -1;
+    g_game.turret_dock_count = 2; // Extra batteries available
+    g_game.selected_turret = 0;
 
-    // Heavy Bolter Default Profile
-    g_turret.center_angle = 64; // Aim straight down into middle trench
-    g_turret.current_angle = 64;
-    g_turret.sweep_amplitude = 16; // 45 deg total
-    g_turret.sweep_speed = 1;
-    g_turret.sweep_dir = 1;
-    g_turret.fire_interval = 8;
-    g_turret.range = 75;
-    g_turret.placed = 0;
-    g_turret.active = 0;
-    g_turret.flash_timer = 0;
+    // Heavy Bolter Default Profile for Turret 0
+    g_turrets[0].id = 0;
+    g_turrets[0].x = 100;
+    g_turrets[0].y = 136; // In open plaza south of highway
+    g_turrets[0].center_angle = 192; // Aim upwards towards highway
+    g_turrets[0].current_angle = 192;
+    g_turrets[0].sweep_amplitude = 16; // 45 deg total
+    g_turrets[0].sweep_speed = 1;
+    g_turrets[0].sweep_dir = 1;
+    g_turrets[0].fire_interval = 8;
+    g_turrets[0].range = 75;
+    g_turrets[0].placed = 1;
+    g_turrets[0].active = 1;
+    g_turrets[0].flash_timer = 0;
+
+    for (int i = 1; i < MAX_TURRETS; i++) {
+        g_turrets[i].id = i;
+        g_turrets[i].center_angle = 192;
+        g_turrets[i].current_angle = 192;
+        g_turrets[i].sweep_amplitude = 16;
+        g_turrets[i].sweep_speed = 1;
+        g_turrets[i].sweep_dir = 1;
+        g_turrets[i].fire_interval = 8;
+        g_turrets[i].range = 75;
+        g_turrets[i].placed = 0;
+        g_turrets[i].active = 0;
+    }
+
     skills_init();
 }
 
@@ -86,34 +103,38 @@ void game_reset_to_prep(void) {
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_splatters, 0, sizeof(g_splatters));
 
-    g_turret.shots_fired = 0;
-    g_turret.hits_confirmed = 0;
-    g_turret.wasted_shots = 0;
-    g_turret.damage_dealt = 0;
-    g_turret.fire_cooldown = 0;
-    g_turret.flash_timer = 0;
-
-    // Apply Mechanicus Skills from Branching Tree
     int interval = 8 - g_skill_tree.bonus_firerate;
     if (interval < 3) interval = 3;
-    g_turret.fire_interval = interval;
-    g_turret.sweep_speed = 1;
+
+    for (int t = 0; t < MAX_TURRETS; t++) {
+        g_turrets[t].shots_fired = 0;
+        g_turrets[t].hits_confirmed = 0;
+        g_turrets[t].wasted_shots = 0;
+        g_turrets[t].damage_dealt = 0;
+        g_turrets[t].fire_cooldown = 0;
+        g_turrets[t].flash_timer = 0;
+        g_turrets[t].fire_interval = interval;
+        g_turrets[t].sweep_speed = 1;
+    }
 }
 
 void game_start_wave(void) {
-    if (!g_turret.placed) {
-        g_turret.x = 100;
-        g_turret.y = 136; // In open plaza south of highway
-        g_turret.center_angle = 192; // Aim upwards towards highway
-        g_turret.current_angle = 192;
-        g_turret.placed = 1;
-        g_turret.active = 1;
-        g_game.turret_dock_count = 0;
+    int any_placed = 0;
+    for (int t = 0; t < MAX_TURRETS; t++) {
+        if (g_turrets[t].placed) { any_placed = 1; break; }
+    }
+    if (!any_placed) {
+        g_turrets[0].x = 100;
+        g_turrets[0].y = 136;
+        g_turrets[0].center_angle = 192;
+        g_turrets[0].current_angle = 192;
+        g_turrets[0].placed = 1;
+        g_turrets[0].active = 1;
     }
 
     game_reset_to_prep();
     g_game.mode = MODE_WAVE;
-    g_game.selected_turret = -1;
+    g_game.selected_turret = 0;
 }
 
 static void spawn_enemy(void) {
@@ -142,16 +163,18 @@ static void spawn_enemy(void) {
     }
 }
 
-static void spawn_bullet(int x, int y, int angle) {
+static void spawn_bullet(int x, int y, int angle, int turret_idx) {
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (!g_bullets[i].active) {
             g_bullets[i].active = 1;
+            g_bullets[i].turret_idx = turret_idx;
             g_bullets[i].x = TO_FP(x);
             g_bullets[i].y = TO_FP(y);
             // Speed = 4 pixels per frame
             g_bullets[i].vx = (fixed_cos(angle) * 4);
             g_bullets[i].vy = (fixed_sin(angle) * 4);
-            g_bullets[i].life = (g_turret.range / 4) + 2;
+            int rng = (turret_idx >= 0 && turret_idx < MAX_TURRETS) ? g_turrets[turret_idx].range : 75;
+            g_bullets[i].life = (rng / 4) + 2;
             break;
         }
     }
@@ -240,47 +263,50 @@ void game_update_simulation(void) {
         }
     }
 
-    // 4. Update Heavy Bolter Turret
-    if (g_turret.placed && g_turret.active) {
-        if (g_turret.flash_timer > 0) g_turret.flash_timer--;
-        if (g_turret.barrel_recoil_l > 0) g_turret.barrel_recoil_l--;
-        if (g_turret.barrel_recoil_r > 0) g_turret.barrel_recoil_r--;
+    // 4. Update Heavy Bolter Turrets (All deployed units)
+    for (int t = 0; t < MAX_TURRETS; t++) {
+        Turret *tur = &g_turrets[t];
+        if (!tur->placed || !tur->active) continue;
 
-        g_turret.current_angle += g_turret.sweep_dir * g_turret.sweep_speed;
+        if (tur->flash_timer > 0) tur->flash_timer--;
+        if (tur->barrel_recoil_l > 0) tur->barrel_recoil_l--;
+        if (tur->barrel_recoil_r > 0) tur->barrel_recoil_r--;
 
-        int min_ang = g_turret.center_angle - g_turret.sweep_amplitude;
-        int max_ang = g_turret.center_angle + g_turret.sweep_amplitude;
+        tur->current_angle += tur->sweep_dir * tur->sweep_speed;
 
-        if (g_turret.current_angle >= max_ang) {
-            g_turret.current_angle = max_ang;
-            g_turret.sweep_dir = -1;
-        } else if (g_turret.current_angle <= min_ang) {
-            g_turret.current_angle = min_ang;
-            g_turret.sweep_dir = 1;
+        int min_ang = tur->center_angle - tur->sweep_amplitude;
+        int max_ang = tur->center_angle + tur->sweep_amplitude;
+
+        if (tur->current_angle >= max_ang) {
+            tur->current_angle = max_ang;
+            tur->sweep_dir = -1;
+        } else if (tur->current_angle <= min_ang) {
+            tur->current_angle = min_ang;
+            tur->sweep_dir = 1;
         }
 
-        if (g_turret.fire_cooldown > 0) {
-            g_turret.fire_cooldown--;
+        if (tur->fire_cooldown > 0) {
+            tur->fire_cooldown--;
         } else {
-            g_turret.fire_cooldown = g_turret.fire_interval;
-            g_turret.flash_timer = 2;
-            g_turret.last_barrel = 1 - g_turret.last_barrel;
+            tur->fire_cooldown = tur->fire_interval;
+            tur->flash_timer = 2;
+            tur->last_barrel = 1 - tur->last_barrel;
             // Explosive snap back: set timer to 4
-            if (g_turret.last_barrel == 0) {
-                g_turret.barrel_recoil_l = 4;
+            if (tur->last_barrel == 0) {
+                tur->barrel_recoil_l = 4;
             } else {
-                g_turret.barrel_recoil_r = 4;
+                tur->barrel_recoil_r = 4;
             }
 
-            int ang = g_turret.current_angle & 0xFF;
+            int ang = tur->current_angle & 0xFF;
             int perp_x = -fixed_sin(ang);
             int perp_y = fixed_cos(ang);
-            int s = (g_turret.last_barrel == 0) ? -3 : 3;
-            int bx = g_turret.x + ((perp_x * s) >> FP_SHIFT);
-            int by = g_turret.y + ((perp_y * s) >> FP_SHIFT);
+            int s = (tur->last_barrel == 0) ? -3 : 3;
+            int bx = tur->x + ((perp_x * s) >> FP_SHIFT);
+            int by = tur->y + ((perp_y * s) >> FP_SHIFT);
 
-            spawn_bullet(bx, by, ang);
-            g_turret.shots_fired++;
+            spawn_bullet(bx, by, ang, t);
+            tur->shots_fired++;
         }
     }
 
@@ -306,11 +332,19 @@ void game_update_simulation(void) {
                 hit = 1;
                 int dmg = 1 + g_skill_tree.bonus_damage;
                 g_enemies[e].hp -= dmg;
-                g_turret.damage_dealt += dmg;
+                int tid = g_bullets[b].turret_idx;
+                if (tid >= 0 && tid < MAX_TURRETS) {
+                    g_turrets[tid].damage_dealt += dmg;
+                    g_turrets[tid].hits_confirmed++;
+                }
+
                 if (g_enemies[e].hp <= 0) {
                     g_enemies[e].active = 0;
                     g_game.enemies_alive--;
                     g_game.enemies_killed++;
+                    if (tid >= 0 && tid < MAX_TURRETS) {
+                        g_turrets[tid].kills++;
+                    }
                     int reward = g_enemy_types[g_enemies[e].variant].scrap_value + (g_skill_tree.bonus_ap > 0 ? 1 : 0);
                     g_game.scrap += reward;
 
@@ -318,7 +352,6 @@ void game_update_simulation(void) {
                     uint16_t splat_col = (g_enemies[e].variant == 0 || g_enemies[e].variant == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
                     game_add_splatter(ex, ey, splat_col);
                 }
-                g_turret.hits_confirmed++;
                 g_bullets[b].active = 0;
                 break;
             }
@@ -326,7 +359,10 @@ void game_update_simulation(void) {
 
         if (!hit) {
             if (g_bullets[b].life <= 0 || bx < 0 || bx >= SCREEN_W || by < 0 || by >= SCREEN_H) {
-                g_turret.wasted_shots++;
+                int tid = g_bullets[b].turret_idx;
+                if (tid >= 0 && tid < MAX_TURRETS) {
+                    g_turrets[tid].wasted_shots++;
+                }
                 g_bullets[b].active = 0;
             }
         }
@@ -359,10 +395,10 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
         }
 
         // [RECALL] Button: (56..104, 2..16)
-        if (g_game.selected_turret >= 0 && g_turret.placed) {
+        if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed) {
             if (touch.px >= 56 && touch.px <= 104 && touch.py >= 2 && touch.py <= 16) {
-                g_turret.placed = 0;
-                g_turret.active = 0;
+                g_turrets[g_game.selected_turret].placed = 0;
+                g_turrets[g_game.selected_turret].active = 0;
                 g_game.turret_dock_count++;
                 g_game.selected_turret = -1;
                 return;
@@ -384,20 +420,23 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
         }
 
         // Touch on placed turret: select it
-        if (g_turret.placed) {
-            int d = abs(touch.px - g_turret.x) + abs(touch.py - g_turret.y);
-            if (d <= 16) {
-                g_game.selected_turret = 0;
-                return;
+        for (int t = 0; t < MAX_TURRETS; t++) {
+            if (g_turrets[t].placed) {
+                int d = abs(touch.px - g_turrets[t].x) + abs(touch.py - g_turrets[t].y);
+                if (d <= 16) {
+                    g_game.selected_turret = t;
+                    return;
+                }
             }
         }
 
         // If turret selected and touch is outside: orient angle
-        if (g_game.selected_turret >= 0 && g_turret.placed && touch.py > 20 && touch.py < 165) {
-            int dy = touch.py - g_turret.y;
-            int dx = touch.px - g_turret.x;
-            g_turret.center_angle = fixed_atan2(dy, dx);
-            g_turret.current_angle = g_turret.center_angle;
+        if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed && touch.py > 20 && touch.py < 165) {
+            Turret *st = &g_turrets[g_game.selected_turret];
+            int dy = touch.py - st->y;
+            int dx = touch.px - st->x;
+            st->center_angle = fixed_atan2(dy, dx);
+            st->current_angle = st->center_angle;
             return;
         }
 
@@ -408,23 +447,39 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
         if (g_game.is_dragging_new) {
             g_game.drag_x = touch.px;
             g_game.drag_y = touch.py;
-        } else if (g_game.selected_turret >= 0 && g_turret.placed) {
-            int dy = touch.py - g_turret.y;
-            int dx = touch.px - g_turret.x;
+        } else if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed) {
+            Turret *st = &g_turrets[g_game.selected_turret];
+            int dy = touch.py - st->y;
+            int dx = touch.px - st->x;
             if (abs(dy) + abs(dx) > 10) {
-                g_turret.center_angle = fixed_atan2(dy, dx);
-                g_turret.current_angle = g_turret.center_angle;
+                st->center_angle = fixed_atan2(dy, dx);
+                st->current_angle = st->center_angle;
             }
         }
     } else {
         if (g_game.is_dragging_new) {
             if (game_is_pos_valid(g_game.drag_x, g_game.drag_y)) {
-                g_turret.x = g_game.drag_x;
-                g_turret.y = g_game.drag_y;
-                g_turret.placed = 1;
-                g_turret.active = 1;
-                g_game.turret_dock_count--;
-                g_game.selected_turret = 0;
+                int slot = -1;
+                for (int t = 0; t < MAX_TURRETS; t++) {
+                    if (!g_turrets[t].placed) { slot = t; break; }
+                }
+                if (slot >= 0) {
+                    g_turrets[slot].x = g_game.drag_x;
+                    g_turrets[slot].y = g_game.drag_y;
+                    g_turrets[slot].placed = 1;
+                    g_turrets[slot].active = 1;
+                    g_turrets[slot].center_angle = 192;
+                    g_turrets[slot].current_angle = 192;
+                    g_turrets[slot].sweep_amplitude = 16;
+                    g_turrets[slot].sweep_speed = 1;
+                    g_turrets[slot].sweep_dir = 1;
+                    int interval = 8 - g_skill_tree.bonus_firerate;
+                    if (interval < 3) interval = 3;
+                    g_turrets[slot].fire_interval = interval;
+                    g_turrets[slot].range = 75;
+                    g_game.turret_dock_count--;
+                    g_game.selected_turret = slot;
+                }
             }
             g_game.is_dragging_new = 0;
         }
