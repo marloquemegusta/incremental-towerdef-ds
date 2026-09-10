@@ -303,7 +303,7 @@ void renderer_draw_ui_prep(void) {
     renderer_draw_text(6, 10, hp_txt, (g_game.core_hp > 6) ? COLOR_LED_GREEN : COLOR_LED_RED);
 
     // If turret selected, show [RECALL] button: (x: 56..104, y: 2..15)
-    if (g_game.selected_turret >= 0 && g_turret.placed) {
+    if (g_game.selected_turret >= 0 && g_game.selected_turret < MAX_TURRETS && g_turrets[g_game.selected_turret].placed) {
         renderer_fill_rect(56, 2, 48, 14, COLOR_HAZARD_BLACK);
         renderer_draw_rect(56, 2, 48, 14, COLOR_RED);
         renderer_fill_rect(59, 5, 4, 8, COLOR_LED_RED);

@@ -15,6 +15,9 @@
 #define MAX_BULLETS 64
 #define MAX_WAYPOINTS 6
 #define MAX_SPLATTERS 32
+#define MAX_TURRETS 4
+
+#include "telemetry_gfx.h"
 
 // Fixed point math: Q8 (256 = 1.0)
 #define FP_SHIFT 8
@@ -103,10 +106,12 @@ typedef struct {
     int last_barrel;     // 0 = left, 1 = right
 
     // Metrics
+    int id;
     int shots_fired;
     int hits_confirmed;
     int wasted_shots;
     int damage_dealt;
+    int kills;
 } Turret;
 
 typedef struct {
@@ -114,6 +119,7 @@ typedef struct {
     int vx, vy; // Q8 fixed point
     int life;
     int active;
+    int turret_idx;
 } Bullet;
 
 typedef struct {
@@ -162,7 +168,8 @@ typedef struct {
 
 // Global declarations
 extern GameContext g_game;
-extern Turret g_turret;
+extern Turret g_turrets[MAX_TURRETS];
+#define g_turret g_turrets[0]
 extern Enemy g_enemies[MAX_ENEMIES];
 extern Bullet g_bullets[MAX_BULLETS];
 extern Splatter g_splatters[MAX_SPLATTERS];

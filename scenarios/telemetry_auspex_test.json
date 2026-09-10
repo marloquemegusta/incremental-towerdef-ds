@@ -1,0 +1,38 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 30, "capture": "top_tab0_batteries"},
+    {"button_down": "R", "frames": 5},
+    {"button_up": "R", "frames": 25, "capture": "top_tab1_swarm"},
+    {"button_down": "R", "frames": 5},
+    {"button_up": "R", "frames": 25, "capture": "top_tab2_forge"},
+    {"button_down": "L", "frames": 5},
+    {"button_up": "L", "frames": 5},
+    {"button_down": "L", "frames": 5},
+    {"button_up": "L", "frames": 15},
+    {"button_down": "A", "frames": 5},
+    {"button_up": "A", "frames": 25, "capture": "top_tab0_gonioradar"},
+    {"button_down": "RIGHT", "frames": 10},
+    {"button_up": "RIGHT", "frames": 5},
+    {"button_down": "Y", "frames": 10},
+    {"button_up": "Y", "frames": 25, "capture": "top_gonioradar_calibrated"},
+    {"button_down": "B", "frames": 5},
+    {"button_up": "B", "frames": 15},
+    {"tap": {"x": 200, "y": 10}, "frames": 5},
+    {"release": true, "frames": 10},
+    {"frames": 120, "capture": "top_tab0_combat_stats"},
+    {"button_down": "A", "frames": 5},
+    {"button_up": "A", "frames": 40, "capture": "top_gonioradar_combat"},
+    {"button_down": "B", "frames": 5},
+    {"button_up": "B", "frames": 5},
+    {"button_down": "R", "frames": 5},
+    {"button_up": "R", "frames": 40, "capture": "top_combat_telemetry"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "top_tab0_batteries",
+      "to": "top_tab1_swarm",
+      "min_changed_pixels": 100
+    }
+  }
+}

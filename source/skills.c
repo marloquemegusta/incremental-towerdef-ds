@@ -112,7 +112,9 @@ int skills_try_purchase(int node_id) {
     // Apply directly to Heavy Bolter battery
     int new_interval = 8 - g_skill_tree.bonus_firerate;
     if (new_interval < 3) new_interval = 3;
-    g_turret.fire_interval = new_interval;
+    for (int t = 0; t < MAX_TURRETS; t++) {
+        g_turrets[t].fire_interval = new_interval;
+    }
 
     return 1;
 }
