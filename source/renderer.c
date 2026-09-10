@@ -202,15 +202,6 @@ void renderer_draw_text(int x, int y, const char *str, uint16_t color) {
 
 void renderer_draw_trench_path(void) {
     tiles_render_sector1_map();
-
-    // Adeptus Mechanicus Bunker HP Bar (over Bunker at tile (13,8))
-    int hp_width = (g_game.core_hp * 26) / g_game.core_max_hp;
-    if (hp_width < 0) hp_width = 0;
-    renderer_fill_rect(211, 124, 26, 3, COLOR_HAZARD_BLACK);
-    if (hp_width > 0) {
-        uint16_t hp_col = (g_game.core_hp > 6) ? COLOR_LED_GREEN : COLOR_LED_RED;
-        renderer_fill_rect(211, 124, hp_width, 3, hp_col);
-    }
 }
 
 void renderer_draw_turret(const Turret *t, int is_selected, int show_cone) {
@@ -250,7 +241,7 @@ void renderer_draw_enemies(void) {
         if (!g_enemies[i].active) continue;
         int ex = FROM_FP(g_enemies[i].x);
         int ey = FROM_FP(g_enemies[i].y);
-        tiles_draw_xenos(ex, ey, g_enemies[i].dir, g_enemies[i].anim_frame);
+        tiles_draw_xenos(ex, ey, g_enemies[i].dir, g_enemies[i].anim_frame, g_enemies[i].variant);
     }
 }
 
@@ -296,12 +287,28 @@ void renderer_draw_ui_prep(void) {
         renderer_draw_pixel(x + 1, 17, COLOR_HAZARD_YELLOW);
     }
 
-    // [PURGE / START] Button: (x: 170..252, y: 2..15)
-    renderer_fill_rect(170, 2, 82, 14, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(170, 2, 82, 14, COLOR_HAZARD_YELLOW);
-    // Green activation LED
-    renderer_fill_rect(173, 5, 4, 8, COLOR_LED_GREEN);
-    renderer_draw_text(182, 6, "PURGE WAVE", COLOR_HAZARD_YELLOW);
+    // Sanctuary Core Hull Integrity Bar: (x: 6..54, y: 3..14)
+    renderer_draw_text(6, 3, "HULL", COLOR_WHITE);
+    renderer_fill_rect(24, 3, 26, 6, COLOR_HAZARD_BLACK);
+    renderer_draw_rect(24, 3, 26, 6, COLOR_IRON_BORDER);
+    int hp_width = (g_game.core_hp * 24) / g_game.core_max_hp;
+    if (hp_width < 0) hp_width = 0;
+    if (hp_width > 24) hp_width = 24;
+    if (hp_width > 0) {
+        uint16_t hp_col = (g_game.core_hp > 6) ? COLOR_LED_GREEN : COLOR_LED_RED;
+        renderer_fill_rect(25, 4, hp_width, 4, hp_col);
+    }
+    char hp_txt[8];
+    sprintf(hp_txt, "%d", g_game.core_hp);
+    renderer_draw_text(6, 10, hp_txt, (g_game.core_hp > 6) ? COLOR_LED_GREEN : COLOR_LED_RED);
+
+    // If turret selected, show [RECALL] button: (x: 56..104, y: 2..15)
+    if (g_game.selected_turret >= 0 && g_turret.placed) {
+        renderer_fill_rect(56, 2, 48, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(56, 2, 48, 14, COLOR_RED);
+        renderer_fill_rect(59, 5, 4, 8, COLOR_LED_RED);
+        renderer_draw_text(66, 6, "RECALL", COLOR_WHITE);
+    }
 
     // Fast-Forward [2X] Button: (x: 110..164, y: 2..15)
     uint16_t ff_led = (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_DARK_GRAY;
@@ -310,13 +317,12 @@ void renderer_draw_ui_prep(void) {
     renderer_fill_rect(113, 5, 4, 8, ff_led);
     renderer_draw_text(122, 6, "COG 2X", (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_IRON_LIGHT);
 
-    // If turret selected, show [RECALL] button: (x: 48..104, y: 2..15)
-    if (g_game.selected_turret >= 0 && g_turret.placed) {
-        renderer_fill_rect(48, 2, 56, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(48, 2, 56, 14, COLOR_RED);
-        renderer_fill_rect(51, 5, 4, 8, COLOR_LED_RED);
-        renderer_draw_text(60, 6, "RECALL", COLOR_WHITE);
-    }
+    // [PURGE / START] Button: (x: 170..252, y: 2..15)
+    renderer_fill_rect(170, 2, 82, 14, COLOR_HAZARD_BLACK);
+    renderer_draw_rect(170, 2, 82, 14, COLOR_HAZARD_YELLOW);
+    // Green activation LED
+    renderer_fill_rect(173, 5, 4, 8, COLOR_LED_GREEN);
+    renderer_draw_text(182, 6, "PURGE WAVE", COLOR_HAZARD_YELLOW);
 
     // 2. Bottom Armory Dock (y: 168..191)
     renderer_fill_rect(0, 168, SCREEN_W, 24, COLOR_IRON_PANEL);
@@ -340,20 +346,7 @@ void renderer_draw_ui_prep(void) {
         int gx = g_game.drag_x;
         int gy = g_game.drag_y;
 
-        // Validity check
-        int valid = (gy >= 24 && gy <= 158 && gx >= 12 && gx <= 244);
-        for (int i = 0; i < MAX_WAYPOINTS - 1; i++) {
-            int x0 = g_waypoints[i].x, y0 = g_waypoints[i].y;
-            int x1 = g_waypoints[i + 1].x, y1 = g_waypoints[i + 1].y;
-            if (x0 == x1) {
-                int minY = (y0 < y1) ? y0 : y1, maxY = (y0 < y1) ? y1 : y0;
-                if (gy >= minY - 14 && gy <= maxY + 14 && abs(gx - x0) <= 16) valid = 0;
-            } else {
-                int minX = (x0 < x1) ? x0 : x1, maxX = (x0 < x1) ? x1 : x0;
-                if (gx >= minX - 14 && gx <= maxX + 14 && abs(gy - y0) <= 16) valid = 0;
-            }
-        }
-
+        int valid = game_is_pos_valid(gx, gy);
         uint16_t ghost_col = valid ? COLOR_HAZARD_YELLOW : COLOR_LED_RED;
         renderer_draw_circle(gx, gy, 7, ghost_col, 0);
         renderer_draw_circle(gx, gy, 45, ghost_col, 0);

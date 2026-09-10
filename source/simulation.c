@@ -1,4 +1,5 @@
 #include "game.h"
+#include "enemy_data.h"
 
 GameContext g_game;
 Turret g_turret;
@@ -15,12 +16,17 @@ const Waypoint g_waypoints[MAX_WAYPOINTS] = {
     {256, 96}
 };
 
-static int is_pos_valid(int x, int y) {
-    // Upper UI / Building roofs reserve
-    if (y < 48 || y > 175 || x < 12 || x > 244) return 0;
-    
-    // Cannot place directly on highway (y between 72 and 112)
-    if (y >= 72 && y <= 112) return 0;
+int game_is_pos_valid(int x, int y) {
+    // Continuous pixel placement: valid anywhere on screen within usable bounds
+    // Screen is 256x192. Turret base has a radius of 8 px.
+    if (x < 10 || x > 245) return 0;
+
+    // Must not overlap Top Command Panel (y: 0..18) or Bottom Dock (y: 168..191)
+    if (y < 27 || y > 159) return 0;
+
+    // Highway exclusion zone: Road surface spans y: 80..111 where xenos move.
+    // Turret base (radius 8px) cannot overlap the road:
+    if (y > 71 && y < 120) return 0;
 
     return 1;
 }
@@ -95,9 +101,9 @@ void game_reset_to_prep(void) {
 void game_start_wave(void) {
     if (!g_turret.placed) {
         g_turret.x = 100;
-        g_turret.y = 72; // On catwalk between top & middle trenches
-        g_turret.center_angle = 64; // Aim straight down
-        g_turret.current_angle = 64;
+        g_turret.y = 136; // In open plaza south of highway
+        g_turret.center_angle = 192; // Aim upwards towards highway
+        g_turret.current_angle = 192;
         g_turret.placed = 1;
         g_turret.active = 1;
         g_game.turret_dock_count = 0;
@@ -112,16 +118,16 @@ static void spawn_enemy(void) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) {
             g_enemies[i].active = 1;
-            g_enemies[i].hp = 1;
             g_enemies[i].waypoint_idx = 0;
 
-            // Wide Swarm Dispersion across 32px trench: (-10 to +10 px)
+            // Wide Swarm Dispersion across 32px highway: (-10 to +10 px)
             int offset = ((rand() % 21) - 10);
             g_enemies[i].lateral_offset = TO_FP(offset);
             
             // Speed jitter (0.85 to 1.15 px/frame)
             g_enemies[i].speed = FP_ONE + ((rand() % 61) - 30);
-            g_enemies[i].variant = rand() % 3;
+            g_enemies[i].variant = rand() % ENEMY_VARIANT_COUNT;
+            g_enemies[i].hp = g_enemy_types[g_enemies[i].variant].default_hp;
 
             // Initial position (WP0 is horizontal, so lateral offset is vertical)
             g_enemies[i].x = TO_FP(g_waypoints[0].x);
@@ -212,7 +218,7 @@ void game_update_simulation(void) {
         } else {
             g_enemies[i].dir = (dx > 0) ? 0 : 2; // 0 = East, 2 = West
         }
-        g_enemies[i].anim_frame = (g_game.sim_ticks_elapsed / 8 + i) % 2;
+        g_enemies[i].anim_frame = (g_game.sim_ticks_elapsed / 6 + i) % 4;
 
         if (dx > 0) {
             g_enemies[i].x += (dx < spd) ? dx : spd;
@@ -301,10 +307,11 @@ void game_update_simulation(void) {
                     g_enemies[e].active = 0;
                     g_game.enemies_alive--;
                     g_game.enemies_killed++;
-                    g_game.scrap += (1 + g_game.upgrades.scrap_lvl);
+                    int reward = g_enemy_types[g_enemies[e].variant].scrap_value + g_game.upgrades.scrap_lvl;
+                    g_game.scrap += reward;
 
-                    // Xenos blood splatter
-                    uint16_t splat_col = (g_enemies[e].variant == 0) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
+                    // Xenos ichor / blood splatter
+                    uint16_t splat_col = (g_enemies[e].variant == 0 || g_enemies[e].variant == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
                     game_add_splatter(ex, ey, splat_col);
                 }
                 g_turret.hits_confirmed++;
@@ -348,9 +355,9 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
             return;
         }
 
-        // [RECALL] Button: (48..104, 2..16)
+        // [RECALL] Button: (56..104, 2..16)
         if (g_game.selected_turret >= 0 && g_turret.placed) {
-            if (touch.px >= 48 && touch.px <= 104 && touch.py >= 2 && touch.py <= 16) {
+            if (touch.px >= 56 && touch.px <= 104 && touch.py >= 2 && touch.py <= 16) {
                 g_turret.placed = 0;
                 g_turret.active = 0;
                 g_game.turret_dock_count++;
@@ -402,7 +409,7 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
         }
     } else {
         if (g_game.is_dragging_new) {
-            if (is_pos_valid(g_game.drag_x, g_game.drag_y)) {
+            if (game_is_pos_valid(g_game.drag_x, g_game.drag_y)) {
                 g_turret.x = g_game.drag_x;
                 g_turret.y = g_game.drag_y;
                 g_turret.placed = 1;

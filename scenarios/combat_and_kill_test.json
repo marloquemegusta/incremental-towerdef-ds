@@ -9,7 +9,8 @@
     {"tap": {"x": 200, "y": 10}, "frames": 5},
     {"release": true, "frames": 30},
     {"button_down": "R", "frames": 5},
-    {"button_up": "R", "frames": 500, "capture": "combat_hits"}
+    {"button_up": "R", "frames": 100, "capture": "combat_mid_wave"},
+    {"frames": 400, "capture": "combat_hits"}
   ],
   "assertions": {
     "screen_changed": {

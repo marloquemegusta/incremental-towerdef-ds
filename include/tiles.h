@@ -41,7 +41,7 @@ void tiles_render_map(void);
 void tiles_render_sector1_map(void);
 void tiles_draw_turret_base(int cx, int cy, int is_selected);
 void tiles_draw_twin_bolters(int cx, int cy, int angle, int flash, int recoil_l, int recoil_r, int last_barrel);
-void tiles_draw_xenos(int cx, int cy, int dir, int anim_frame);
+void tiles_draw_xenos(int cx, int cy, int dir, int anim_frame, int variant);
 
 // Sector 1 Data
 extern const uint16_t g_s1_tiles[17][256];
