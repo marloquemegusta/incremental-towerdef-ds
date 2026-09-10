@@ -1,4 +1,5 @@
 #include "tiles.h"
+#include "enemy_data.h"
 
 // Color Palette Shading Ramps
 #define C_BLACK       (RGB15(0, 0, 0) | BIT(15))
@@ -596,75 +597,6 @@ void tiles_draw_twin_bolters(int cx, int cy, int angle, int flash, int recoil_l,
     }
 }
 
-void tiles_draw_xenos(int cx, int cy, int dir, int anim_frame) {
-    int leg = anim_frame ? 1 : 0;
-
-    if (dir == 1) {
-        // Heading SOUTH (+Y)
-        // Symmetrical scuttling legs on left & right
-        renderer_draw_pixel(cx - 3, cy - 2 + leg, C_BLACK);
-        renderer_draw_pixel(cx - 3, cy + 1 - leg, C_BLACK);
-        renderer_draw_pixel(cx + 3, cy - 2 + leg, C_BLACK);
-        renderer_draw_pixel(cx + 3, cy + 1 - leg, C_BLACK);
-
-        // Body outline & Purple organic flanks
-        renderer_draw_rect(cx - 2, cy - 3, 5, 7, C_BLACK);
-        renderer_fill_rect(cx - 1, cy - 2, 3, 5, C_PURPLE_FLESH);
-
-        // Segmented Bone Chitin Carapace
-        renderer_draw_line(cx - 1, cy - 2, cx - 1, cy + 1, C_BONE_HI);
-        renderer_draw_line(cx, cy - 2, cx, cy + 1, C_BONE_MID);
-        renderer_draw_line(cx + 1, cy - 2, cx + 1, cy + 1, C_BONE_SHD);
-
-        // Neon Green Eyes & Mandibles pointing SOUTH (+Y)
-        renderer_draw_pixel(cx - 1, cy + 3, C_NEON_EYE);
-        renderer_draw_pixel(cx + 1, cy + 3, C_NEON_EYE);
-        renderer_draw_pixel(cx - 1, cy + 4, C_BONE_HI);
-        renderer_draw_pixel(cx + 1, cy + 4, C_BONE_HI);
-        renderer_draw_pixel(cx, cy - 4, C_PURPLE_DARK); // tail
-    } else if (dir == 2) {
-        // Heading WEST (-X)
-        // Legs top & bot
-        renderer_draw_pixel(cx - 1 + leg, cy - 3, C_BLACK);
-        renderer_draw_pixel(cx + 2 - leg, cy - 3, C_BLACK);
-        renderer_draw_pixel(cx - 1 + leg, cy + 3, C_BLACK);
-        renderer_draw_pixel(cx + 2 - leg, cy + 3, C_BLACK);
-
-        renderer_draw_rect(cx - 2, cy - 2, 5, 5, C_BLACK);
-        renderer_fill_rect(cx - 1, cy - 1, 3, 3, C_PURPLE_FLESH);
-
-        // Bone Carapace
-        renderer_draw_line(cx - 1, cy - 1, cx + 2, cy - 1, C_BONE_HI);
-        renderer_draw_line(cx - 1, cy, cx + 2, cy, C_BONE_MID);
-        renderer_draw_line(cx - 1, cy + 1, cx + 2, cy + 1, C_BONE_SHD);
-
-        // Neon Green Eyes & Mandibles pointing WEST (-X)
-        renderer_draw_pixel(cx - 3, cy - 1, C_NEON_EYE);
-        renderer_draw_pixel(cx - 3, cy + 1, C_NEON_EYE);
-        renderer_draw_pixel(cx - 4, cy - 1, C_BONE_HI);
-        renderer_draw_pixel(cx - 4, cy + 1, C_BONE_HI);
-        renderer_draw_pixel(cx + 3, cy, C_PURPLE_DARK); // tail
-    } else {
-        // Heading EAST (+X) (default / dir == 0)
-        // Legs top & bot
-        renderer_draw_pixel(cx - 2 + leg, cy - 3, C_BLACK);
-        renderer_draw_pixel(cx + 1 - leg, cy - 3, C_BLACK);
-        renderer_draw_pixel(cx - 2 + leg, cy + 3, C_BLACK);
-        renderer_draw_pixel(cx + 1 - leg, cy + 3, C_BLACK);
-
-        renderer_draw_rect(cx - 3, cy - 2, 5, 5, C_BLACK);
-        renderer_fill_rect(cx - 2, cy - 1, 3, 3, C_PURPLE_FLESH);
-
-        // Bone Carapace
-        renderer_draw_line(cx - 2, cy - 1, cx + 1, cy - 1, C_BONE_HI);
-        renderer_draw_line(cx - 2, cy, cx + 1, cy, C_BONE_MID);
-        renderer_draw_line(cx - 2, cy + 1, cx + 1, cy + 1, C_BONE_SHD);
-
-        // Neon Green Eyes & Mandibles pointing EAST (+X)
-        renderer_draw_pixel(cx + 3, cy - 1, C_NEON_EYE);
-        renderer_draw_pixel(cx + 3, cy + 1, C_NEON_EYE);
-        renderer_draw_pixel(cx + 4, cy - 1, C_BONE_HI);
-        renderer_draw_pixel(cx + 4, cy + 1, C_BONE_HI);
-        renderer_draw_pixel(cx - 4, cy, C_PURPLE_DARK); // tail
-    }
+void tiles_draw_xenos(int cx, int cy, int dir, int anim_frame, int variant) {
+    enemy_draw_sprite(cx, cy, variant, anim_frame, dir);
 }

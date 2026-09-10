@@ -183,6 +183,7 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_workshop(touchPosition touch, int keys_down, int keys_held);
 void game_reset_to_prep(void);
 void game_add_splatter(int x, int y, uint16_t color);
+int game_is_pos_valid(int x, int y);
 
 // Renderer
 void renderer_init(void);
