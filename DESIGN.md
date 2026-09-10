@@ -46,7 +46,21 @@ $$\text{Daño Recibido} = \max(1, \text{Daño Bala} - \text{Armadura Enemigo})$$
 
 ---
 
-## 4. Progresión Incremental (De 20 a 20.000.000)
+## 4. Jerarquía Oficial de Amenazas Xenos (6 Tiers)
+Selección oficial de enemigos para el motor de juego (con todas las 18 variantes preservadas en `assets/sprites/enemies/`):
+
+| Tier | Enemigo Oficial | Tamaño | Rol & Comportamiento | Stats Base |
+| :--- | :--- | :---: | :--- | :--- |
+| **Tier 0** | **0A. Micro-Larva Rastrera** | $2 \times 2$ px | Horda masiva milimétrica (100+ en pantalla). Se estira y encoge. | 1 HP \| 0 Arm \| 1 Chatarra |
+| **Tier 1** | **1A. Ripper Devorador** | $6 \times 4$ px | Parásito carnívoro con ondulación continua en S y mordisco voraz. | 8 HP \| 0 Arm \| 3 Chatarra |
+| **Tier 2** | **2A. Gárgola Bio-Scout** | $9 \times 9$ px | Volador ágil con aleteo rítmico membranoso y bio-aguijón venenoso. | 35 HP \| 0 Arm \| 12 Chatarra |
+| **Tier 3** | **3A. Ravener Serpiente** | $14 \times 10$ px | Excavador acorazado con onda espinal sinusoidal y 4 guadañas de hueso. | 160 HP \| 2 Arm \| 60 Chatarra |
+| **Tier 4** | **4B. Haruspex Fauces Vivas** | $20 \times 20$ px | Bestia de asedio pesada con boca circular dentada y tentáculos prensiles. | 2.8k HP \| 5 Arm \| 850 Chatarra |
+| **Tier 5** | **5A. Bio-Titán Hierofante** | $28 \times 28$ px | Coloso arácnido de 4 zancas titánicas, chimeneas de bio-humo y cañones. | 40k HP \| 8 Arm \| 20.000 Chatarra |
+
+---
+
+## 5. Progresión Incremental (De 20 a 20.000.000)
 - **Densidad de Biomasa (40-120 sprites en pantalla):** En lugar de dibujar miles de sprites que saturen la pantalla y el ARM9, los enemigos evolucionan en masa de biomasa, vida y valor de chatarra (Sector 1: 2 HP / 1 chatarra; Sector 3: 50.000 HP / 25.000 chatarra).
 - **Multiplicadores Compuestos Intra-Run:**
   $$\text{Ganancia Chatarra} = (\text{Base}) \times (\text{Reciclaje Taller}) \times (\text{Combo Racha}) \times (\text{Interés Diezmo})$$

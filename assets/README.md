@@ -28,8 +28,12 @@ assets/
 │   │   └── bolter_particle_casing_spin_strip.png
 │   │
 │   └── enemies/
-│       ├── ds_enemies_1x.png                # Micro-sprites direccionales de xenos a resolución nativa DS
-│       └── ds_enemies_8x.png                # Micro-sprites direccionales escalados a 8x Nearest Neighbor
+│       ├── enemy_animated_roster.gif        # Catálogo maestro animado con todas las 18 propuestas en movimiento
+│       ├── enemy_trench_battle.gif          # Simulación animada de combate en trinchera de 32px (Nintendo DS)
+│       ├── enemy_proposals_sheet.png        # Hoja estática de propuestas con telemetría y stats
+│       ├── t0_a_anim.gif ... t5_c_anim.gif  # GIFs animados individuales de cada propuesta (4 frames)
+│       ├── t0_a_1x.png ... t5_c_1x.png      # Sprites estáticos nativos 1:1
+│       └── t0_a_8x.png ... t5_c_8x.png      # Sprites escalados 8x Nearest Neighbor
 │
 └── screenshots/
     ├── wide_prep.png                        # Pantalla de preparación con trinchera continua de 32px
