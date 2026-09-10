@@ -201,7 +201,7 @@ void renderer_draw_text(int x, int y, const char *str, uint16_t color) {
 }
 
 void renderer_draw_trench_path(void) {
-    tiles_render_map();
+    tiles_render_sector1_map();
 
     // Adeptus Mechanicus Bunker HP Bar (over Bunker at tile (13,8))
     int hp_width = (g_game.core_hp * 26) / g_game.core_max_hp;
