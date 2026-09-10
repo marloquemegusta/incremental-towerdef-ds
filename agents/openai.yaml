@@ -1,0 +1,4 @@
+interface:
+  display_name: "DS Game Development"
+  short_description: "Complete Nintendo DS game development"
+  default_prompt: "Use the bundled DeSmuME agent to test this Nintendo DS ROM with a minimal reproducible scenario and inspect the evidence."

@@ -1,0 +1,11 @@
+{
+  "rom": "ds-stylophone.nds",
+  "steps": [
+    {"frames": 300, "capture": "boot"},
+    {"tap": {"x": 10, "y": 80}, "frames": 30, "capture": "note0"},
+    {"release": true, "frames": 2}
+  ],
+  "assertions": {
+    "screen_changed": {"from": "boot", "to": "note0", "min_changed_pixels": 20}
+  }
+}
