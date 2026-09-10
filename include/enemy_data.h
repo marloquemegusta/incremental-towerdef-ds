@@ -3,7 +3,7 @@
 
 #include <nds.h>
 
-#define ENEMY_VARIANT_COUNT 5
+#define ENEMY_VARIANT_COUNT 6
 
 typedef struct {
     uint8_t w;
@@ -13,8 +13,8 @@ typedef struct {
 
 typedef struct {
     uint8_t frame_count;
-    uint8_t default_hp;
-    uint8_t scrap_value;
+    uint32_t default_hp;
+    uint32_t scrap_value;
     EnemyFrameDef frames[4];
 } EnemyTypeDef;
 

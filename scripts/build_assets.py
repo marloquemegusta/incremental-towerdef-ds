@@ -122,35 +122,36 @@ def build_enemies():
 
     enemy_defs = [
         ("t0_larva", "t0_larva_strip_master_1x.png", 4, 1, 1),
-        ("t1_ripper", "t1_ripper_strip_master_1x.png", 4, 2, 2),
-        ("t2_hormagaunt", "t2_hormagaunt_strip_master_1x.png", 4, 4, 3),
-        ("t3_gargoyle", "t3_gargoyle_strip_master_1x.png", 4, 8, 5),
-        ("t4_ravener", "t4_ravener_strip_master_1x.png", 4, 16, 10),
+        ("t1_ripper", "t1_ripper_strip_master_1x.png", 4, 8, 3),
+        ("t2_hormagaunt", "t2_hormagaunt_strip_master_1x.png", 4, 40, 10),
+        ("t3_ravener", "t3_ravener_strip_master_1x.png", 4, 160, 60),
+        ("t4_carnifex", "t4_carnifex_strip_master_1x.png", 4, 2500, 750),
+        ("t5_hierophant", "t5_hierophant_strip_master_1x.png", 4, 40000, 20000),
     ]
 
     enemy_count = len(enemy_defs)
 
     # Write include/enemy_data.h
     with open("include/enemy_data.h", "w") as fh:
-        fh.write('''#ifndef ENEMY_DATA_H
+        fh.write(f'''#ifndef ENEMY_DATA_H
 #define ENEMY_DATA_H
 
 #include <nds.h>
 
-#define ENEMY_VARIANT_COUNT 5
+#define ENEMY_VARIANT_COUNT {enemy_count}
 
-typedef struct {
+typedef struct {{
     uint8_t w;
     uint8_t h;
     const uint16_t *pixels;
-} EnemyFrameDef;
+}} EnemyFrameDef;
 
-typedef struct {
+typedef struct {{
     uint8_t frame_count;
-    uint8_t default_hp;
-    uint8_t scrap_value;
+    uint32_t default_hp;
+    uint32_t scrap_value;
     EnemyFrameDef frames[4];
-} EnemyTypeDef;
+}} EnemyTypeDef;
 
 extern const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT];
 
