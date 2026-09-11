@@ -1,8 +1,8 @@
-﻿{
+{
   "rom": "game.nds",
   "steps": [
     {"frames": 30, "capture": "prep_mode_initial"},
-    {"drag": {"from": {"x": 30, "y": 180}, "to": {"x": 120, "y": 70}, "frames": 20}},
+    {"drag": {"from": {"x": 20, "y": 183}, "to": {"x": 120, "y": 70}, "frames": 20}},
     {"release": true, "frames": 10, "capture": "prep_turret1_placed"},
     {"button_down": "Y", "frames": 10},
     {"button_up": "Y", "frames": 10, "capture": "prep_turret1_cone_widened"},
@@ -10,7 +10,7 @@
     {"button_up": "START", "frames": 20, "capture": "prep_paused"},
     {"button_down": "START", "frames": 5},
     {"button_up": "START", "frames": 20, "capture": "prep_resumed"},
-    {"tap": {"x": 210, "y": 8}, "frames": 5},
+    {"tap": {"x": 240, "y": 183}, "frames": 5},
     {"release": true, "frames": 40, "capture": "wave_combat_running"},
     {"button_down": "START", "frames": 5},
     {"button_up": "START", "frames": 25, "capture": "wave_combat_paused"},
@@ -35,3 +35,4 @@
     ]
   }
 }
+

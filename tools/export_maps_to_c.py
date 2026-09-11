@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 sys.path.append('tools')
 import generate_sector_maps as gsm
 import random
@@ -16,7 +16,7 @@ maps = [
 print('Generating source/sector1_data.c...')
 with open('source/sector1_data.c', 'w', encoding='utf-8') as f:
     f.write('// Auto-generated Sector 1 High-Fidelity Maps for Nintendo DS\n')
-    f.write('#include game.h\n#include tiles.h\n\n')
+    f.write('#include "game.h"\n#include "tiles.h"\n\n')
     
     for name, img in maps:
         f.write(f'const uint16_t {name}[SCREEN_W * SCREEN_H] __attribute__((aligned(4))) = {{\n')
@@ -32,7 +32,7 @@ with open('source/sector1_data.c', 'w', encoding='utf-8') as f:
 };
 
 static const Waypoint s_map_1_2_wp[6] = {
-    {0, 48}, {208, 48}, {208, 112}, {48, 112}, {48, 176}, {256, 176}
+    {0, 32}, {208, 32}, {208, 96}, {48, 96}, {48, 160}, {256, 160}
 };
 
 static const Waypoint s_map_1_3_wp[5] = {

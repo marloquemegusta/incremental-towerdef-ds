@@ -401,46 +401,46 @@ def build_map_1_1(rand_gen):
 def build_map_1_2(rand_gen):
     grid = [[make_ground_tile(c, r, seed=200 + r*16 + c) for c in range(16)] for r in range(12)]
     
-    # Fila 1 superior: Filas 2 y 3 (Cols 0..11)
-    place_2x2(grid, 2, 0, make_block_h_aligned(feat=None))
-    place_2x2(grid, 2, 2, make_block_h_aligned(feat="stairs"))
-    place_2x2(grid, 2, 4, make_block_h_aligned(feat=None))
-    place_2x2(grid, 2, 6, make_block_h_aligned(feat=None))
-    place_2x2(grid, 2, 8, make_block_h_aligned(feat="drain"))
-    place_2x2(grid, 2, 10, make_block_h_aligned(feat=None))
+    # Fila 1 superior: Filas 1 y 2 (Cols 0..11) — starts at y=16 to keep full map visible
+    place_2x2(grid, 1, 0, make_block_h_aligned(feat=None))
+    place_2x2(grid, 1, 2, make_block_h_aligned(feat="stairs"))
+    place_2x2(grid, 1, 4, make_block_h_aligned(feat=None))
+    place_2x2(grid, 1, 6, make_block_h_aligned(feat=None))
+    place_2x2(grid, 1, 8, make_block_h_aligned(feat="drain"))
+    place_2x2(grid, 1, 10, make_block_h_aligned(feat=None))
     
     # Giro 1: Oeste a Sur en Cols 12..13
-    place_2x2(grid, 2, 12, make_turn_ws_aligned(12 * 16, 2 * 16))
-    # Bajada 1: Filas 4..5, Cols 12..13
-    place_2x2(grid, 4, 12, make_block_v_aligned())
-    # Giro 2: Norte a Oeste en Cols 12..13, Filas 6..7
-    place_2x2(grid, 6, 12, make_turn_sw_aligned(12 * 16, 6 * 16))
+    place_2x2(grid, 1, 12, make_turn_ws_aligned(12 * 16, 1 * 16))
+    # Bajada 1: Filas 3..4, Cols 12..13
+    place_2x2(grid, 3, 12, make_block_v_aligned())
+    # Giro 2: Norte a Oeste en Cols 12..13, Filas 5..6
+    place_2x2(grid, 5, 12, make_turn_sw_aligned(12 * 16, 5 * 16))
     
-    # Fila 2 media hacia Oeste: Filas 6 y 7 (Cols 10..4)
-    place_2x2(grid, 6, 10, make_block_h_aligned(feat=None))
-    place_2x2(grid, 6, 8, make_block_h_aligned(feat="pipe"))
-    place_2x2(grid, 6, 6, make_block_h_aligned(feat=None))
-    place_2x2(grid, 6, 4, make_block_h_aligned(feat=None))
+    # Fila 2 media hacia Oeste: Filas 5 y 6 (Cols 10..4)
+    place_2x2(grid, 5, 10, make_block_h_aligned(feat=None))
+    place_2x2(grid, 5, 8, make_block_h_aligned(feat="pipe"))
+    place_2x2(grid, 5, 6, make_block_h_aligned(feat=None))
+    place_2x2(grid, 5, 4, make_block_h_aligned(feat=None))
     
-    # Giro 3: Este a Sur en Cols 2..3, Filas 6..7
-    place_2x2(grid, 6, 2, make_turn_es_aligned(2 * 16, 6 * 16))
-    # Bajada 2: Filas 8..9, Cols 2..3
-    place_2x2(grid, 8, 2, make_block_v_aligned())
-    # Giro 4: Norte a Este en Cols 2..3, Filas 10..11
-    place_2x2(grid, 10, 2, make_turn_se_aligned(2 * 16, 10 * 16))
+    # Giro 3: Este a Sur en Cols 2..3, Filas 5..6
+    place_2x2(grid, 5, 2, make_turn_es_aligned(2 * 16, 5 * 16))
+    # Bajada 2: Filas 7..8, Cols 2..3
+    place_2x2(grid, 7, 2, make_block_v_aligned())
+    # Giro 4: Norte a Este en Cols 2..3, Filas 9..10
+    place_2x2(grid, 9, 2, make_turn_se_aligned(2 * 16, 9 * 16))
     
-    # Fila 3 inferior hacia Este: Filas 10 y 11 (Cols 4..15)
-    place_2x2(grid, 10, 4, make_block_h_aligned(feat=None))
-    place_2x2(grid, 10, 6, make_block_h_aligned(feat="stairs"))
-    place_2x2(grid, 10, 8, make_block_h_aligned(feat=None))
-    place_2x2(grid, 10, 10, make_block_h_aligned(feat="drain"))
-    place_2x2(grid, 10, 12, make_block_h_aligned(feat=None))
-    place_2x2(grid, 10, 14, make_block_h_aligned(feat=None))
+    # Fila 3 inferior hacia Este: Filas 9 y 10 (Cols 4..15) — ends at y=176, within safe zone
+    place_2x2(grid, 9, 4, make_block_h_aligned(feat=None))
+    place_2x2(grid, 9, 6, make_block_h_aligned(feat="stairs"))
+    place_2x2(grid, 9, 8, make_block_h_aligned(feat=None))
+    place_2x2(grid, 9, 10, make_block_h_aligned(feat="drain"))
+    place_2x2(grid, 9, 12, make_block_h_aligned(feat=None))
+    place_2x2(grid, 9, 14, make_block_h_aligned(feat=None))
     
     # Sacos terreros en recodos
-    grid[1][7] = make_sandbags()
-    grid[5][8] = make_sandbags()
-    grid[9][7] = make_sandbags()
+    grid[0][7] = make_sandbags()
+    grid[4][8] = make_sandbags()
+    grid[8][7] = make_sandbags()
     return grid
 
 def build_map_1_3(rand_gen):
@@ -557,14 +557,14 @@ maps_data = [
         (larva_f0, 145, 112, 0), (larva_f1, 175, 110, 0), (larva_f0, 205, 114, 0)
     ]),
     
-    # MAPA 1-2: LA DOBLE S RETORCIDA
+    # MAPA 1-2: LA DOBLE S RETORCIDA (fila superior en y=32, media en y=96, inferior en y=160)
     ("map_1_2_s_curve", "M2: DOBLE S", "OLA 2/4 (ZIG-ZAG)", build_map_1_2(rng), [
-        ("bolter", 115, 75, 180, 35),
-        ("lascannon", 110, 170, 345, 25),
+        ("bolter", 115, 60, 180, 35),
+        ("lascannon", 110, 155, 345, 25),
     ], [
-        (ripper_f0, 30, 48, 0), (gaunt_f0, 80, 48, 0),
-        (gaunt_f1, 200, 75, 1), (ravener_f0, 150, 112, 2), (ripper_f1, 100, 112, 2),
-        (gaunt_f0, 48, 140, 1), (larva_f0, 110, 176, 0), (larva_f1, 150, 176, 0)
+        (ripper_f0, 30, 32, 0), (gaunt_f0, 80, 32, 0),
+        (gaunt_f1, 200, 60, 1), (ravener_f0, 150, 96, 2), (ripper_f1, 100, 96, 2),
+        (gaunt_f0, 48, 128, 1), (larva_f0, 110, 160, 0), (larva_f1, 150, 160, 0)
     ]),
     
     # MAPA 1-3: ROTONDA DEL SANCTUM CON ISLA CENTRAL
