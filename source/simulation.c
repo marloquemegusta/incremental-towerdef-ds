@@ -119,93 +119,105 @@ void game_add_splatter(int x, int y, uint16_t color) {
 }
 
 void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
-    // 1. Determine explosion characteristics by enemy tier
+    // 1. Determine base explosion characteristics by enemy tier
     int particle_count = 6;
-    int burst_speed = 3;  // base velocity magnitude
-    int gore_spread = 8;  // radius for initial puddle
-    int puddle_drops = 3;
+    int base_burst_speed = 2;  // base velocity magnitude
+    int gore_spread = 8;       // radius for initial puddle
+    int puddle_drops = 5;
 
     switch (variant) {
         case 0: // T0: Larva (4x4) - Tiny pop
-            particle_count = 6;
-            burst_speed = 2;
+            particle_count = 5;
+            base_burst_speed = 2;
             gore_spread = 6;
-            puddle_drops = 3;
+            puddle_drops = 4;
             break;
         case 1: // T1: Ripper (6x5) - Small spray
-            particle_count = 10;
-            burst_speed = 3;
+            particle_count = 8;
+            base_burst_speed = 2;
             gore_spread = 10;
-            puddle_drops = 5;
+            puddle_drops = 7;
             break;
         case 2: // T2: Hormagaunt (9x9) - Medium bloody burst
-            particle_count = 18;
-            burst_speed = 4;
+            particle_count = 14;
+            base_burst_speed = 3;
             gore_spread = 14;
-            puddle_drops = 8;
+            puddle_drops = 12;
             break;
         case 3: // T3: Ravener (15x11) - Large violent rupture
-            particle_count = 32;
-            burst_speed = 5;
+            particle_count = 24;
+            base_burst_speed = 3;
             gore_spread = 18;
-            puddle_drops = 14;
+            puddle_drops = 18;
             break;
         case 4: // T4: Carnifex (21x21) - Massive heavy explosion
-            particle_count = 60;
-            burst_speed = 6;
+            particle_count = 45;
+            base_burst_speed = 4;
             gore_spread = 24;
-            puddle_drops = 24;
+            puddle_drops = 30;
             break;
         case 5: // T5: Hierophant (30x30) - Colossal bio-cataclysm
-            particle_count = 80;
-            burst_speed = 7;
+            particle_count = 60;
+            base_burst_speed = 5;
             gore_spread = 32;
-            puddle_drops = 36;
+            puddle_drops = 45;
             break;
         default:
-            particle_count = 14;
-            burst_speed = 3;
+            particle_count = 12;
+            base_burst_speed = 2;
             gore_spread = 10;
-            puddle_drops = 6;
+            puddle_drops = 8;
             break;
     }
+
+    // Modulate by user-calibrated explosion_force (1..5, default: 2)
+    int force = g_calibration.explosion_force;
+    if (force < 1) force = 1;
+    if (force > 5) force = 5;
+    // burst_speed scaled gently so particles stay well contained in view
+    // force=1: 60%, force=2: 80%, force=3: 100%, force=4: 120%, force=5: 140%
+    int burst_speed = (base_burst_speed * (60 + (force - 1) * 20)) / 100;
+    if (burst_speed < 1) burst_speed = 1;
+
+    // Particle count slightly scales with force
+    particle_count = (particle_count * (75 + force * 15)) / 100;
 
     // 2. Primary blood colors according to canonical Xenos lore
     uint16_t col_primary = (variant == 0 || variant == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
     uint16_t col_secondary = COLOR_XENOS_FLESH;
     uint16_t col_chitin = COLOR_XENOS_CHITIN;
 
-    // 3. Deposit immediate core blood puddles on the ground
+    // 3. Deposit immediate core blood puddles on the ground (large coverage)
     // Center dense puddle
-    int puddle_size = (variant >= 4) ? 2 : ((variant >= 2) ? 1 : 0);
-    game_add_splatter_ex(x, y, col_primary, puddle_size, 360 + (rand() % 120));
-    if (variant >= 2) {
+    int puddle_size = (variant >= 4) ? 2 : ((variant >= 2) ? 1 : 1);
+    game_add_splatter_ex(x, y, col_primary, puddle_size, 450 + (rand() % 150));
+    if (variant >= 1) {
         // Satellite cluster pools for rich ground coverage
-        game_add_splatter_ex(x - 3, y - 2, col_secondary, (variant >= 4 ? 2 : 1), 360 + (rand() % 120));
-        game_add_splatter_ex(x + 3, y + 2, col_primary, (variant >= 4 ? 2 : 1), 360 + (rand() % 120));
+        game_add_splatter_ex(x - 3, y - 2, col_secondary, (variant >= 4 ? 2 : 1), 450 + (rand() % 150));
+        game_add_splatter_ex(x + 3, y + 2, col_primary, (variant >= 4 ? 2 : 1), 450 + (rand() % 150));
     }
-    if (variant >= 4) {
+    if (variant >= 3) {
         // Extra dense satellite core pools for colossal bio-titans
-        game_add_splatter_ex(x + 2, y - 4, col_chitin, 1, 360 + (rand() % 120));
-        game_add_splatter_ex(x - 2, y + 4, col_primary, 1, 360 + (rand() % 120));
-        game_add_splatter_ex(x - 5, y + 1, col_secondary, 2, 360 + (rand() % 120));
-        game_add_splatter_ex(x + 5, y - 1, col_primary, 2, 360 + (rand() % 120));
+        game_add_splatter_ex(x + 2, y - 4, col_chitin, 1, 450 + (rand() % 150));
+        game_add_splatter_ex(x - 2, y + 4, col_primary, 1, 450 + (rand() % 150));
+        game_add_splatter_ex(x - 5, y + 1, col_secondary, 2, 450 + (rand() % 150));
+        game_add_splatter_ex(x + 5, y - 1, col_primary, 2, 450 + (rand() % 150));
     }
 
-    // Satellite splatter drops (soaking the ground in blood)
+    // Satellite splatter drops (soaking the ground in visceral blood)
     for (int d = 0; d < puddle_drops; d++) {
         int ox = (rand() % (gore_spread * 2 + 1)) - gore_spread;
         int oy = (rand() % (gore_spread * 2 + 1)) - gore_spread;
         uint16_t c = (rand() % 3 == 0) ? col_secondary : col_primary;
-        int sz = (rand() % 3 == 0 && variant >= 2) ? 1 : 0;
-        int dur = 260 + (rand() % 180);
+        int sz = (rand() % 2 == 0 && variant >= 1) ? 1 : 0;
+        int dur = 350 + (rand() % 250);
         game_add_splatter_ex(x + ox, y + oy, c, sz, dur);
     }
 
     // 4. Spawn airborne pseudo-3D ballistic particles (contained velocity)
     int spawned = 0;
-    int bullet_dir_bias_x = bvx / 6; // moderate momentum transfer from projectile
-    int bullet_dir_bias_y = bvy / 6;
+    int bullet_dir_bias_x = bvx / 8; // gentle momentum transfer from projectile
+    int bullet_dir_bias_y = bvy / 8;
 
     for (int i = 0; i < MAX_DEATH_PARTICLES && spawned < particle_count; i++) {
         if (!g_death_particles[i].active) {
@@ -217,7 +229,7 @@ void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
 
             // Radial burst velocities (contained nicely inside the screen)
             int ang = rand() % 256;
-            int spd = (rand() % (burst_speed * 110)) + TO_FP(1);
+            int spd = (rand() % (burst_speed * 90)) + TO_FP(1);
             g_death_particles[i].vx = ((fixed_cos(ang) * spd) >> FP_SHIFT) + bullet_dir_bias_x;
             g_death_particles[i].vy = ((fixed_sin(ang) * spd) >> FP_SHIFT) + bullet_dir_bias_y;
             // Vertical upward ejection velocity
@@ -302,7 +314,8 @@ void game_reset_to_prep(void) {
     g_game.enemies_alive = 0;
     g_game.enemies_killed = 0;
     g_game.enemies_breached = 0;
-    g_game.spawn_timer = 0;
+    g_game.spawn_timer_small = 0;
+    g_game.spawn_timer_large = 0;
     g_game.sim_ticks_elapsed = 0;
 
     memset(g_enemies, 0, sizeof(g_enemies));
@@ -350,7 +363,7 @@ void game_start_wave(void) {
     g_game.selected_turret = 0;
 }
 
-static void spawn_enemy(void) {
+static void spawn_enemy_caste(int is_large) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) {
             g_enemies[i].active = 1;
@@ -363,7 +376,14 @@ static void spawn_enemy(void) {
             // Speed jitter based on calibrated speed (enemy_speed_int is tenths of px/frame)
             int base_spd = (g_calibration.enemy_speed_int > 0) ? ((g_calibration.enemy_speed_int * FP_ONE) / 10) : FP_ONE;
             int jitter = ((rand() % 21) - 10) * (FP_ONE / 100);
-            g_enemies[i].variant = rand() % ENEMY_VARIANT_COUNT;
+            
+            // Small: T0 (Larva), T1 (Ripper), T2 (Hormagaunt)
+            // Large: T3 (Ravener), T4 (Carnifex), T5 (Hierophant)
+            if (is_large) {
+                g_enemies[i].variant = 3 + (rand() % 3);
+            } else {
+                g_enemies[i].variant = rand() % 3;
+            }
             
             // Speed scaled by biocaste (Swarm runs fast, Colossals tread slowly)
             // T0: 1.2x, T1: 1.3x, T2: 1.5x, T3: 1.1x, T4: 0.6x, T5: 0.35x
@@ -421,14 +441,25 @@ void game_update_simulation(void) {
 
     g_game.sim_ticks_elapsed++;
 
-    // 1. Spawning
-    int max_to_spawn = (g_calibration.enemy_count > 0) ? g_calibration.enemy_count : TOTAL_WAVE_ENEMIES;
-    int spawn_delay = (g_calibration.spawn_delay > 0) ? g_calibration.spawn_delay : 10;
+    // 1. Spawning (Supports Infinite Waves when enemy_count == 0)
+    int is_infinite = (g_calibration.enemy_count == 0);
+    int max_to_spawn = is_infinite ? 99999999 : g_calibration.enemy_count;
+    int delay_small = (g_calibration.spawn_delay_small > 0) ? g_calibration.spawn_delay_small : 25;
+    int delay_large = (g_calibration.spawn_delay_large > 0) ? g_calibration.spawn_delay_large : 80;
+
     if (g_game.enemies_spawned < max_to_spawn) {
-        g_game.spawn_timer++;
-        if (g_game.spawn_timer >= spawn_delay) {
-            g_game.spawn_timer = 0;
-            spawn_enemy();
+        g_game.spawn_timer_small++;
+        if (g_game.spawn_timer_small >= delay_small) {
+            g_game.spawn_timer_small = 0;
+            spawn_enemy_caste(0); // Small xenos (T0..T2)
+        }
+    }
+
+    if (g_game.enemies_spawned < max_to_spawn) {
+        g_game.spawn_timer_large++;
+        if (g_game.spawn_timer_large >= delay_large) {
+            g_game.spawn_timer_large = 0;
+            spawn_enemy_caste(1); // Large xenos (T3..T5)
         }
     }
 
@@ -665,8 +696,8 @@ void game_update_simulation(void) {
         }
     }
 
-    // 6. Wave Completion
-    if (g_game.enemies_spawned >= max_to_spawn && g_game.enemies_alive == 0) {
+    // 6. Wave Completion (Never finishes if enemy_count == 0 / infinite)
+    if (g_calibration.enemy_count > 0 && g_game.enemies_spawned >= g_calibration.enemy_count && g_game.enemies_alive == 0) {
         g_game.scrap += 25;
         g_game.wave_number++;
         g_game.mode = MODE_CALIBRATION;
@@ -818,15 +849,17 @@ void calibration_init(void) {
     g_calibration.selected_map = cur_map;
     g_calibration.enemy_count = 12;
     g_calibration.enemy_hp = 15;
-    g_calibration.enemy_speed_int = 8;  // 0.8 px/frame
-    g_calibration.spawn_delay = 40;     // 40 frames
+    g_calibration.enemy_speed_int = 8;     // 0.8 px/frame
+    g_calibration.spawn_delay_small = 25;  // 25 frames (T0-T2: Larva, Ripper, Hormagaunt)
+    g_calibration.spawn_delay_large = 80;  // 80 frames (T3-T5: Ravener, Carnifex, Hierophant)
+    g_calibration.explosion_force = 2;     // 2 (normal/satisfying)
     g_calibration.turret_damage = 5;
-    g_calibration.turret_fire_rate = 8; // 8 frames
-    g_calibration.cone_spread = 35;     // 35 deg
-    g_calibration.sweep_speed = 1;      // 1 deg/frame
-    g_calibration.turret_range = 65;    // 65 px
-    g_calibration.starting_scrap = 150; // 150 $
-    g_calibration.core_lives = 10;      // 10 HP
+    g_calibration.turret_fire_rate = 8;    // 8 frames
+    g_calibration.cone_spread = 35;        // 35 deg
+    g_calibration.sweep_speed = 1;         // 1 deg/frame
+    g_calibration.turret_range = 65;       // 65 px
+    g_calibration.starting_scrap = 150;    // 150 $
+    g_calibration.core_lives = 10;         // 10 HP
     g_calibration.selected_row = cur_sel;
 }
 
@@ -837,9 +870,10 @@ static void modify_param(int row, int delta) {
             map_select(g_calibration.selected_map);
             break;
         case 1:
-            g_calibration.enemy_count += delta * 1;
-            if (g_calibration.enemy_count < 1) g_calibration.enemy_count = 1;
-            if (g_calibration.enemy_count > 60) g_calibration.enemy_count = 60;
+            // 0 = INF, 1..300
+            g_calibration.enemy_count += delta;
+            if (g_calibration.enemy_count < 0) g_calibration.enemy_count = 0;
+            if (g_calibration.enemy_count > 300) g_calibration.enemy_count = 300;
             break;
         case 2:
             g_calibration.enemy_hp += delta * 2;
@@ -847,47 +881,57 @@ static void modify_param(int row, int delta) {
             if (g_calibration.enemy_hp > 100) g_calibration.enemy_hp = 100;
             break;
         case 3:
-            g_calibration.enemy_speed_int += delta * 1;
+            g_calibration.enemy_speed_int += delta;
             if (g_calibration.enemy_speed_int < 3) g_calibration.enemy_speed_int = 3;
             if (g_calibration.enemy_speed_int > 25) g_calibration.enemy_speed_int = 25;
             break;
         case 4:
-            g_calibration.spawn_delay += delta * 5;
-            if (g_calibration.spawn_delay < 5) g_calibration.spawn_delay = 5;
-            if (g_calibration.spawn_delay > 120) g_calibration.spawn_delay = 120;
+            g_calibration.spawn_delay_small += delta * 2;
+            if (g_calibration.spawn_delay_small < 5) g_calibration.spawn_delay_small = 5;
+            if (g_calibration.spawn_delay_small > 180) g_calibration.spawn_delay_small = 180;
             break;
         case 5:
-            g_calibration.turret_damage += delta * 1;
+            g_calibration.spawn_delay_large += delta * 5;
+            if (g_calibration.spawn_delay_large < 10) g_calibration.spawn_delay_large = 10;
+            if (g_calibration.spawn_delay_large > 300) g_calibration.spawn_delay_large = 300;
+            break;
+        case 6:
+            g_calibration.explosion_force += delta;
+            if (g_calibration.explosion_force < 1) g_calibration.explosion_force = 1;
+            if (g_calibration.explosion_force > 5) g_calibration.explosion_force = 5;
+            break;
+        case 7:
+            g_calibration.turret_damage += delta;
             if (g_calibration.turret_damage < 1) g_calibration.turret_damage = 1;
             if (g_calibration.turret_damage > 50) g_calibration.turret_damage = 50;
             break;
-        case 6:
-            g_calibration.turret_fire_rate += delta * 1;
+        case 8:
+            g_calibration.turret_fire_rate += delta;
             if (g_calibration.turret_fire_rate < 3) g_calibration.turret_fire_rate = 3;
             if (g_calibration.turret_fire_rate > 30) g_calibration.turret_fire_rate = 30;
             break;
-        case 7:
+        case 9:
             g_calibration.cone_spread += delta * 5;
             if (g_calibration.cone_spread < 10) g_calibration.cone_spread = 10;
             if (g_calibration.cone_spread > 120) g_calibration.cone_spread = 120;
             break;
-        case 8:
-            g_calibration.sweep_speed += delta * 1;
+        case 10:
+            g_calibration.sweep_speed += delta;
             if (g_calibration.sweep_speed < 1) g_calibration.sweep_speed = 1;
             if (g_calibration.sweep_speed > 6) g_calibration.sweep_speed = 6;
             break;
-        case 9:
+        case 11:
             g_calibration.turret_range += delta * 5;
             if (g_calibration.turret_range < 30) g_calibration.turret_range = 30;
             if (g_calibration.turret_range > 120) g_calibration.turret_range = 120;
             break;
-        case 10:
+        case 12:
             g_calibration.starting_scrap += delta * 25;
             if (g_calibration.starting_scrap < 0) g_calibration.starting_scrap = 0;
             if (g_calibration.starting_scrap > 999) g_calibration.starting_scrap = 999;
             break;
-        case 11:
-            g_calibration.core_lives += delta * 1;
+        case 13:
+            g_calibration.core_lives += delta;
             if (g_calibration.core_lives < 1) g_calibration.core_lives = 1;
             if (g_calibration.core_lives > 50) g_calibration.core_lives = 50;
             break;
@@ -926,11 +970,19 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     if (keys_down & KEY_DOWN) {
         g_calibration.selected_row = (g_calibration.selected_row + 1) % CALIBRATION_ROWS;
     }
+    // Cruceta izquierda / derecha: de 1 en 1
     if (keys_down & KEY_LEFT) {
         modify_param(g_calibration.selected_row, -1);
     }
     if (keys_down & KEY_RIGHT) {
         modify_param(g_calibration.selected_row, 1);
+    }
+    // Botones L / R: de 5 en 5 para acelerar ajuste
+    if (keys_down & KEY_L) {
+        modify_param(g_calibration.selected_row, -5);
+    }
+    if (keys_down & KEY_R) {
+        modify_param(g_calibration.selected_row, 5);
     }
     if (keys_down & KEY_Y) {
         calibration_init();
@@ -965,10 +1017,10 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
             return;
         }
 
-        // Calibration rows: (y: 20 + i * 11)
+        // Calibration rows: (y: 20 + i * 10)
         for (int i = 0; i < CALIBRATION_ROWS; i++) {
-            int ry = 20 + i * 11;
-            if (touch.py >= ry - 1 && touch.py <= ry + 10) {
+            int ry = 20 + i * 10;
+            if (touch.py >= ry - 1 && touch.py <= ry + 9) {
                 g_calibration.selected_row = i;
                 // [-] button: x: 104..128
                 if (touch.px >= 104 && touch.px <= 128) {

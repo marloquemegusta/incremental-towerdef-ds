@@ -472,7 +472,9 @@ void renderer_draw_ui_calibration(void) {
         "ENEMY COUNT",
         "ENEMY HP",
         "ENEMY SPEED",
-        "SPAWN DELAY",
+        "SPAWN DELAY SM",
+        "SPAWN DELAY LG",
+        "EXPLOSION FORCE",
         "TURRET DAMAGE",
         "TURRET CADENCE",
         "CONE SPREAD",
@@ -488,6 +490,8 @@ void renderer_draw_ui_calibration(void) {
         "HP",
         "PX/F",
         "FRAMES",
+        "FRAMES",
+        "X",
         "DMG",
         "FRAMES",
         "DEG",
@@ -499,11 +503,11 @@ void renderer_draw_ui_calibration(void) {
 
     char val_buf[16];
     for (int i = 0; i < CALIBRATION_ROWS; i++) {
-        int y = 20 + i * 11;
+        int y = 20 + i * 10;
         int is_sel = (g_calibration.selected_row == i);
 
         if (is_sel) {
-            renderer_fill_rect(4, y - 1, 248, 10, COLOR_IRON_BORDER);
+            renderer_fill_rect(4, y - 1, 248, 9, COLOR_IRON_BORDER);
             renderer_draw_text(6, y + 1, ">", COLOR_HAZARD_YELLOW);
         }
 
@@ -516,17 +520,22 @@ void renderer_draw_ui_calibration(void) {
                 else if (g_calibration.selected_map == 1) sprintf(val_buf, "DOBLE S");
                 else sprintf(val_buf, "ROTONDA");
                 break;
-            case 1: sprintf(val_buf, "%d", g_calibration.enemy_count); break;
+            case 1:
+                if (g_calibration.enemy_count == 0) sprintf(val_buf, "INF");
+                else sprintf(val_buf, "%d", g_calibration.enemy_count);
+                break;
             case 2: sprintf(val_buf, "%d", g_calibration.enemy_hp); break;
             case 3: sprintf(val_buf, "%d.%d", g_calibration.enemy_speed_int / 10, g_calibration.enemy_speed_int % 10); break;
-            case 4: sprintf(val_buf, "%d", g_calibration.spawn_delay); break;
-            case 5: sprintf(val_buf, "%d", g_calibration.turret_damage); break;
-            case 6: sprintf(val_buf, "%d", g_calibration.turret_fire_rate); break;
-            case 7: sprintf(val_buf, "%d", g_calibration.cone_spread); break;
-            case 8: sprintf(val_buf, "%d", g_calibration.sweep_speed); break;
-            case 9: sprintf(val_buf, "%d", g_calibration.turret_range); break;
-            case 10: sprintf(val_buf, "%d", g_calibration.starting_scrap); break;
-            case 11: sprintf(val_buf, "%d", g_calibration.core_lives); break;
+            case 4: sprintf(val_buf, "%d", g_calibration.spawn_delay_small); break;
+            case 5: sprintf(val_buf, "%d", g_calibration.spawn_delay_large); break;
+            case 6: sprintf(val_buf, "%d", g_calibration.explosion_force); break;
+            case 7: sprintf(val_buf, "%d", g_calibration.turret_damage); break;
+            case 8: sprintf(val_buf, "%d", g_calibration.turret_fire_rate); break;
+            case 9: sprintf(val_buf, "%d", g_calibration.cone_spread); break;
+            case 10: sprintf(val_buf, "%d", g_calibration.sweep_speed); break;
+            case 11: sprintf(val_buf, "%d", g_calibration.turret_range); break;
+            case 12: sprintf(val_buf, "%d", g_calibration.starting_scrap); break;
+            case 13: sprintf(val_buf, "%d", g_calibration.core_lives); break;
             default: sprintf(val_buf, "0"); break;
         }
 
@@ -547,22 +556,22 @@ void renderer_draw_ui_calibration(void) {
         renderer_draw_text(204, y + 1, units[i], COLOR_DARK_GRAY);
     }
 
-    // Bottom Controls Bar (y: 156..191)
-    renderer_fill_rect(0, 156, SCREEN_W, 36, COLOR_IRON_PANEL);
-    renderer_draw_line(0, 156, SCREEN_W - 1, 156, COLOR_IRON_BORDER);
+    // Bottom Controls Bar (y: 160..191)
+    renderer_fill_rect(0, 160, SCREEN_W, 32, COLOR_IRON_PANEL);
+    renderer_draw_line(0, 160, SCREEN_W - 1, 160, COLOR_IRON_BORDER);
 
-    renderer_draw_text(8, 158, "CRUCETA: SELECCIONAR / MODIFICAR", COLOR_IRON_LIGHT);
+    renderer_draw_text(6, 162, "CRUCETA: +/-1  L/R: +/-5", COLOR_IRON_LIGHT);
 
     // [DEFAULT (Y)] Button
-    renderer_fill_rect(6, 168, 76, 20, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(6, 168, 76, 20, COLOR_IRON_LIGHT);
-    renderer_draw_text(10, 175, "RESET [Y]", COLOR_WHITE);
+    renderer_fill_rect(6, 172, 76, 17, COLOR_HAZARD_BLACK);
+    renderer_draw_rect(6, 172, 76, 17, COLOR_IRON_LIGHT);
+    renderer_draw_text(10, 177, "RESET [Y]", COLOR_WHITE);
 
     // [PROBAR PARTIDA (A)] Button
-    renderer_fill_rect(86, 168, 164, 20, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(86, 168, 164, 20, COLOR_HAZARD_YELLOW);
-    renderer_fill_rect(90, 172, 6, 12, COLOR_LED_GREEN);
-    renderer_draw_text(102, 175, "PROBAR PARTIDA [A]", COLOR_HAZARD_YELLOW);
+    renderer_fill_rect(86, 172, 164, 17, COLOR_HAZARD_BLACK);
+    renderer_draw_rect(86, 172, 164, 17, COLOR_HAZARD_YELLOW);
+    renderer_fill_rect(90, 175, 6, 11, COLOR_LED_GREEN);
+    renderer_draw_text(102, 177, "PROBAR PARTIDA [A]", COLOR_HAZARD_YELLOW);
 }
 
 void renderer_present(void) {

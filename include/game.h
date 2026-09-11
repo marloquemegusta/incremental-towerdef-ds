@@ -151,22 +151,24 @@ typedef enum {
     MODE_CALIBRATION
 } GameMode;
 
-#define CALIBRATION_ROWS 12
+#define CALIBRATION_ROWS 14
 
 typedef struct {
-    int enemy_count;          // 5..50, default: 12
-    int enemy_hp;             // 5..60, default: 15
-    int enemy_speed_int;      // speed in tenths of px/f: 4..20 (0.4..2.0), default: 8
-    int spawn_delay;          // 15..90 frames, default: 40
-    int turret_damage;        // 2..25, default: 5
-    int turret_fire_rate;     // 4..20 frames, default: 8
-    int cone_spread;          // 10..90 deg, default: 35
-    int sweep_speed;          // 1..4 deg/f, default: 1
-    int turret_range;         // 40..90 px, default: 65
-    int starting_scrap;       // 50..500 $, default: 150
-    int core_lives;           // 1..30 HP, default: 10
+    int enemy_count;          // 0..300, 0 = INF, default: 12
+    int enemy_hp;             // 5..100, default: 15
+    int enemy_speed_int;      // speed in tenths of px/f: 3..25 (0.3..2.5), default: 8
+    int spawn_delay_small;    // 5..120 frames, default: 25 (T0-T2: Larva, Ripper, Hormagaunt)
+    int spawn_delay_large;    // 15..240 frames, default: 80 (T3-T5: Ravener, Carnifex, Hierophant)
+    int explosion_force;      // 1..5 multiplier, default: 2 (1=soft, 2=normal, 3=energetic, 4=extreme, 5=cataclysm)
+    int turret_damage;        // 1..50, default: 5
+    int turret_fire_rate;     // 3..30 frames, default: 8
+    int cone_spread;          // 10..120 deg, default: 35
+    int sweep_speed;          // 1..6 deg/f, default: 1
+    int turret_range;         // 30..120 px, default: 65
+    int starting_scrap;       // 0..999 $, default: 150
+    int core_lives;           // 1..50 HP, default: 10
     int selected_map;         // 0..2 (0=Trinchera, 1=Doble S, 2=Rotonda)
-    int selected_row;         // 0..11
+    int selected_row;         // 0..13
 } RunCalibration;
 
 extern RunCalibration g_calibration;
@@ -188,7 +190,8 @@ typedef struct {
     int enemies_alive;
     int enemies_killed;
     int enemies_breached;
-    int spawn_timer;
+    int spawn_timer_small;
+    int spawn_timer_large;
 
     int fast_forward;
     int sim_ticks_elapsed;
