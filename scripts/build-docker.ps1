@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$ProjectPath)
+param([string]$ProjectPath = '.')
 $ErrorActionPreference = 'Stop'
 $project = (Resolve-Path -LiteralPath $ProjectPath).Path
 $skill = Split-Path -Parent $PSScriptRoot

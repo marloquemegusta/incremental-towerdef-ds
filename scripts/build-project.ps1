@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)] [string]$ProjectPath,
+    [string]$ProjectPath = '.',
     [string]$OutputRom
 )
 

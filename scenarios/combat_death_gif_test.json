@@ -1,0 +1,22 @@
+﻿{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 40, "capture": "boot_prep"},
+    {"drag": {"from": {"x": 30, "y": 180}, "to": {"x": 72, "y": 152}, "frames": 20}},
+    {"release": true, "frames": 10},
+    {"tap": {"x": 72, "y": 96}, "frames": 10},
+    {"release": true, "frames": 5},
+    {"tap": {"x": 200, "y": 10}, "frames": 5},
+    {"release": true, "frames": 30},
+    {"button_down": "R", "frames": 5},
+    {"button_up": "R", "frames": 100, "capture": "combat_mid_wave"},
+    {"frames": 220, "capture_sequence": "combat_anim", "capture_every": 2, "capture": "combat_hits"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "boot_prep",
+      "to": "combat_hits",
+      "min_changed_pixels": 100
+    }
+  }
+}
