@@ -246,6 +246,11 @@ int telemetry_gfx_is_detail_mode(void) { return s_detail_mode; }
 void telemetry_gfx_update(int keys_down, int keys_held) {
     if (g_game.mode == MODE_CALIBRATION) return;
 
+    // Synchronize selection with g_game.selected_turret if modified externally (e.g. touch)
+    if (g_game.selected_turret >= 0 && g_game.selected_turret < MAX_TURRETS) {
+        s_selected_turret = g_game.selected_turret;
+    }
+
     // 1. Tab Switching with L / R
     if (keys_down & KEY_L) {
         s_active_tab = (s_active_tab + 2) % 3;
@@ -275,26 +280,26 @@ void telemetry_gfx_update(int keys_down, int keys_held) {
             s_selected_turret = (s_selected_turret + 1) % MAX_TURRETS;
             g_game.selected_turret = s_selected_turret;
         }
+    }
 
-        // Live Calibration on selected placed turret
-        if (s_selected_turret >= 0 && s_selected_turret < MAX_TURRETS && g_turrets[s_selected_turret].placed) {
-            Turret *t = &g_turrets[s_selected_turret];
+    // 3. Live Calibration on selected placed turret (available anytime in prep, wave, or pause)
+    if (s_selected_turret >= 0 && s_selected_turret < MAX_TURRETS && g_turrets[s_selected_turret].placed) {
+        Turret *t = &g_turrets[s_selected_turret];
 
-            // D-Pad Left / Right: Rotate central axis
-            if ((keys_down & KEY_LEFT) || ((keys_held & KEY_LEFT) && (g_game.sim_ticks_elapsed % 4 == 0))) {
-                t->center_angle = (t->center_angle - 4) & 0xFF;
-            }
-            if ((keys_down & KEY_RIGHT) || ((keys_held & KEY_RIGHT) && (g_game.sim_ticks_elapsed % 4 == 0))) {
-                t->center_angle = (t->center_angle + 4) & 0xFF;
-            }
+        // D-Pad Left / Right: Rotate central axis
+        if ((keys_down & KEY_LEFT) || ((keys_held & KEY_LEFT) && (g_game.sim_ticks_elapsed % 4 == 0))) {
+            t->center_angle = (t->center_angle - 4) & 0xFF;
+        }
+        if ((keys_down & KEY_RIGHT) || ((keys_held & KEY_RIGHT) && (g_game.sim_ticks_elapsed % 4 == 0))) {
+            t->center_angle = (t->center_angle + 4) & 0xFF;
+        }
 
-            // X / Y: Narrow or Widen sweep cone
-            if (keys_down & KEY_X) {
-                if (t->sweep_amplitude > 4) t->sweep_amplitude -= 2;
-            }
-            if (keys_down & KEY_Y) {
-                if (t->sweep_amplitude < 48) t->sweep_amplitude += 2;
-            }
+        // X / Y: Narrow or Widen sweep cone (on selected turret!)
+        if (keys_down & KEY_X) {
+            if (t->sweep_amplitude > 4) t->sweep_amplitude -= 2;
+        }
+        if (keys_down & KEY_Y) {
+            if (t->sweep_amplitude < 48) t->sweep_amplitude += 2;
         }
     }
 }
@@ -321,10 +326,13 @@ static void render_header(void) {
 
     // Status mode
     const char *st = (g_game.core_hp <= 0) ? "BREACH" :
+                     (g_game.mode == MODE_PAUSED) ? "PAUSE" :
                      (g_game.mode == MODE_WAVE) ? "PURGE" :
                      (g_game.mode == MODE_WORKSHOP) ? "FORGE" : "READY";
+    uint16_t st_col = (g_game.mode == MODE_PAUSED) ? COLOR_AMBER :
+                      (g_game.mode == MODE_WAVE) ? COLOR_LED_RED : COLOR_PHOSPHOR_GREEN;
     top_draw_text(190, 12, "MODE:", COLOR_IRON_LIGHT);
-    top_draw_text(216, 12, st, (g_game.mode == MODE_WAVE) ? COLOR_LED_RED : COLOR_PHOSPHOR_GREEN);
+    top_draw_text(216, 12, st, st_col);
 }
 
 static void render_tab_bar(void) {

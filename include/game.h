@@ -146,6 +146,7 @@ typedef struct {
 typedef enum {
     MODE_PREPARATION = 0,
     MODE_WAVE,
+    MODE_PAUSED,
     MODE_GAME_OVER,
     MODE_WORKSHOP,
     MODE_CALIBRATION
@@ -180,6 +181,7 @@ typedef struct {
 
 typedef struct {
     GameMode mode;
+    GameMode previous_mode;
     int wave_number;
     int core_hp;
     int core_max_hp;
@@ -228,8 +230,11 @@ void game_start_wave(void);
 void game_update_simulation(void);
 void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held);
+void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held);
+void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_workshop(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held);
+void game_toggle_pause(void);
 void game_reset_to_prep(void);
 void map_select(int map_index);
 void calibration_init(void);
@@ -257,6 +262,8 @@ void renderer_draw_bullets(void);
 void renderer_draw_splatters(void);
 void renderer_draw_death_particles(void);
 void renderer_draw_ui_prep(void);
+void renderer_draw_ui_pause(void);
+void renderer_draw_ui_game_over(void);
 void renderer_draw_ui_workshop(void);
 void renderer_draw_ui_calibration(void);
 void renderer_present(void);

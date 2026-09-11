@@ -1,0 +1,37 @@
+﻿{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 30, "capture": "prep_mode_initial"},
+    {"drag": {"from": {"x": 30, "y": 180}, "to": {"x": 120, "y": 70}, "frames": 20}},
+    {"release": true, "frames": 10, "capture": "prep_turret1_placed"},
+    {"button_down": "Y", "frames": 10},
+    {"button_up": "Y", "frames": 10, "capture": "prep_turret1_cone_widened"},
+    {"button_down": "START", "frames": 5},
+    {"button_up": "START", "frames": 20, "capture": "prep_paused"},
+    {"button_down": "START", "frames": 5},
+    {"button_up": "START", "frames": 20, "capture": "prep_resumed"},
+    {"tap": {"x": 210, "y": 8}, "frames": 5},
+    {"release": true, "frames": 40, "capture": "wave_combat_running"},
+    {"button_down": "START", "frames": 5},
+    {"button_up": "START", "frames": 25, "capture": "wave_combat_paused"},
+    {"tap": {"x": 120, "y": 115}, "frames": 5},
+    {"release": true, "frames": 20, "capture": "wave_combat_resumed_touch"},
+    {"tap": {"x": 120, "y": 70}, "frames": 5},
+    {"release": true, "frames": 15, "capture": "wave_turret_selected"},
+    {"button_down": "X", "frames": 10},
+    {"button_up": "X", "frames": 15, "capture": "wave_turret_cone_narrowed"},
+    {"frames": 60, "capture": "wave_running_smooth"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "prep_mode_initial",
+      "to": "wave_combat_paused",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {"from": "prep_mode_initial", "to": "prep_turret1_placed", "min_changed_pixels": 20},
+      {"from": "prep_turret1_placed", "to": "prep_paused", "min_changed_pixels": 50},
+      {"from": "wave_combat_running", "to": "wave_combat_paused", "min_changed_pixels": 80}
+    ]
+  }
+}

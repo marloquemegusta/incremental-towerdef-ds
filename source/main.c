@@ -30,17 +30,26 @@ int main(void) {
             } else {
                 g_game.mode = MODE_CALIBRATION;
             }
+        } else if (keys_down & KEY_START) {
+            // Toggle pause if in wave, prep, or paused
+            if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PREPARATION || g_game.mode == MODE_PAUSED) {
+                game_toggle_pause();
+            }
         } else if (g_game.mode == MODE_CALIBRATION) {
             game_handle_input_calibration(touch, keys_down, keys_held);
+        } else if (g_game.mode == MODE_PAUSED) {
+            game_handle_input_pause(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_PREPARATION) {
             game_handle_input_prep(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_WAVE) {
             game_handle_input_wave(touch, keys_down, keys_held);
-        } else if (g_game.mode == MODE_WORKSHOP || g_game.mode == MODE_GAME_OVER) {
+        } else if (g_game.mode == MODE_WORKSHOP) {
             game_handle_input_workshop(touch, keys_down, keys_held);
+        } else if (g_game.mode == MODE_GAME_OVER) {
+            game_handle_input_game_over(touch, keys_down, keys_held);
         }
 
-        // Simulation update
+        // Simulation update (strictly during active WAVE mode)
         if (g_game.mode == MODE_WAVE) {
             game_update_simulation();
             if (g_game.fast_forward == 2 && g_game.mode == MODE_WAVE) {
@@ -49,7 +58,7 @@ int main(void) {
         }
 
         // Visual render (Bottom Screen)
-        if (g_game.mode == MODE_PREPARATION || g_game.mode == MODE_WAVE) {
+        if (g_game.mode == MODE_PREPARATION || g_game.mode == MODE_WAVE || g_game.mode == MODE_PAUSED || g_game.mode == MODE_GAME_OVER) {
             renderer_draw_trench_path();
             renderer_draw_splatters();
             renderer_draw_enemies();
@@ -65,9 +74,15 @@ int main(void) {
             }
 
             renderer_draw_ui_prep();
+
+            if (g_game.mode == MODE_PAUSED) {
+                renderer_draw_ui_pause();
+            } else if (g_game.mode == MODE_GAME_OVER) {
+                renderer_draw_ui_game_over();
+            }
         } else if (g_game.mode == MODE_CALIBRATION) {
             renderer_draw_ui_calibration();
-        } else {
+        } else if (g_game.mode == MODE_WORKSHOP) {
             renderer_draw_ui_workshop();
         }
 
