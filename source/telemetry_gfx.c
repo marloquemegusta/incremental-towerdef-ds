@@ -246,10 +246,9 @@ int telemetry_gfx_is_detail_mode(void) { return s_detail_mode; }
 void telemetry_gfx_update(int keys_down, int keys_held) {
     if (g_game.mode == MODE_CALIBRATION) return;
 
-    // Synchronize selection with g_game.selected_turret if modified externally (e.g. touch)
-    if (g_game.selected_turret >= 0 && g_game.selected_turret < MAX_TURRETS) {
-        s_selected_turret = g_game.selected_turret;
-    }
+    // Synchronize s_selected_turret from g_game.selected_turret (touch input writes there)
+    // This covers the case where the touch screen selected a turret last frame.
+    s_selected_turret = g_game.selected_turret;
 
     // 1. Tab Switching with L / R
     if (keys_down & KEY_L) {
@@ -271,13 +270,15 @@ void telemetry_gfx_update(int keys_down, int keys_held) {
             s_detail_mode = 0;
         }
 
-        // D-Pad Up / Down: Select turret
+        // D-Pad Up / Down: Select turret — write directly to g_game.selected_turret
         if (keys_down & KEY_UP) {
-            s_selected_turret = (s_selected_turret + MAX_TURRETS - 1) % MAX_TURRETS;
+            int cur = (s_selected_turret >= 0 && s_selected_turret < MAX_TURRETS) ? s_selected_turret : 0;
+            s_selected_turret = (cur + MAX_TURRETS - 1) % MAX_TURRETS;
             g_game.selected_turret = s_selected_turret;
         }
         if (keys_down & KEY_DOWN) {
-            s_selected_turret = (s_selected_turret + 1) % MAX_TURRETS;
+            int cur = (s_selected_turret >= 0 && s_selected_turret < MAX_TURRETS) ? s_selected_turret : 0;
+            s_selected_turret = (cur + 1) % MAX_TURRETS;
             g_game.selected_turret = s_selected_turret;
         }
     }

@@ -22,20 +22,31 @@ int main(void) {
         // Process Top Screen Auspex navigation and calibration
         telemetry_gfx_update(keys_down, keys_held);
 
-        // Bottom Screen Input processing
-        if (keys_down & KEY_SELECT) {
-            if (g_game.mode == MODE_CALIBRATION) {
-                calibration_apply_settings();
-                g_game.mode = MODE_PREPARATION;
-            } else {
-                g_game.mode = MODE_CALIBRATION;
-            }
-        } else if (keys_down & KEY_START) {
-            // Toggle pause if in wave, prep, or paused
+        // Global priority: START always toggles pause in wave/prep/paused
+        if (keys_down & KEY_START) {
             if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PREPARATION || g_game.mode == MODE_PAUSED) {
                 game_toggle_pause();
             }
-        } else if (g_game.mode == MODE_CALIBRATION) {
+        }
+
+        // SELECT: enter/exit calibration, preserving previous mode
+        if (keys_down & KEY_SELECT) {
+            if (g_game.mode == MODE_CALIBRATION) {
+                // Exiting calibration: apply settings (without resetting HP/scrap) and restore previous mode
+                calibration_apply_settings();
+                // Restore to previous mode, defaulting to PREPARATION if not set
+                GameMode restore = g_game.previous_mode;
+                if (restore == MODE_CALIBRATION || restore == MODE_PAUSED) restore = MODE_PREPARATION;
+                g_game.mode = restore;
+            } else if (g_game.mode != MODE_GAME_OVER && g_game.mode != MODE_WORKSHOP) {
+                // Save current mode and enter calibration
+                g_game.previous_mode = g_game.mode;
+                g_game.mode = MODE_CALIBRATION;
+            }
+        }
+
+        // Bottom Screen mode-specific input
+        if (g_game.mode == MODE_CALIBRATION) {
             game_handle_input_calibration(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_PAUSED) {
             game_handle_input_pause(touch, keys_down, keys_held);

@@ -29,9 +29,9 @@ void map_select(int map_index) {
         g_turrets[0].y = 145;
         g_turrets[0].center_angle = 192; // Aim North towards highway
         g_turrets[0].current_angle = 192;
-    } else if (map_index == 1) { // La Doble S
+    } else if (map_index == 1) { // La Doble S (rowshift: fila superior en y=32)
         g_turrets[0].x = 115;
-        g_turrets[0].y = 75;
+        g_turrets[0].y = 60;  // Between upper and middle roads (was 75 before row shift)
         g_turrets[0].center_angle = 64;  // Aim South towards highway
         g_turrets[0].current_angle = 64;
     } else if (map_index == 2) { // Rotonda del Sanctum
@@ -44,7 +44,7 @@ void map_select(int map_index) {
 
 int game_is_pos_valid(int x, int y) {
     if (x < 12 || x > 244) return 0;
-    if (y < 24 || y > 160) return 0;
+    if (y < 4 || y > 168) return 0;
 
     // Check distance to all active road segments
     for (int wp = 0; wp < g_waypoint_count - 1; wp++) {
@@ -715,27 +715,40 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
     }
 
     if (keys_down & KEY_TOUCH) {
-        // [PURGE / START] Button: (194..252, 2..16)
-        if (touch.px >= 194 && touch.px <= 252 && touch.py >= 2 && touch.py <= 16) {
+        // [PURGA / START] Button: (224..254, 174..191) — new single bottom strip
+        if (touch.px >= 224 && touch.px <= 254 && touch.py >= 174) {
             game_start_wave();
             return;
         }
 
-        // [PAUSE] Button: (154..190, 2..16)
-        if (touch.px >= 154 && touch.px <= 190 && touch.py >= 2 && touch.py <= 16) {
+        // [PAUS] Button: (199..221, 174..191)
+        if (touch.px >= 199 && touch.px <= 221 && touch.py >= 174) {
             game_toggle_pause();
             return;
         }
 
-        // [COG 2X] Button: (102..150, 2..16)
-        if (touch.px >= 102 && touch.px <= 150 && touch.py >= 2 && touch.py <= 16) {
+        // [COG 2X] Button: (174..196, 174..191)
+        if (touch.px >= 174 && touch.px <= 196 && touch.py >= 174) {
             g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
             return;
         }
 
-        // [RECALL] Button: (54..98, 2..16)
+        // [FORJA] button: (134..170, 174..191)
+        if (touch.px >= 134 && touch.px <= 170 && touch.py >= 174) {
+            g_game.mode = MODE_WORKSHOP;
+            return;
+        }
+
+        // [CALIB] button: (95..130, 174..191)
+        if (touch.px >= 95 && touch.px <= 130 && touch.py >= 174) {
+            g_game.previous_mode = g_game.mode;
+            g_game.mode = MODE_CALIBRATION;
+            return;
+        }
+
+        // [RECALL] Button: (54..92, 174..191) — only when turret selected and placed
         if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed) {
-            if (touch.px >= 54 && touch.px <= 98 && touch.py >= 2 && touch.py <= 16) {
+            if (touch.px >= 54 && touch.px <= 92 && touch.py >= 174) {
                 g_turrets[g_game.selected_turret].placed = 0;
                 g_turrets[g_game.selected_turret].active = 0;
                 g_game.turret_dock_count++;
@@ -744,23 +757,11 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
             }
         }
 
-        // Dock slot touch: drag Heavy Bolter
-        if (g_game.turret_dock_count > 0 && touch.px >= 8 && touch.px <= 80 && touch.py >= 168) {
+        // [BOLTER dock] slot touch: drag Heavy Bolter (2..50, 174..191)
+        if (g_game.turret_dock_count > 0 && touch.px >= 2 && touch.px <= 50 && touch.py >= 174) {
             g_game.is_dragging_new = 1;
             g_game.drag_x = touch.px;
             g_game.drag_y = touch.py;
-            return;
-        }
-
-        // Dock button touch: open CALIBRAR (x: 84..160, y: 168..191)
-        if (touch.px >= 84 && touch.px <= 160 && touch.py >= 168) {
-            g_game.mode = MODE_CALIBRATION;
-            return;
-        }
-
-        // Dock button touch: open FORGE STC (Branching Skill Tree)
-        if (touch.px >= 164 && touch.px <= 250 && touch.py >= 168) {
-            g_game.mode = MODE_WORKSHOP;
             return;
         }
 
@@ -775,8 +776,8 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
             }
         }
 
-        // If turret selected and touch is outside: orient angle
-        if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed && touch.py > 20 && touch.py < 165) {
+        // If turret selected and touch is outside buttons/turrets: orient angle
+        if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed && touch.py < 174) {
             Turret *st = &g_turrets[g_game.selected_turret];
             int dy = touch.py - st->y;
             int dx = touch.px - st->x;
@@ -839,14 +840,14 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     }
 
     if (keys_down & KEY_TOUCH) {
-        // [COG 2X] Button: (102..150, 2..16)
-        if (touch.px >= 102 && touch.px <= 150 && touch.py >= 2 && touch.py <= 16) {
+        // [COG 2X] Button in bottom strip: (148..170, 174..191)
+        if (touch.px >= 148 && touch.px <= 170 && touch.py >= 174) {
             g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
             return;
         }
 
-        // [PAUSE] Button: (154..190, 2..16)
-        if (touch.px >= 154 && touch.px <= 190 && touch.py >= 2 && touch.py <= 16) {
+        // [PAUSE] Button in bottom strip: (174..196, 174..191)
+        if (touch.px >= 174 && touch.px <= 196 && touch.py >= 174) {
             game_toggle_pause();
             return;
         }
@@ -871,9 +872,9 @@ void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held) 
     }
 
     if (keys_down & KEY_TOUCH) {
-        // Resume button in modal (x: 48..208, y: 104..126) or [PAUSE] button in header (154..190, 2..16)
+        // Resume button in modal (x: 48..208, y: 104..126) or [PAUSE] button in bottom strip (174..196, 174..191)
         if ((touch.px >= 48 && touch.px <= 208 && touch.py >= 104 && touch.py <= 126) ||
-            (touch.px >= 154 && touch.px <= 190 && touch.py >= 2 && touch.py <= 16)) {
+            (touch.px >= 174 && touch.px <= 196 && touch.py >= 174)) {
             game_toggle_pause();
             return;
         }
@@ -1034,9 +1035,9 @@ static void modify_param(int row, int delta) {
 }
 
 void calibration_apply_settings(void) {
-    g_game.core_hp = g_calibration.core_lives;
-    g_game.core_max_hp = g_calibration.core_lives;
-    g_game.scrap = g_calibration.starting_scrap;
+    // NOTE: core_hp/scrap are reset only when starting a new run via calibration_apply_and_start.
+    // Calling calibration_apply_settings mid-game (via SELECT) must NOT reset hull or scrap.
+    // Those are only reset in game_reset_to_prep / game_start_wave.
 
     int base_interval = (g_calibration.turret_fire_rate > 0) ? g_calibration.turret_fire_rate : 8;
     int interval = base_interval - g_skill_tree.bonus_firerate;
@@ -1046,15 +1047,25 @@ void calibration_apply_settings(void) {
     if (half_angle_units < 4) half_angle_units = 4;
 
     for (int t = 0; t < MAX_TURRETS; t++) {
+        // Apply fire rate, speed and range globally (these don't have per-turret customisation)
         g_turrets[t].fire_interval = interval;
-        g_turrets[t].sweep_amplitude = half_angle_units;
         g_turrets[t].sweep_speed = (g_calibration.sweep_speed > 0) ? g_calibration.sweep_speed : 1;
         g_turrets[t].range = (g_calibration.turret_range > 0) ? g_calibration.turret_range : 75;
+
+        // IMPORTANT: Only apply the global cone spread to turrets not yet placed (dock stock).
+        // For placed turrets, preserve the per-turret cone that the player tuned with X/Y.
+        if (!g_turrets[t].placed) {
+            g_turrets[t].sweep_amplitude = half_angle_units;
+        }
     }
 }
 
 void calibration_apply_and_start(void) {
+    // Full new-run reset: apply settings, reset hp and scrap, then start wave
     calibration_apply_settings();
+    g_game.core_hp = g_calibration.core_lives;
+    g_game.core_max_hp = g_calibration.core_lives;
+    g_game.scrap = g_calibration.starting_scrap;
     game_start_wave();
 }
 
@@ -1082,13 +1093,16 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     if (keys_down & KEY_Y) {
         calibration_init();
     }
-    if (keys_down & (KEY_A | KEY_START)) {
+    if (keys_down & KEY_A) {
         calibration_apply_and_start();
         return;
     }
     if (keys_down & KEY_B) {
         calibration_apply_settings();
-        g_game.mode = MODE_PREPARATION;
+        // Restore to previous mode (e.g. MODE_WAVE if paused mid-combat)
+        GameMode restore = g_game.previous_mode;
+        if (restore == MODE_CALIBRATION || restore == MODE_PAUSED) restore = MODE_PREPARATION;
+        g_game.mode = restore;
         return;
     }
 
@@ -1096,7 +1110,9 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         // Header [VOLVER]: (x: 202..252, y: 2..15)
         if (touch.px >= 200 && touch.px <= 254 && touch.py >= 2 && touch.py <= 16) {
             calibration_apply_settings();
-            g_game.mode = MODE_PREPARATION;
+            GameMode restore = g_game.previous_mode;
+            if (restore == MODE_CALIBRATION || restore == MODE_PAUSED) restore = MODE_PREPARATION;
+            g_game.mode = restore;
             return;
         }
 

@@ -358,122 +358,121 @@ void renderer_draw_death_particles(void) {
 }
 
 void renderer_draw_ui_prep(void) {
-    // 1. Top Command Panel (y: 0..17) - Stamped Iron with Hazard Trim
-    renderer_fill_rect(0, 0, SCREEN_W, 18, COLOR_IRON_PANEL);
-    renderer_draw_line(0, 18, SCREEN_W - 1, 18, COLOR_IRON_BORDER);
+    // =========================================================
+    // SINGLE BOTTOM COMMAND DOCK (y: 174..191, 18px tall)
+    // All control buttons are compacted here. The map is fully
+    // visible from y=0..173 with no top strip obstruction.
+    // =========================================================
+    renderer_fill_rect(0, 174, SCREEN_W, 18, COLOR_IRON_PANEL);
+    renderer_draw_line(0, 174, SCREEN_W - 1, 174, COLOR_IRON_BORDER);
 
-    // Hazard accent bar
+    // Hazard accent line at the top of the dock
     for (int x = 0; x < SCREEN_W; x += 4) {
-        renderer_draw_pixel(x, 17, COLOR_HAZARD_YELLOW);
-        renderer_draw_pixel(x + 1, 17, COLOR_HAZARD_YELLOW);
+        renderer_draw_pixel(x, 174, COLOR_HAZARD_YELLOW);
+        renderer_draw_pixel(x + 1, 174, COLOR_HAZARD_YELLOW);
     }
 
-    // Sanctuary Core Hull Integrity Bar: (x: 6..54, y: 3..14)
-    renderer_draw_text(6, 3, "HULL", COLOR_WHITE);
-    renderer_fill_rect(24, 3, 26, 6, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(24, 3, 26, 6, COLOR_IRON_BORDER);
-    int hp_width = (g_game.core_hp * 24) / g_game.core_max_hp;
-    if (hp_width < 0) hp_width = 0;
-    if (hp_width > 24) hp_width = 24;
-    if (hp_width > 0) {
-        uint16_t hp_col = (g_game.core_hp > 6) ? COLOR_LED_GREEN : COLOR_LED_RED;
-        renderer_fill_rect(25, 4, hp_width, 4, hp_col);
-    }
-    char hp_txt[8];
-    sprintf(hp_txt, "%d", g_game.core_hp);
-    renderer_draw_text(6, 10, hp_txt, (g_game.core_hp > 6) ? COLOR_LED_GREEN : COLOR_LED_RED);
-
-    // If turret selected and in prep, show [RECALL] button: (x: 54..98, y: 2..15)
-    if (g_game.mode == MODE_PREPARATION && g_game.selected_turret >= 0 && g_game.selected_turret < MAX_TURRETS && g_turrets[g_game.selected_turret].placed) {
-        renderer_fill_rect(54, 2, 44, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(54, 2, 44, 14, COLOR_RED);
-        renderer_fill_rect(56, 5, 3, 8, COLOR_LED_RED);
-        renderer_draw_text(62, 6, "RECALL", COLOR_WHITE);
-    }
-
-    // Fast-Forward [2X] Button: (x: 102..150, y: 2..15)
-    uint16_t ff_led = (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_DARK_GRAY;
-    renderer_fill_rect(102, 2, 48, 14, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(102, 2, 48, 14, COLOR_IRON_LIGHT);
-    renderer_fill_rect(105, 5, 4, 8, ff_led);
-    renderer_draw_text(113, 6, "COG 2X", (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_IRON_LIGHT);
-
-    // [PAUSE] Button: (x: 154..190, y: 2..15)
-    renderer_fill_rect(154, 2, 36, 14, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(154, 2, 36, 14, COLOR_IRON_LIGHT);
-    renderer_fill_rect(157, 5, 3, 8, (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_DARK_GRAY);
-    renderer_draw_text(163, 6, "PAUS", (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_WHITE);
-
-    // [PURGE / START] Button: (x: 194..252, y: 2..15)
     if (g_game.mode == MODE_PREPARATION) {
-        renderer_fill_rect(194, 2, 58, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(194, 2, 58, 14, COLOR_HAZARD_YELLOW);
-        renderer_fill_rect(197, 5, 3, 8, COLOR_LED_GREEN);
-        renderer_draw_text(204, 6, "PURGA", COLOR_HAZARD_YELLOW);
-    } else {
-        // In wave mode, indicate purging wave
-        renderer_fill_rect(194, 2, 58, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(194, 2, 58, 14, COLOR_LED_RED);
-        renderer_fill_rect(197, 5, 3, 8, COLOR_LED_RED);
-        renderer_draw_text(204, 6, "ACTIVA", COLOR_WHITE);
-    }
+        // ── BOLTER DOCK [BOLTER xN] (x: 2..50) ──
+        renderer_fill_rect(2, 176, 48, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(2, 176, 48, 14, (g_game.turret_dock_count > 0) ? COLOR_BRASS : COLOR_DARK_GRAY);
+        // Mini twin-barrel icon (8px)
+        renderer_draw_circle(11, 183, 3, COLOR_TURRET_RING, 1);
+        renderer_draw_line(11, 182, 15, 182, COLOR_BARREL_STEEL);
+        renderer_draw_line(11, 184, 15, 184, COLOR_BARREL_STEEL);
+        char dock_lbl[8];
+        sprintf(dock_lbl, "x%d", g_game.turret_dock_count);
+        renderer_draw_text(18, 180, dock_lbl, (g_game.turret_dock_count > 0) ? COLOR_HAZARD_YELLOW : COLOR_IRON_LIGHT);
 
-    // 2. Bottom Armory Dock (y: 168..191) - only in prep mode
-    if (g_game.mode == MODE_PREPARATION) {
-        renderer_fill_rect(0, 168, SCREEN_W, 24, COLOR_IRON_PANEL);
-        renderer_draw_line(0, 168, SCREEN_W - 1, 168, COLOR_IRON_BORDER);
+        // ── RECALL (x: 54..92) — only when a placed turret is selected ──
+        if (g_game.selected_turret >= 0 && g_game.selected_turret < MAX_TURRETS && g_turrets[g_game.selected_turret].placed) {
+            renderer_fill_rect(54, 176, 38, 14, COLOR_HAZARD_BLACK);
+            renderer_draw_rect(54, 176, 38, 14, COLOR_RED);
+            renderer_fill_rect(57, 179, 3, 8, COLOR_LED_RED);
+            renderer_draw_text(63, 180, "RECL", COLOR_WHITE);
+        } else {
+            renderer_fill_rect(54, 176, 38, 14, COLOR_HAZARD_BLACK);
+            renderer_draw_rect(54, 176, 38, 14, COLOR_DARK_GRAY);
+            renderer_draw_text(60, 180, "RECL", COLOR_DARK_GRAY);
+        }
 
-        // Dock slot icon for Heavy Bolter: (x: 8..80, y: 171..188)
-        renderer_fill_rect(8, 171, 72, 17, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(8, 171, 72, 17, (g_game.turret_dock_count > 0) ? COLOR_BRASS : COLOR_DARK_GRAY);
+        // ── CALIB (x: 95..130) ──
+        renderer_fill_rect(95, 176, 36, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(95, 176, 36, 14, COLOR_AMBER);
+        renderer_fill_rect(98, 179, 3, 8, COLOR_HAZARD_YELLOW);
+        renderer_draw_text(104, 180, "CALIB", COLOR_AMBER);
 
-        // Mini twin-barrel turret icon in slot
-        renderer_draw_circle(20, 179, 4, COLOR_TURRET_RING, 1);
-        renderer_draw_line(20, 178, 26, 178, COLOR_BARREL_STEEL);
-        renderer_draw_line(20, 180, 26, 180, COLOR_BARREL_STEEL);
+        // ── FORJA (x: 134..170) ──
+        renderer_fill_rect(134, 176, 36, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(134, 176, 36, 14, COLOR_BRASS);
+        renderer_fill_rect(137, 179, 3, 8, COLOR_AMBER);
+        renderer_draw_text(143, 180, "FORJA", COLOR_BRASS);
 
-        char dock_label[16];
-        sprintf(dock_label, "BOLTER [%d]", g_game.turret_dock_count);
-        renderer_draw_text(30, 177, dock_label, (g_game.turret_dock_count > 0) ? COLOR_HAZARD_YELLOW : COLOR_IRON_LIGHT);
+        // ── COG 2X (x: 174..196) ──
+        uint16_t ff_led = (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_DARK_GRAY;
+        renderer_fill_rect(174, 176, 22, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(174, 176, 22, 14, COLOR_IRON_LIGHT);
+        renderer_fill_rect(177, 179, 3, 8, ff_led);
+        renderer_draw_text(183, 180, "2X", (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_IRON_LIGHT);
 
-        // Dock button for CALIBRAR (x: 84..160, y: 171..188)
-        renderer_fill_rect(84, 171, 76, 17, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(84, 171, 76, 17, COLOR_AMBER);
-        renderer_fill_rect(87, 174, 4, 11, COLOR_HAZARD_YELLOW);
-        renderer_draw_text(94, 177, "CALIBRAR", COLOR_AMBER);
+        // ── PAUS (x: 199..221) ──
+        renderer_fill_rect(199, 176, 22, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(199, 176, 22, 14, COLOR_IRON_LIGHT);
+        renderer_fill_rect(202, 179, 3, 8, (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_DARK_GRAY);
+        renderer_draw_text(208, 180, "PAU", (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_WHITE);
 
-        // Dock button for FORGE STC (Branching Skill Tree): (x: 164..248, y: 171..188)
-        renderer_fill_rect(164, 171, 84, 17, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(164, 171, 84, 17, COLOR_BRASS);
-        renderer_fill_rect(167, 174, 4, 11, COLOR_AMBER);
-        renderer_draw_text(176, 177, "FORGE STC", COLOR_BRASS);
+        // ── PURGA (x: 224..254) — Start wave ──
+        renderer_fill_rect(224, 176, 30, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(224, 176, 30, 14, COLOR_HAZARD_YELLOW);
+        renderer_fill_rect(227, 179, 3, 8, COLOR_LED_GREEN);
+        renderer_draw_text(233, 180, "PURGA", COLOR_HAZARD_YELLOW);
 
-        // Dragging ghost preview
+        // Ghost drag preview
         if (g_game.is_dragging_new) {
             int gx = g_game.drag_x;
             int gy = g_game.drag_y;
-
             int valid = game_is_pos_valid(gx, gy);
             uint16_t ghost_col = valid ? COLOR_HAZARD_YELLOW : COLOR_LED_RED;
             renderer_draw_circle(gx, gy, 7, ghost_col, 0);
             renderer_draw_circle(gx, gy, 45, ghost_col, 0);
         }
+
     } else if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PAUSED) {
-        // Bottom combat strip: wave info and instructions
-        renderer_fill_rect(0, 174, SCREEN_W, 18, COLOR_IRON_PANEL);
-        renderer_draw_line(0, 174, SCREEN_W - 1, 174, COLOR_IRON_BORDER);
+        // ── WAVE MODE / PAUSED: COG 2X, PAUS, ACTIVA + turret info ──
+
+        // Left side: selected turret info (or hint)
         if (g_game.selected_turret >= 0 && g_game.selected_turret < MAX_TURRETS && g_turrets[g_game.selected_turret].placed) {
-            char tinfo[48];
             Turret *st = &g_turrets[g_game.selected_turret];
             int deg = (st->center_angle * 360) / 256;
             int cdeg = (st->sweep_amplitude * 360) / 256;
-            snprintf(tinfo, sizeof(tinfo), "BATERIA #%d SEL | EJE:%03d | CONO:+-%02d", g_game.selected_turret + 1, deg, cdeg);
-            renderer_draw_text(8, 179, tinfo, COLOR_HAZARD_YELLOW);
+            char tinfo[40];
+            snprintf(tinfo, sizeof(tinfo), "#%d EJE:%03d CONO:+-%02d", g_game.selected_turret + 1, deg, cdeg);
+            renderer_draw_text(4, 180, tinfo, COLOR_HAZARD_YELLOW);
         } else {
-            renderer_draw_text(8, 179, "TOCA TORRETA PARA SELECCIONAR / INSPECCIONAR", COLOR_IRON_LIGHT);
+            renderer_draw_text(4, 180, "TOCA TORRETA", COLOR_IRON_LIGHT);
         }
+
+        // COG 2X (x: 148..170)
+        uint16_t ff_led = (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_DARK_GRAY;
+        renderer_fill_rect(148, 176, 22, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(148, 176, 22, 14, COLOR_IRON_LIGHT);
+        renderer_fill_rect(151, 179, 3, 8, ff_led);
+        renderer_draw_text(157, 180, "2X", (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_IRON_LIGHT);
+
+        // PAUS (x: 174..196)
+        renderer_fill_rect(174, 176, 22, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(174, 176, 22, 14, COLOR_IRON_LIGHT);
+        renderer_fill_rect(177, 179, 3, 8, (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_DARK_GRAY);
+        renderer_draw_text(183, 180, "PAU", (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_WHITE);
+
+        // ACTIVA indicator (x: 199..254)
+        renderer_fill_rect(199, 176, 55, 14, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(199, 176, 55, 14, COLOR_LED_RED);
+        renderer_fill_rect(202, 179, 3, 8, COLOR_LED_RED);
+        renderer_draw_text(208, 180, "COMBATE", COLOR_WHITE);
     }
 }
+
 
 void renderer_draw_ui_pause(void) {
     // Semi-transparent / dithered or solid modal frame in center
