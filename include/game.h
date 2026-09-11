@@ -14,7 +14,8 @@
 #define TOTAL_WAVE_ENEMIES 100
 #define MAX_BULLETS 64
 #define MAX_WAYPOINTS 6
-#define MAX_SPLATTERS 32
+#define MAX_SPLATTERS 160
+#define MAX_DEATH_PARTICLES 256
 #define MAX_TURRETS 4
 
 #include "telemetry_gfx.h"
@@ -126,8 +127,21 @@ typedef struct {
 typedef struct {
     int x, y;
     int life;
+    int max_life;
+    int size;       // 0 = 1x1, 1 = 2x2, 2 = 3x3 cross
     uint16_t color;
 } Splatter;
+
+typedef struct {
+    int x, y;       // Q8 fixed point position
+    int z;          // Q8 height above ground
+    int vx, vy;     // Q8 fixed point horizontal velocity
+    int vz;         // Q8 fixed point vertical velocity
+    int life;
+    int size;       // 0 = 1x1 px, 1 = 2x2 px
+    int active;
+    uint16_t color;
+} DeathParticle;
 
 typedef enum {
     MODE_PREPARATION = 0,
@@ -195,6 +209,7 @@ extern Turret g_turrets[MAX_TURRETS];
 extern Enemy g_enemies[MAX_ENEMIES];
 extern Bullet g_bullets[MAX_BULLETS];
 extern Splatter g_splatters[MAX_SPLATTERS];
+extern DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
 extern Waypoint g_waypoints[MAX_WAYPOINTS];
 extern int g_waypoint_count;
 extern const uint16_t *g_current_map_bg;
@@ -220,6 +235,8 @@ void calibration_init(void);
 void calibration_apply_settings(void);
 void calibration_apply_and_start(void);
 void game_add_splatter(int x, int y, uint16_t color);
+void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration);
+void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant);
 int game_is_pos_valid(int x, int y);
 
 // Renderer
@@ -237,6 +254,7 @@ void renderer_draw_turret(const Turret *t, int is_selected, int show_cone);
 void renderer_draw_enemies(void);
 void renderer_draw_bullets(void);
 void renderer_draw_splatters(void);
+void renderer_draw_death_particles(void);
 void renderer_draw_ui_prep(void);
 void renderer_draw_ui_workshop(void);
 void renderer_draw_ui_calibration(void);

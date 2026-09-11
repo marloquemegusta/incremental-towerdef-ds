@@ -7,6 +7,7 @@ Turret g_turrets[MAX_TURRETS];
 Enemy g_enemies[MAX_ENEMIES];
 Bullet g_bullets[MAX_BULLETS];
 Splatter g_splatters[MAX_SPLATTERS];
+DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
 RunCalibration g_calibration;
 
 Waypoint g_waypoints[MAX_WAYPOINTS];
@@ -86,14 +87,156 @@ int game_is_pos_valid(int x, int y) {
     return 1;
 }
 
-void game_add_splatter(int x, int y, uint16_t color) {
+void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration) {
+    if (x < 2 || x >= SCREEN_W - 2 || y < 2 || y >= SCREEN_H - 2) return;
+
+    // Find first empty slot or oldest slot
+    int best_slot = -1;
+    int min_life = 999999;
     for (int i = 0; i < MAX_SPLATTERS; i++) {
         if (g_splatters[i].life <= 0) {
-            g_splatters[i].x = x;
-            g_splatters[i].y = y;
-            g_splatters[i].life = 45;
-            g_splatters[i].color = color;
+            best_slot = i;
             break;
+        }
+        if (g_splatters[i].life < min_life) {
+            min_life = g_splatters[i].life;
+            best_slot = i;
+        }
+    }
+
+    if (best_slot >= 0) {
+        g_splatters[best_slot].x = x;
+        g_splatters[best_slot].y = y;
+        g_splatters[best_slot].life = duration;
+        g_splatters[best_slot].max_life = duration;
+        g_splatters[best_slot].size = size;
+        g_splatters[best_slot].color = color;
+    }
+}
+
+void game_add_splatter(int x, int y, uint16_t color) {
+    game_add_splatter_ex(x, y, color, 1, 180);
+}
+
+void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
+    // 1. Determine explosion characteristics by enemy tier
+    int particle_count = 6;
+    int burst_speed = 3;  // base velocity magnitude
+    int gore_spread = 6;  // radius for initial puddle
+    int puddle_drops = 2;
+
+    switch (variant) {
+        case 0: // T0: Larva (4x4) - Tiny pop
+            particle_count = 5;
+            burst_speed = 3;
+            gore_spread = 5;
+            puddle_drops = 2;
+            break;
+        case 1: // T1: Ripper (6x5) - Small spray
+            particle_count = 8;
+            burst_speed = 4;
+            gore_spread = 8;
+            puddle_drops = 3;
+            break;
+        case 2: // T2: Hormagaunt (9x9) - Medium bloody burst
+            particle_count = 14;
+            burst_speed = 5;
+            gore_spread = 12;
+            puddle_drops = 5;
+            break;
+        case 3: // T3: Ravener (15x11) - Large violent rupture
+            particle_count = 32;
+            burst_speed = 7;
+            gore_spread = 20;
+            puddle_drops = 10;
+            break;
+        case 4: // T4: Carnifex (21x21) - Massive heavy explosion
+            particle_count = 64;
+            burst_speed = 10;
+            gore_spread = 32;
+            puddle_drops = 22;
+            break;
+        case 5: // T5: Hierophant (30x30) - Colossal bio-cataclysm
+            particle_count = 96;
+            burst_speed = 12;
+            gore_spread = 45;
+            puddle_drops = 32;
+            break;
+        default:
+            particle_count = 14;
+            burst_speed = 5;
+            gore_spread = 12;
+            puddle_drops = 6;
+            break;
+    }
+
+    // 2. Primary blood colors according to canonical Xenos lore
+    uint16_t col_primary = (variant == 0 || variant == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
+    uint16_t col_secondary = COLOR_XENOS_FLESH;
+    uint16_t col_chitin = COLOR_XENOS_CHITIN;
+
+    // 3. Deposit immediate core blood puddles on the ground
+    // Center dense puddle
+    int puddle_size = (variant >= 4) ? 2 : ((variant >= 2) ? 1 : 0);
+    game_add_splatter_ex(x, y, col_primary, puddle_size, 240 + (rand() % 60));
+    if (variant >= 4) {
+        // Extra dense satellite core pools for colossal bio-titans
+        game_add_splatter_ex(x - 5, y - 3, col_secondary, 2, 240 + (rand() % 60));
+        game_add_splatter_ex(x + 5, y + 3, col_primary, 2, 240 + (rand() % 60));
+        game_add_splatter_ex(x + 2, y - 5, col_chitin, 1, 240 + (rand() % 60));
+        game_add_splatter_ex(x - 2, y + 5, col_primary, 1, 240 + (rand() % 60));
+    }
+
+    // Satellite splatter drops
+    for (int d = 0; d < puddle_drops; d++) {
+        int ox = (rand() % (gore_spread * 2 + 1)) - gore_spread;
+        int oy = (rand() % (gore_spread * 2 + 1)) - gore_spread;
+        uint16_t c = (rand() % 3 == 0) ? col_secondary : col_primary;
+        int sz = (rand() % 4 == 0 && variant >= 3) ? 1 : 0;
+        int dur = 180 + (rand() % 120);
+        game_add_splatter_ex(x + ox, y + oy, c, sz, dur);
+    }
+
+    // 4. Spawn airborne pseudo-3D ballistic particles
+    int spawned = 0;
+    int bullet_dir_bias_x = bvx / 3; // momentum transfer from projectile
+    int bullet_dir_bias_y = bvy / 3;
+
+    for (int i = 0; i < MAX_DEATH_PARTICLES && spawned < particle_count; i++) {
+        if (!g_death_particles[i].active) {
+            g_death_particles[i].active = 1;
+            g_death_particles[i].x = TO_FP(x) + ((rand() % 9 - 4) << FP_SHIFT);
+            g_death_particles[i].y = TO_FP(y) + ((rand() % 9 - 4) << FP_SHIFT);
+            // Starting height Z (Q8) based on creature size
+            g_death_particles[i].z = TO_FP(4 + (variant * 3));
+
+            // Radial burst velocities
+            int ang = rand() % 256;
+            int spd = (rand() % (burst_speed * 180)) + TO_FP(2);
+            g_death_particles[i].vx = ((fixed_cos(ang) * spd) >> FP_SHIFT) + bullet_dir_bias_x;
+            g_death_particles[i].vy = ((fixed_sin(ang) * spd) >> FP_SHIFT) + bullet_dir_bias_y;
+            // Vertical upward ejection velocity
+            g_death_particles[i].vz = TO_FP(2) + (rand() % (TO_FP(burst_speed) + TO_FP(2)));
+
+            g_death_particles[i].life = 45;
+
+            // Particle type / color / size
+            int roll = rand() % 100;
+            if (roll < 45) {
+                // Liquid blood / ichor drop
+                g_death_particles[i].color = col_primary;
+                g_death_particles[i].size = (variant >= 3 && (rand() % 2 == 0)) ? 1 : 0;
+            } else if (roll < 75) {
+                // Bioluminescent flesh
+                g_death_particles[i].color = col_secondary;
+                g_death_particles[i].size = (variant >= 3) ? 1 : 0;
+            } else {
+                // Hard chitin / exoskeleton shrapnel
+                g_death_particles[i].color = col_chitin;
+                g_death_particles[i].size = (variant >= 2 && (rand() % 2 == 0)) ? 1 : 0;
+            }
+
+            spawned++;
         }
     }
 }
@@ -104,6 +247,7 @@ void game_init(void) {
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_splatters, 0, sizeof(g_splatters));
+    memset(g_death_particles, 0, sizeof(g_death_particles));
 
     calibration_init();
     map_select(0);
@@ -159,6 +303,7 @@ void game_reset_to_prep(void) {
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_splatters, 0, sizeof(g_splatters));
+    memset(g_death_particles, 0, sizeof(g_death_particles));
 
     int base_interval = (g_calibration.turret_fire_rate > 0) ? g_calibration.turret_fire_rate : 8;
     int interval = base_interval - g_skill_tree.bonus_firerate;
@@ -228,7 +373,10 @@ static void spawn_enemy(void) {
             int tier_mult = s_tier_speed_mult[g_enemies[i].variant];
             int caste_spd = (base_spd * tier_mult) / 100;
             g_enemies[i].speed = caste_spd + jitter;
-            g_enemies[i].hp = (g_calibration.enemy_hp > 0) ? g_calibration.enemy_hp : g_enemy_types[g_enemies[i].variant].default_hp;
+            // Scale HP proportionally by caste: Larva (4), Ripper (12), Hormagaunt (25), Ravener (50), Carnifex (100), Hierophant (200)
+            static const int s_tier_hp_base[ENEMY_VARIANT_COUNT] = { 4, 10, 22, 45, 90, 180 };
+            int calib_mult = (g_calibration.enemy_hp > 0) ? g_calibration.enemy_hp : 15;
+            g_enemies[i].hp = (s_tier_hp_base[g_enemies[i].variant] * calib_mult) / 15;
 
             // Initial position (check if first segment is vertical or horizontal)
             if (g_waypoint_count > 1 && g_waypoints[0].x == g_waypoints[1].x) {
@@ -284,6 +432,35 @@ void game_update_simulation(void) {
         if (g_splatters[i].life > 0) g_splatters[i].life--;
     }
 
+    // 2b. Update Airborne Ballistic Death Particles (Pseudo-3D)
+    for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
+        if (!g_death_particles[i].active) continue;
+
+        // Apply horizontal velocities and air friction
+        g_death_particles[i].x += g_death_particles[i].vx;
+        g_death_particles[i].y += g_death_particles[i].vy;
+        g_death_particles[i].vx = (g_death_particles[i].vx * 31) / 32;
+        g_death_particles[i].vy = (g_death_particles[i].vy * 31) / 32;
+
+        // Vertical pseudo-3D ballistic flight with gravity
+        g_death_particles[i].z += g_death_particles[i].vz;
+        g_death_particles[i].vz -= (FP_ONE / 8); // Gravity: 0.125 px/frame^2 (floatier, more visible trajectory)
+
+        g_death_particles[i].life--;
+
+        // Ground collision (Z <= 0) or timeout
+        if (g_death_particles[i].z <= 0 || g_death_particles[i].life <= 0) {
+            int px = FROM_FP(g_death_particles[i].x);
+            int py = FROM_FP(g_death_particles[i].y);
+            // On ground impact, deposit a lasting blood droplet / giblet on the deck!
+            if (px >= 2 && px < SCREEN_W - 2 && py >= 2 && py < SCREEN_H - 2) {
+                int dur = 150 + (rand() % 120);
+                game_add_splatter_ex(px, py, g_death_particles[i].color, g_death_particles[i].size, dur);
+            }
+            g_death_particles[i].active = 0;
+        }
+    }
+
     // 3. Update Enemies (Following Waypoints with lateral corridor offset)
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
@@ -296,7 +473,7 @@ void game_update_simulation(void) {
             g_game.enemies_alive--;
             g_game.enemies_breached++;
             g_game.core_hp--;
-            game_add_splatter(FROM_FP(g_enemies[i].x), FROM_FP(g_enemies[i].y), COLOR_BLOOD_DARK);
+            game_spawn_death_gore(FROM_FP(g_enemies[i].x), FROM_FP(g_enemies[i].y), 0, 0, g_enemies[i].variant);
             if (g_game.core_hp <= 0) {
                 g_game.core_hp = 0;
                 g_game.mode = MODE_CALIBRATION;
@@ -432,8 +609,10 @@ void game_update_simulation(void) {
             int ex = FROM_FP(g_enemies[e].x);
             int ey = FROM_FP(g_enemies[e].y);
 
-            // Radius hit check
-            if (abs(bx - ex) <= 4 && abs(by - ey) <= 4) {
+            // Hit check scaled to enemy hitbox
+            static const int s_hit_radius[ENEMY_VARIANT_COUNT] = { 4, 5, 7, 9, 13, 16 };
+            int hit_r = s_hit_radius[g_enemies[e].variant];
+            if (abs(bx - ex) <= hit_r && abs(by - ey) <= hit_r) {
                 hit = 1;
                 int base_dmg = (g_calibration.turret_damage > 0) ? g_calibration.turret_damage : 1;
                 int dmg = base_dmg + g_skill_tree.bonus_damage;
@@ -454,9 +633,8 @@ void game_update_simulation(void) {
                     int reward = g_enemy_types[g_enemies[e].variant].scrap_value + (g_skill_tree.bonus_ap > 0 ? 1 : 0);
                     g_game.scrap += reward;
 
-                    // Xenos ichor / blood splatter
-                    uint16_t splat_col = (g_enemies[e].variant == 0 || g_enemies[e].variant == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
-                    game_add_splatter(ex, ey, splat_col);
+                    // Spectacular visceral death gore burst scaled by enemy tier
+                    game_spawn_death_gore(ex, ey, g_bullets[b].vx, g_bullets[b].vy, g_enemies[e].variant);
                 }
                 g_bullets[b].active = 0;
                 break;

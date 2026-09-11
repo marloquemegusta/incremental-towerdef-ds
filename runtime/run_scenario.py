@@ -124,9 +124,17 @@ def main() -> int:
             if "release" in step:
                 lib.desmume_input_release_touch()
                 events.append({"step": index, "action": "release"})
-            for _ in range(step.get("frames", 1)):
+            capture_seq = step.get("capture_sequence")
+            capture_every = max(1, int(step.get("capture_every", 1)))
+            frame_count = step.get("frames", 1)
+            seq_index = 0
+            for f in range(frame_count):
                 lib.desmume_cycle(0)
-            events.append({"step": index, "action": "frame_advance", "frames": step.get("frames", 1),
+                if capture_seq and (f % capture_every == 0):
+                    cname = f"{capture_seq}_{seq_index:04d}"
+                    capture(lib, output / f"{cname}.png")
+                    seq_index += 1
+            events.append({"step": index, "action": "frame_advance", "frames": frame_count,
                            "keypad": int(lib.desmume_input_keypad_get())})
             if "capture" in step:
                 name = step["capture"]
