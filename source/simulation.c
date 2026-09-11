@@ -213,8 +213,21 @@ static void spawn_enemy(void) {
             // Speed jitter based on calibrated speed (enemy_speed_int is tenths of px/frame)
             int base_spd = (g_calibration.enemy_speed_int > 0) ? ((g_calibration.enemy_speed_int * FP_ONE) / 10) : FP_ONE;
             int jitter = ((rand() % 21) - 10) * (FP_ONE / 100);
-            g_enemies[i].speed = base_spd + jitter;
             g_enemies[i].variant = rand() % ENEMY_VARIANT_COUNT;
+            
+            // Speed scaled by biocaste (Swarm runs fast, Colossals tread slowly)
+            // T0: 1.2x, T1: 1.3x, T2: 1.5x, T3: 1.1x, T4: 0.6x, T5: 0.35x
+            static const int s_tier_speed_mult[ENEMY_VARIANT_COUNT] = {
+                120, // T0 Larva
+                130, // T1 Ripper
+                150, // T2 Hormagaunt
+                110, // T3 Ravener
+                 60, // T4 Carnifex
+                 35  // T5 Hierophant
+            };
+            int tier_mult = s_tier_speed_mult[g_enemies[i].variant];
+            int caste_spd = (base_spd * tier_mult) / 100;
+            g_enemies[i].speed = caste_spd + jitter;
             g_enemies[i].hp = (g_calibration.enemy_hp > 0) ? g_calibration.enemy_hp : g_enemy_types[g_enemies[i].variant].default_hp;
 
             // Initial position (check if first segment is vertical or horizontal)
@@ -319,7 +332,23 @@ void game_update_simulation(void) {
         } else {
             g_enemies[i].dir = (dx > 0) ? 0 : 2; // 0 = East, 2 = West
         }
-        g_enemies[i].anim_frame = (g_game.sim_ticks_elapsed / 6 + i) % 4;
+        // Animation frequency based on biocaste:
+        // Swarm (T0-T2): rapid scuttling (every 3 ticks)
+        // Mid (T3): fluid serpentine motion (every 5 ticks)
+        // Heavy (T4-T5): heavy, deliberate steps (every 8-10 ticks)
+        static const uint8_t s_anim_div[ENEMY_VARIANT_COUNT] = {
+            3, // T0 Larva (frenetic crawl)
+            3, // T1 Ripper (rapid undulating bite)
+            4, // T2 Hormagaunt (galloping scythe strides)
+            5, // T3 Ravener (rhythmic burrowing wave)
+            8, // T4 Carnifex (heavy pillar stomps)
+           10  // T5 Hierophant (colossal titan strides)
+        };
+        int v = g_enemies[i].variant;
+        if (v < 0 || v >= ENEMY_VARIANT_COUNT) v = 0;
+        int div = s_anim_div[v];
+        int phase_offset = (i * 3 + v * 2);
+        g_enemies[i].anim_frame = ((g_game.sim_ticks_elapsed + phase_offset) / div) % 4;
 
         if (dx > 0) {
             g_enemies[i].x += (dx < spd) ? dx : spd;
