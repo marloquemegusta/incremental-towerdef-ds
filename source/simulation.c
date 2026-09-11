@@ -122,50 +122,50 @@ void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
     // 1. Determine explosion characteristics by enemy tier
     int particle_count = 6;
     int burst_speed = 3;  // base velocity magnitude
-    int gore_spread = 6;  // radius for initial puddle
-    int puddle_drops = 2;
+    int gore_spread = 8;  // radius for initial puddle
+    int puddle_drops = 3;
 
     switch (variant) {
         case 0: // T0: Larva (4x4) - Tiny pop
-            particle_count = 5;
-            burst_speed = 3;
-            gore_spread = 5;
-            puddle_drops = 2;
-            break;
-        case 1: // T1: Ripper (6x5) - Small spray
-            particle_count = 8;
-            burst_speed = 4;
-            gore_spread = 8;
+            particle_count = 6;
+            burst_speed = 2;
+            gore_spread = 6;
             puddle_drops = 3;
             break;
-        case 2: // T2: Hormagaunt (9x9) - Medium bloody burst
-            particle_count = 14;
-            burst_speed = 5;
-            gore_spread = 12;
+        case 1: // T1: Ripper (6x5) - Small spray
+            particle_count = 10;
+            burst_speed = 3;
+            gore_spread = 10;
             puddle_drops = 5;
+            break;
+        case 2: // T2: Hormagaunt (9x9) - Medium bloody burst
+            particle_count = 18;
+            burst_speed = 4;
+            gore_spread = 14;
+            puddle_drops = 8;
             break;
         case 3: // T3: Ravener (15x11) - Large violent rupture
             particle_count = 32;
-            burst_speed = 7;
-            gore_spread = 20;
-            puddle_drops = 10;
+            burst_speed = 5;
+            gore_spread = 18;
+            puddle_drops = 14;
             break;
         case 4: // T4: Carnifex (21x21) - Massive heavy explosion
-            particle_count = 64;
-            burst_speed = 10;
-            gore_spread = 32;
-            puddle_drops = 22;
+            particle_count = 60;
+            burst_speed = 6;
+            gore_spread = 24;
+            puddle_drops = 24;
             break;
         case 5: // T5: Hierophant (30x30) - Colossal bio-cataclysm
-            particle_count = 96;
-            burst_speed = 12;
-            gore_spread = 45;
-            puddle_drops = 32;
+            particle_count = 80;
+            burst_speed = 7;
+            gore_spread = 32;
+            puddle_drops = 36;
             break;
         default:
             particle_count = 14;
-            burst_speed = 5;
-            gore_spread = 12;
+            burst_speed = 3;
+            gore_spread = 10;
             puddle_drops = 6;
             break;
     }
@@ -178,47 +178,52 @@ void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
     // 3. Deposit immediate core blood puddles on the ground
     // Center dense puddle
     int puddle_size = (variant >= 4) ? 2 : ((variant >= 2) ? 1 : 0);
-    game_add_splatter_ex(x, y, col_primary, puddle_size, 240 + (rand() % 60));
+    game_add_splatter_ex(x, y, col_primary, puddle_size, 360 + (rand() % 120));
+    if (variant >= 2) {
+        // Satellite cluster pools for rich ground coverage
+        game_add_splatter_ex(x - 3, y - 2, col_secondary, (variant >= 4 ? 2 : 1), 360 + (rand() % 120));
+        game_add_splatter_ex(x + 3, y + 2, col_primary, (variant >= 4 ? 2 : 1), 360 + (rand() % 120));
+    }
     if (variant >= 4) {
         // Extra dense satellite core pools for colossal bio-titans
-        game_add_splatter_ex(x - 5, y - 3, col_secondary, 2, 240 + (rand() % 60));
-        game_add_splatter_ex(x + 5, y + 3, col_primary, 2, 240 + (rand() % 60));
-        game_add_splatter_ex(x + 2, y - 5, col_chitin, 1, 240 + (rand() % 60));
-        game_add_splatter_ex(x - 2, y + 5, col_primary, 1, 240 + (rand() % 60));
+        game_add_splatter_ex(x + 2, y - 4, col_chitin, 1, 360 + (rand() % 120));
+        game_add_splatter_ex(x - 2, y + 4, col_primary, 1, 360 + (rand() % 120));
+        game_add_splatter_ex(x - 5, y + 1, col_secondary, 2, 360 + (rand() % 120));
+        game_add_splatter_ex(x + 5, y - 1, col_primary, 2, 360 + (rand() % 120));
     }
 
-    // Satellite splatter drops
+    // Satellite splatter drops (soaking the ground in blood)
     for (int d = 0; d < puddle_drops; d++) {
         int ox = (rand() % (gore_spread * 2 + 1)) - gore_spread;
         int oy = (rand() % (gore_spread * 2 + 1)) - gore_spread;
         uint16_t c = (rand() % 3 == 0) ? col_secondary : col_primary;
-        int sz = (rand() % 4 == 0 && variant >= 3) ? 1 : 0;
-        int dur = 180 + (rand() % 120);
+        int sz = (rand() % 3 == 0 && variant >= 2) ? 1 : 0;
+        int dur = 260 + (rand() % 180);
         game_add_splatter_ex(x + ox, y + oy, c, sz, dur);
     }
 
-    // 4. Spawn airborne pseudo-3D ballistic particles
+    // 4. Spawn airborne pseudo-3D ballistic particles (contained velocity)
     int spawned = 0;
-    int bullet_dir_bias_x = bvx / 3; // momentum transfer from projectile
-    int bullet_dir_bias_y = bvy / 3;
+    int bullet_dir_bias_x = bvx / 6; // moderate momentum transfer from projectile
+    int bullet_dir_bias_y = bvy / 6;
 
     for (int i = 0; i < MAX_DEATH_PARTICLES && spawned < particle_count; i++) {
         if (!g_death_particles[i].active) {
             g_death_particles[i].active = 1;
-            g_death_particles[i].x = TO_FP(x) + ((rand() % 9 - 4) << FP_SHIFT);
-            g_death_particles[i].y = TO_FP(y) + ((rand() % 9 - 4) << FP_SHIFT);
+            g_death_particles[i].x = TO_FP(x) + ((rand() % 7 - 3) << FP_SHIFT);
+            g_death_particles[i].y = TO_FP(y) + ((rand() % 7 - 3) << FP_SHIFT);
             // Starting height Z (Q8) based on creature size
-            g_death_particles[i].z = TO_FP(4 + (variant * 3));
+            g_death_particles[i].z = TO_FP(3 + (variant * 2));
 
-            // Radial burst velocities
+            // Radial burst velocities (contained nicely inside the screen)
             int ang = rand() % 256;
-            int spd = (rand() % (burst_speed * 180)) + TO_FP(2);
+            int spd = (rand() % (burst_speed * 110)) + TO_FP(1);
             g_death_particles[i].vx = ((fixed_cos(ang) * spd) >> FP_SHIFT) + bullet_dir_bias_x;
             g_death_particles[i].vy = ((fixed_sin(ang) * spd) >> FP_SHIFT) + bullet_dir_bias_y;
             // Vertical upward ejection velocity
-            g_death_particles[i].vz = TO_FP(2) + (rand() % (TO_FP(burst_speed) + TO_FP(2)));
+            g_death_particles[i].vz = TO_FP(1) + (rand() % (TO_FP(burst_speed) + TO_FP(1)));
 
-            g_death_particles[i].life = 45;
+            g_death_particles[i].life = 40;
 
             // Particle type / color / size
             int roll = rand() % 100;
@@ -473,7 +478,7 @@ void game_update_simulation(void) {
             g_game.enemies_alive--;
             g_game.enemies_breached++;
             g_game.core_hp--;
-            game_spawn_death_gore(FROM_FP(g_enemies[i].x), FROM_FP(g_enemies[i].y), 0, 0, g_enemies[i].variant);
+            // No death explosion when breaching core — enemies enter the bunker alive!
             if (g_game.core_hp <= 0) {
                 g_game.core_hp = 0;
                 g_game.mode = MODE_CALIBRATION;
@@ -537,6 +542,14 @@ void game_update_simulation(void) {
             g_enemies[i].y += (dy < spd) ? dy : spd;
         } else if (dy < 0) {
             g_enemies[i].y += (dy > -spd) ? dy : -spd;
+        }
+
+        // Swarm ground bio-trail: enemies secrete ichor and slime as they advance through the trench
+        if ((g_game.sim_ticks_elapsed + i * 7) % 28 == 0) {
+            int ex = FROM_FP(g_enemies[i].x);
+            int ey = FROM_FP(g_enemies[i].y);
+            uint16_t trail_col = (v == 0 || v == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
+            game_add_splatter_ex(ex, ey, trail_col, (v >= 3 ? 1 : 0), 300 + (rand() % 120));
         }
 
         // Reached waypoint?
