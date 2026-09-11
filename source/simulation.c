@@ -338,8 +338,12 @@ void game_reset_to_prep(void) {
         g_turrets[t].flash_timer = 0;
         g_turrets[t].fire_interval = interval;
         g_turrets[t].sweep_speed = (g_calibration.sweep_speed > 0) ? g_calibration.sweep_speed : 1;
-        g_turrets[t].sweep_amplitude = half_angle_units;
-        g_turrets[t].range = (g_calibration.turret_range > 0) ? g_calibration.turret_range : 75;
+        if (g_turrets[t].sweep_amplitude < 4) {
+            g_turrets[t].sweep_amplitude = half_angle_units;
+        }
+        if (g_turrets[t].range <= 0) {
+            g_turrets[t].range = (g_calibration.turret_range > 0) ? g_calibration.turret_range : 75;
+        }
     }
 }
 
@@ -501,7 +505,7 @@ void game_update_simulation(void) {
             // No death explosion when breaching core — enemies enter the bunker alive!
             if (g_game.core_hp <= 0) {
                 g_game.core_hp = 0;
-                g_game.mode = MODE_CALIBRATION;
+                g_game.mode = MODE_GAME_OVER;
                 return;
             }
             continue;
@@ -689,7 +693,19 @@ void game_update_simulation(void) {
     if (g_calibration.enemy_count > 0 && g_game.enemies_spawned >= g_calibration.enemy_count && g_game.enemies_alive == 0) {
         g_game.scrap += 25;
         g_game.wave_number++;
-        g_game.mode = MODE_CALIBRATION;
+        // Clear bullets and transient particles for crisp transition
+        memset(g_bullets, 0, sizeof(g_bullets));
+        memset(g_death_particles, 0, sizeof(g_death_particles));
+        g_game.mode = MODE_PREPARATION;
+    }
+}
+
+void game_toggle_pause(void) {
+    if (g_game.mode == MODE_PAUSED) {
+        g_game.mode = (g_game.previous_mode == MODE_PAUSED) ? MODE_PREPARATION : g_game.previous_mode;
+    } else if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PREPARATION) {
+        g_game.previous_mode = g_game.mode;
+        g_game.mode = MODE_PAUSED;
     }
 }
 
@@ -699,21 +715,27 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
     }
 
     if (keys_down & KEY_TOUCH) {
-        // [PURGE / START] Button: (170..252, 2..16)
-        if (touch.px >= 170 && touch.px <= 252 && touch.py >= 2 && touch.py <= 16) {
+        // [PURGE / START] Button: (194..252, 2..16)
+        if (touch.px >= 194 && touch.px <= 252 && touch.py >= 2 && touch.py <= 16) {
             game_start_wave();
             return;
         }
 
-        // [COG 2X] Button: (110..164, 2..16)
-        if (touch.px >= 110 && touch.px <= 164 && touch.py >= 2 && touch.py <= 16) {
+        // [PAUSE] Button: (154..190, 2..16)
+        if (touch.px >= 154 && touch.px <= 190 && touch.py >= 2 && touch.py <= 16) {
+            game_toggle_pause();
+            return;
+        }
+
+        // [COG 2X] Button: (102..150, 2..16)
+        if (touch.px >= 102 && touch.px <= 150 && touch.py >= 2 && touch.py <= 16) {
             g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
             return;
         }
 
-        // [RECALL] Button: (56..104, 2..16)
+        // [RECALL] Button: (54..98, 2..16)
         if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed) {
-            if (touch.px >= 56 && touch.px <= 104 && touch.py >= 2 && touch.py <= 16) {
+            if (touch.px >= 54 && touch.px <= 98 && touch.py >= 2 && touch.py <= 16) {
                 g_turrets[g_game.selected_turret].placed = 0;
                 g_turrets[g_game.selected_turret].active = 0;
                 g_game.turret_dock_count++;
@@ -793,13 +815,15 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
                     g_turrets[slot].active = 1;
                     g_turrets[slot].center_angle = 192;
                     g_turrets[slot].current_angle = 192;
-                    g_turrets[slot].sweep_amplitude = 16;
-                    g_turrets[slot].sweep_speed = 1;
+                    int half_angle_units = (g_calibration.cone_spread > 0) ? ((g_calibration.cone_spread * 64) / 90) : 16;
+                    if (half_angle_units < 4) half_angle_units = 4;
+                    g_turrets[slot].sweep_amplitude = half_angle_units;
+                    g_turrets[slot].sweep_speed = (g_calibration.sweep_speed > 0) ? g_calibration.sweep_speed : 1;
                     g_turrets[slot].sweep_dir = 1;
                     int interval = 8 - g_skill_tree.bonus_firerate;
                     if (interval < 3) interval = 3;
                     g_turrets[slot].fire_interval = interval;
-                    g_turrets[slot].range = 75;
+                    g_turrets[slot].range = (g_calibration.turret_range > 0) ? g_calibration.turret_range : 75;
                     g_game.turret_dock_count--;
                     g_game.selected_turret = slot;
                 }
@@ -813,14 +837,83 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     if (keys_down & KEY_R) {
         g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
     }
+
     if (keys_down & KEY_TOUCH) {
-        if (touch.px >= 110 && touch.px <= 164 && touch.py >= 2 && touch.py <= 16) {
+        // [COG 2X] Button: (102..150, 2..16)
+        if (touch.px >= 102 && touch.px <= 150 && touch.py >= 2 && touch.py <= 16) {
             g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
+            return;
+        }
+
+        // [PAUSE] Button: (154..190, 2..16)
+        if (touch.px >= 154 && touch.px <= 190 && touch.py >= 2 && touch.py <= 16) {
+            game_toggle_pause();
+            return;
+        }
+
+        // Touch on placed turret: select it to view cone and sync Auspex Cogitator!
+        for (int t = 0; t < MAX_TURRETS; t++) {
+            if (g_turrets[t].placed) {
+                int d = abs(touch.px - g_turrets[t].x) + abs(touch.py - g_turrets[t].y);
+                if (d <= 18) {
+                    g_game.selected_turret = t;
+                    return;
+                }
+            }
+        }
+    }
+}
+
+void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held) {
+    if (keys_down & (KEY_START | KEY_A | KEY_B)) {
+        game_toggle_pause();
+        return;
+    }
+
+    if (keys_down & KEY_TOUCH) {
+        // Resume button in modal (x: 48..208, y: 104..126) or [PAUSE] button in header (154..190, 2..16)
+        if ((touch.px >= 48 && touch.px <= 208 && touch.py >= 104 && touch.py <= 126) ||
+            (touch.px >= 154 && touch.px <= 190 && touch.py >= 2 && touch.py <= 16)) {
+            game_toggle_pause();
+            return;
+        }
+
+        // Allow tapping turrets even while paused to inspect them
+        for (int t = 0; t < MAX_TURRETS; t++) {
+            if (g_turrets[t].placed) {
+                int d = abs(touch.px - g_turrets[t].x) + abs(touch.py - g_turrets[t].y);
+                if (d <= 18) {
+                    g_game.selected_turret = t;
+                    return;
+                }
+            }
+        }
+    }
+}
+
+void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_held) {
+    if (keys_down & (KEY_A | KEY_START)) {
+        g_game.core_hp = g_game.core_max_hp;
+        game_reset_to_prep();
+        return;
+    }
+
+    if (keys_down & KEY_TOUCH) {
+        // Retry button (mx + 20..mx + 196 -> x: 40..216, y: 116..140)
+        if (touch.px >= 40 && touch.px <= 216 && touch.py >= 116 && touch.py <= 140) {
+            g_game.core_hp = g_game.core_max_hp;
+            game_reset_to_prep();
+            return;
         }
     }
 }
 
 void game_handle_input_workshop(touchPosition touch, int keys_down, int keys_held) {
+    if (keys_down & (KEY_B | KEY_START)) {
+        game_reset_to_prep();
+        return;
+    }
+
     if (keys_down & KEY_TOUCH) {
         if (skills_handle_touch(touch.px, touch.py)) {
             if (g_game.core_hp <= 0) {
