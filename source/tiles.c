@@ -412,20 +412,14 @@ void tiles_render_map(void) {
 }
 
 void tiles_render_sector1_map(void) {
-    for (int ty = 0; ty < MAP_ROWS; ty++) {
-        for (int tx = 0; tx < MAP_COLS; tx++) {
-            uint8_t tid = g_s1_map[ty][tx];
-            const uint16_t *src = g_s1_tiles[tid];
-            int px = tx * TILE_SIZE;
-            int py = ty * TILE_SIZE;
-
-            for (int y = 0; y < TILE_SIZE; y++) {
-                uint16_t *dst = &g_backbuffer[(py + y) * SCREEN_W + px];
-                for (int x = 0; x < TILE_SIZE; x++) {
-                    dst[x] = src[y * TILE_SIZE + x];
-                }
-            }
+    if (g_current_map_bg) {
+        uint32_t *dst = (uint32_t *)g_backbuffer;
+        const uint32_t *src = (const uint32_t *)g_current_map_bg;
+        for (int i = 0; i < (SCREEN_W * SCREEN_H) / 2; i++) {
+            dst[i] = src[i];
         }
+    } else {
+        tiles_render_map();
     }
 }
 
@@ -475,10 +469,21 @@ void tiles_draw_turret_base(int cx, int cy, int is_selected) {
     }
 }
 
+static inline int get_barrel_id(int dx, int dy, int fwd_x, int fwd_y, int perp_x, int perp_y,
+                                int l_start, int l_end, int r_start, int r_end, int *out_lp) {
+    int lf = (dx * fwd_x + dy * fwd_y + 128) >> FP_SHIFT;
+    int lp = (dx * perp_x + dy * perp_y + 128) >> FP_SHIFT;
+    if (out_lp) *out_lp = lp;
+    if (lp >= -5 && lp <= -1 && lf >= l_start && lf <= l_end) return 1;
+    if (lp >= 1 && lp <= 5 && lf >= r_start && lf <= r_end) return 2;
+    return 0;
+}
+
 void tiles_draw_twin_bolters(int cx, int cy, int angle, int flash, int recoil_l, int recoil_r, int last_barrel) {
     (void)flash;
     (void)last_barrel;
-    int ang = angle & 0xFF;
+    // Quantize angle to 64 discrete directions (5.625 deg steps) for clean, crisp, solid mechanical outlines
+    int ang = ((angle + 2) & ~3) & 0xFF;
     int fwd_x = fixed_cos(ang);
     int fwd_y = fixed_sin(ang);
     int perp_x = -fixed_sin(ang);
@@ -488,69 +493,42 @@ void tiles_draw_twin_bolters(int cx, int cy, int angle, int flash, int recoil_l,
     int d_rec_l = (recoil_l >= 3) ? 4 : (recoil_l == 2 ? 2 : (recoil_l == 1 ? 1 : 0));
     int d_rec_r = (recoil_r >= 3) ? 4 : (recoil_r == 2 ? 2 : (recoil_r == 1 ? 1 : 0));
 
-    // 1. LEFT BARREL & CARRIAGE (MASSIVE CHUNKY: 3-pixel wide solid metal + outlines)
-    // Entire carriage block from cupola (-2) to tip (+11) slides back rigidly by d_rec_l pixels
     int l_start = -2 - d_rec_l;
     int l_end = 11 - d_rec_l;
-
-    // Outlines (top at -5, bottom at -1)
-    int l_outlines[2] = {-5, -1};
-    for (int k = 0; k < 2; k++) {
-        int off = l_outlines[k];
-        int x0 = cx + ((perp_x * off + fwd_x * l_start) >> FP_SHIFT);
-        int y0 = cy + ((perp_y * off + fwd_y * l_start) >> FP_SHIFT);
-        int x1 = cx + ((perp_x * off + fwd_x * l_end) >> FP_SHIFT);
-        int y1 = cy + ((perp_y * off + fwd_y * l_end) >> FP_SHIFT);
-        renderer_draw_line(x0, y0, x1, y1, C_BLACK);
-    }
-    // 3px Solid Metal Body (offsets -4, -3, -2)
-    for (int off = -4; off <= -2; off++) {
-        int x0 = cx + ((perp_x * off + fwd_x * l_start) >> FP_SHIFT);
-        int y0 = cy + ((perp_y * off + fwd_y * l_start) >> FP_SHIFT);
-        int x1 = cx + ((perp_x * off + fwd_x * (l_end - 1)) >> FP_SHIFT);
-        int y1 = cy + ((perp_y * off + fwd_y * (l_end - 1)) >> FP_SHIFT);
-        uint16_t col = (off == -4) ? C_PIPE_HI : ((off == -3) ? C_PIPE_MID : C_FLOOR_DARK);
-        renderer_draw_line(x0, y0, x1, y1, col);
-    }
-    // Left heavy muzzle brake cap
-    {
-        int mx0 = cx + ((perp_x * -5 + fwd_x * l_end) >> FP_SHIFT);
-        int my0 = cy + ((perp_y * -5 + fwd_y * l_end) >> FP_SHIFT);
-        int mx1 = cx + ((perp_x * -1 + fwd_x * l_end) >> FP_SHIFT);
-        int my1 = cy + ((perp_y * -1 + fwd_y * l_end) >> FP_SHIFT);
-        renderer_draw_line(mx0, my0, mx1, my1, C_BLACK);
-    }
-
-    // 2. RIGHT BARREL & CARRIAGE (MASSIVE CHUNKY: 3-pixel wide solid metal + outlines)
     int r_start = -2 - d_rec_r;
     int r_end = 11 - d_rec_r;
 
-    // Outlines (top at +1, bottom at +5)
-    int r_outlines[2] = {1, 5};
-    for (int k = 0; k < 2; k++) {
-        int off = r_outlines[k];
-        int x0 = cx + ((perp_x * off + fwd_x * r_start) >> FP_SHIFT);
-        int y0 = cy + ((perp_y * off + fwd_y * r_start) >> FP_SHIFT);
-        int x1 = cx + ((perp_x * off + fwd_x * r_end) >> FP_SHIFT);
-        int y1 = cy + ((perp_y * off + fwd_y * r_end) >> FP_SHIFT);
-        renderer_draw_line(x0, y0, x1, y1, C_BLACK);
-    }
-    // 3px Solid Metal Body (offsets +2, +3, +4)
-    for (int off = 2; off <= 4; off++) {
-        int x0 = cx + ((perp_x * off + fwd_x * r_start) >> FP_SHIFT);
-        int y0 = cy + ((perp_y * off + fwd_y * r_start) >> FP_SHIFT);
-        int x1 = cx + ((perp_x * off + fwd_x * (r_end - 1)) >> FP_SHIFT);
-        int y1 = cy + ((perp_y * off + fwd_y * (r_end - 1)) >> FP_SHIFT);
-        uint16_t col = (off == 2) ? C_PIPE_HI : ((off == 3) ? C_PIPE_MID : C_FLOOR_DARK);
-        renderer_draw_line(x0, y0, x1, y1, col);
-    }
-    // Right heavy muzzle brake cap
-    {
-        int mx0 = cx + ((perp_x * 1 + fwd_x * r_end) >> FP_SHIFT);
-        int my0 = cy + ((perp_y * 1 + fwd_y * r_end) >> FP_SHIFT);
-        int mx1 = cx + ((perp_x * 5 + fwd_x * r_end) >> FP_SHIFT);
-        int my1 = cy + ((perp_y * 5 + fwd_y * r_end) >> FP_SHIFT);
-        renderer_draw_line(mx0, my0, mx1, my1, C_BLACK);
+    // Solid, anti-tear contiguous rasterization for twin barrels (28x28 bounding box)
+    for (int dy = -14; dy <= 14; dy++) {
+        for (int dx = -14; dx <= 14; dx++) {
+            int px = cx + dx;
+            int py = cy + dy;
+            if (px < 0 || px >= SCREEN_W || py < 0 || py >= SCREEN_H) continue;
+
+            int lp = 0;
+            int b = get_barrel_id(dx, dy, fwd_x, fwd_y, perp_x, perp_y, l_start, l_end, r_start, r_end, &lp);
+            if (!b) continue;
+
+            // 4-neighbor perimeter outline detection: guaranteed 100% solid, non-broken black contour
+            int is_outline = (get_barrel_id(dx + 1, dy, fwd_x, fwd_y, perp_x, perp_y, l_start, l_end, r_start, r_end, NULL) != b) ||
+                             (get_barrel_id(dx - 1, dy, fwd_x, fwd_y, perp_x, perp_y, l_start, l_end, r_start, r_end, NULL) != b) ||
+                             (get_barrel_id(dx, dy + 1, fwd_x, fwd_y, perp_x, perp_y, l_start, l_end, r_start, r_end, NULL) != b) ||
+                             (get_barrel_id(dx, dy - 1, fwd_x, fwd_y, perp_x, perp_y, l_start, l_end, r_start, r_end, NULL) != b);
+
+            if (is_outline) {
+                renderer_draw_pixel(px, py, C_BLACK);
+            } else {
+                if (b == 1) {
+                    if (lp == -4) renderer_draw_pixel(px, py, C_PIPE_HI);
+                    else if (lp == -3) renderer_draw_pixel(px, py, C_PIPE_MID);
+                    else renderer_draw_pixel(px, py, C_FLOOR_DARK);
+                } else {
+                    if (lp == 2) renderer_draw_pixel(px, py, C_PIPE_HI);
+                    else if (lp == 3) renderer_draw_pixel(px, py, C_PIPE_MID);
+                    else renderer_draw_pixel(px, py, C_FLOOR_DARK);
+                }
+            }
+        }
     }
 
     // 3. OPTION 3: FRICTION SPARKS FROM BOLT EJECTION PORTS

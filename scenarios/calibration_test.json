@@ -1,0 +1,107 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 30,
+      "capture": "01_boot_prep"
+    },
+    {
+      "tap": {
+        "x": 120,
+        "y": 178
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 15,
+      "capture": "02_calibration_screen"
+    },
+    {
+      "button_down": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_up": "DOWN",
+      "frames": 10
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 10,
+      "capture": "03_calibration_dpad_modified"
+    },
+    {
+      "tap": {
+        "x": 172,
+        "y": 26
+      },
+      "frames": 5
+    },
+    {
+      "release": true,
+      "frames": 10,
+      "capture": "04_calibration_touch_modified"
+    },
+    {
+      "tap": {
+        "x": 226,
+        "y": 8
+      },
+      "frames": 5
+    },
+    {
+      "release": true,
+      "frames": 15,
+      "capture": "05_returned_to_prep"
+    },
+    {
+      "button_down": "SELECT",
+      "frames": 5
+    },
+    {
+      "button_up": "SELECT",
+      "frames": 15,
+      "capture": "06_reentered_calibration"
+    },
+    {
+      "button_down": "A",
+      "frames": 5
+    },
+    {
+      "button_up": "A",
+      "frames": 60,
+      "capture": "07_combat_wave_running"
+    },
+    {
+      "frames": 60,
+      "capture": "08_combat_wave_advanced"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_boot_prep",
+      "to": "02_calibration_screen",
+      "min_changed_pixels": 500
+    }
+  }
+}

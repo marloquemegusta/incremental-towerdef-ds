@@ -1,5 +1,6 @@
 #include "game.h"
 #include "tiles.h"
+#include "turret_data.h"
 
 uint16_t g_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 
@@ -186,6 +187,21 @@ void renderer_draw_text(int x, int y, const char *str, uint16_t color) {
         } else if (c == '<') {
             custom[0] = 0x1; custom[1] = 0x2; custom[2] = 0x4; custom[3] = 0x2; custom[4] = 0x1;
             glyph = custom;
+        } else if (c == ':') {
+            custom[0] = 0x0; custom[1] = 0x2; custom[2] = 0x0; custom[3] = 0x2; custom[4] = 0x0;
+            glyph = custom;
+        } else if (c == '.') {
+            custom[0] = 0x0; custom[1] = 0x0; custom[2] = 0x0; custom[3] = 0x0; custom[4] = 0x2;
+            glyph = custom;
+        } else if (c == '/') {
+            custom[0] = 0x1; custom[1] = 0x2; custom[2] = 0x2; custom[3] = 0x4; custom[4] = 0x4;
+            glyph = custom;
+        } else if (c == '$') {
+            custom[0] = 0x2; custom[1] = 0x7; custom[2] = 0x6; custom[3] = 0x7; custom[4] = 0x2;
+            glyph = custom;
+        } else if (c == '%') {
+            custom[0] = 0x5; custom[1] = 0x1; custom[2] = 0x2; custom[3] = 0x4; custom[4] = 0x5;
+            glyph = custom;
         }
 
         if (glyph) {
@@ -228,12 +244,8 @@ void renderer_draw_turret(const Turret *t, int is_selected, int show_cone) {
         }
     }
 
-    // 2. Pixel-Art Shaded Turret Base with Rivets and Ammo Canister
-    tiles_draw_turret_base(t->x, t->y, is_selected);
-
-    // 3. Shaded Twin Heavy Bolter Barrels with Alternating Recoil and Muzzle Flash
-    tiles_draw_twin_bolters(t->x, t->y, t->current_angle, t->flash_timer > 0,
-                            t->barrel_recoil_l, t->barrel_recoil_r, t->last_barrel);
+    // 2. Pixel-art canonical 32-angle discrete sprite (RotSprite)
+    turret_draw_angle(t->x, t->y, t->type, t->current_angle, is_selected);
 }
 
 void renderer_draw_enemies(void) {
@@ -341,6 +353,12 @@ void renderer_draw_ui_prep(void) {
     sprintf(dock_label, "BOLTER [%d]", g_game.turret_dock_count);
     renderer_draw_text(30, 177, dock_label, (g_game.turret_dock_count > 0) ? COLOR_HAZARD_YELLOW : COLOR_IRON_LIGHT);
 
+    // Dock button for CALIBRAR (x: 84..160, y: 171..188)
+    renderer_fill_rect(84, 171, 76, 17, COLOR_HAZARD_BLACK);
+    renderer_draw_rect(84, 171, 76, 17, COLOR_AMBER);
+    renderer_fill_rect(87, 174, 4, 11, COLOR_HAZARD_YELLOW);
+    renderer_draw_text(94, 177, "CALIBRAR", COLOR_AMBER);
+
     // Dock button for FORGE STC (Branching Skill Tree): (x: 164..248, y: 171..188)
     renderer_fill_rect(164, 171, 84, 17, COLOR_HAZARD_BLACK);
     renderer_draw_rect(164, 171, 84, 17, COLOR_BRASS);
@@ -361,6 +379,121 @@ void renderer_draw_ui_prep(void) {
 
 void renderer_draw_ui_workshop(void) {
     skills_draw_tree();
+}
+
+void renderer_draw_ui_calibration(void) {
+    renderer_clear(COLOR_DECK_FLOOR);
+
+    // Header (y: 0..17)
+    renderer_fill_rect(0, 0, SCREEN_W, 18, COLOR_IRON_PANEL);
+    renderer_draw_line(0, 18, SCREEN_W - 1, 18, COLOR_IRON_BORDER);
+    for (int x = 0; x < SCREEN_W; x += 4) {
+        renderer_draw_pixel(x, 17, COLOR_HAZARD_YELLOW);
+        renderer_draw_pixel(x + 1, 17, COLOR_HAZARD_YELLOW);
+    }
+    renderer_draw_text(6, 6, "TUNING DECK - CALIBRACION M1", COLOR_HAZARD_YELLOW);
+
+    // [VOLVER] button (x: 202..252, y: 2..15)
+    renderer_fill_rect(202, 2, 50, 14, COLOR_HAZARD_BLACK);
+    renderer_draw_rect(202, 2, 50, 14, COLOR_IRON_LIGHT);
+    renderer_draw_text(208, 6, "VOLVER", COLOR_WHITE);
+
+    static const char *labels[CALIBRATION_ROWS] = {
+        "ACTIVE MAP",
+        "ENEMY COUNT",
+        "ENEMY HP",
+        "ENEMY SPEED",
+        "SPAWN DELAY",
+        "TURRET DAMAGE",
+        "TURRET CADENCE",
+        "CONE SPREAD",
+        "SWEEP SPEED",
+        "TURRET RANGE",
+        "STARTING SCRAP",
+        "BASE LIVES"
+    };
+
+    static const char *units[CALIBRATION_ROWS] = {
+        "M1",
+        "XENOS",
+        "HP",
+        "PX/F",
+        "FRAMES",
+        "DMG",
+        "FRAMES",
+        "DEG",
+        "DEG/F",
+        "PX",
+        "$",
+        "HP"
+    };
+
+    char val_buf[16];
+    for (int i = 0; i < CALIBRATION_ROWS; i++) {
+        int y = 20 + i * 11;
+        int is_sel = (g_calibration.selected_row == i);
+
+        if (is_sel) {
+            renderer_fill_rect(4, y - 1, 248, 10, COLOR_IRON_BORDER);
+            renderer_draw_text(6, y + 1, ">", COLOR_HAZARD_YELLOW);
+        }
+
+        uint16_t txt_col = is_sel ? COLOR_WHITE : COLOR_IRON_LIGHT;
+        renderer_draw_text(14, y + 1, labels[i], txt_col);
+
+        switch (i) {
+            case 0:
+                if (g_calibration.selected_map == 0) sprintf(val_buf, "TRINCHERA");
+                else if (g_calibration.selected_map == 1) sprintf(val_buf, "DOBLE S");
+                else sprintf(val_buf, "ROTONDA");
+                break;
+            case 1: sprintf(val_buf, "%d", g_calibration.enemy_count); break;
+            case 2: sprintf(val_buf, "%d", g_calibration.enemy_hp); break;
+            case 3: sprintf(val_buf, "%d.%d", g_calibration.enemy_speed_int / 10, g_calibration.enemy_speed_int % 10); break;
+            case 4: sprintf(val_buf, "%d", g_calibration.spawn_delay); break;
+            case 5: sprintf(val_buf, "%d", g_calibration.turret_damage); break;
+            case 6: sprintf(val_buf, "%d", g_calibration.turret_fire_rate); break;
+            case 7: sprintf(val_buf, "%d", g_calibration.cone_spread); break;
+            case 8: sprintf(val_buf, "%d", g_calibration.sweep_speed); break;
+            case 9: sprintf(val_buf, "%d", g_calibration.turret_range); break;
+            case 10: sprintf(val_buf, "%d", g_calibration.starting_scrap); break;
+            case 11: sprintf(val_buf, "%d", g_calibration.core_lives); break;
+            default: sprintf(val_buf, "0"); break;
+        }
+
+        // [-] touch button
+        renderer_fill_rect(108, y, 10, 8, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(108, y, 10, 8, is_sel ? COLOR_AMBER : COLOR_DARK_GRAY);
+        renderer_draw_text(111, y + 1, "-", COLOR_WHITE);
+
+        // Value text
+        renderer_draw_text(122, y + 1, val_buf, is_sel ? COLOR_HAZARD_YELLOW : COLOR_WHITE);
+
+        // [+] touch button
+        renderer_fill_rect(190, y, 10, 8, COLOR_HAZARD_BLACK);
+        renderer_draw_rect(190, y, 10, 8, is_sel ? COLOR_AMBER : COLOR_DARK_GRAY);
+        renderer_draw_text(193, y + 1, "+", COLOR_WHITE);
+
+        // Unit
+        renderer_draw_text(204, y + 1, units[i], COLOR_DARK_GRAY);
+    }
+
+    // Bottom Controls Bar (y: 156..191)
+    renderer_fill_rect(0, 156, SCREEN_W, 36, COLOR_IRON_PANEL);
+    renderer_draw_line(0, 156, SCREEN_W - 1, 156, COLOR_IRON_BORDER);
+
+    renderer_draw_text(8, 158, "CRUCETA: SELECCIONAR / MODIFICAR", COLOR_IRON_LIGHT);
+
+    // [DEFAULT (Y)] Button
+    renderer_fill_rect(6, 168, 76, 20, COLOR_HAZARD_BLACK);
+    renderer_draw_rect(6, 168, 76, 20, COLOR_IRON_LIGHT);
+    renderer_draw_text(10, 175, "RESET [Y]", COLOR_WHITE);
+
+    // [PROBAR PARTIDA (A)] Button
+    renderer_fill_rect(86, 168, 164, 20, COLOR_HAZARD_BLACK);
+    renderer_draw_rect(86, 168, 164, 20, COLOR_HAZARD_YELLOW);
+    renderer_fill_rect(90, 172, 6, 12, COLOR_LED_GREEN);
+    renderer_draw_text(102, 175, "PROBAR PARTIDA [A]", COLOR_HAZARD_YELLOW);
 }
 
 void renderer_present(void) {
