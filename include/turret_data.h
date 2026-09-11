@@ -19,5 +19,6 @@ typedef struct {
 extern const TurretSpriteDef g_turret_sprites[TURRET_TYPE_COUNT];
 
 void turret_draw_sprite_frame(int cx, int cy, int type, int frame_idx, int is_selected);
+void turret_draw_angle(int cx, int cy, int type, int angle_256, int is_selected);
 
 #endif // TURRET_DATA_H

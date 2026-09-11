@@ -1,0 +1,121 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 30
+    },
+    {
+      "tap": {
+        "x": 120,
+        "y": 178
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 15,
+      "capture": "round_01_calibration"
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_down": "LEFT",
+      "frames": 5
+    },
+    {
+      "button_up": "LEFT",
+      "frames": 10,
+      "capture": "round_02_count_min"
+    },
+    {
+      "button_down": "A",
+      "frames": 5
+    },
+    {
+      "button_up": "A",
+      "frames": 60,
+      "capture": "round_03_wave_running"
+    },
+    {
+      "frames": 250,
+      "capture": "round_04_after_wave"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "round_01_calibration",
+      "to": "round_02_count_min",
+      "min_changed_pixels": 20
+    }
+  }
+}

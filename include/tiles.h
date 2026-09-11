@@ -48,5 +48,8 @@ extern const uint16_t g_s1_tiles[17][256];
 extern const uint8_t g_s1_map[12][16];
 extern const uint16_t g_hb_frames[11][1024];
 extern const uint16_t g_las_frames[6][1024];
+extern const uint16_t *g_map_backgrounds[3];
+extern const Waypoint *g_map_waypoints[3];
+extern const int g_map_waypoint_counts[3];
 
 #endif // TILES_H

@@ -244,6 +244,8 @@ int telemetry_gfx_get_selected_turret(void) { return s_selected_turret; }
 int telemetry_gfx_is_detail_mode(void) { return s_detail_mode; }
 
 void telemetry_gfx_update(int keys_down, int keys_held) {
+    if (g_game.mode == MODE_CALIBRATION) return;
+
     // 1. Tab Switching with L / R
     if (keys_down & KEY_L) {
         s_active_tab = (s_active_tab + 2) % 3;
@@ -571,7 +573,7 @@ static void render_tab_swarm(void) {
 
     // Draw miniature trench path
     // Scale: screen 256x192 -> radar 100x80 (offset x=12, y=70, scale /2.5)
-    for (int wp = 0; wp < MAX_WAYPOINTS - 1; wp++) {
+    for (int wp = 0; wp < g_waypoint_count - 1; wp++) {
         int x0 = 14 + (g_waypoints[wp].x * 100) / SCREEN_W;
         int y0 = 70 + (g_waypoints[wp].y * 80) / SCREEN_H;
         int x1 = 14 + (g_waypoints[wp + 1].x * 100) / SCREEN_W;
@@ -612,7 +614,8 @@ static void render_tab_swarm(void) {
     sprintf(buf, "ACTIVAS EN CAMPO: %d", g_game.enemies_alive);
     top_draw_text(130, 106, buf, COLOR_HAZARD_YELLOW);
 
-    sprintf(buf, "PURGADOS: %d / %d", g_game.enemies_killed, TOTAL_WAVE_ENEMIES);
+    int total_enemies = (g_calibration.enemy_count > 0) ? g_calibration.enemy_count : TOTAL_WAVE_ENEMIES;
+    sprintf(buf, "PURGADOS: %d / %d", g_game.enemies_killed, total_enemies);
     top_draw_text(130, 118, buf, COLOR_PHOSPHOR_GREEN);
 
     sprintf(buf, "BRECHAS SANCTUM : %d", g_game.enemies_breached);
@@ -620,7 +623,7 @@ static void render_tab_swarm(void) {
 
     // Wave progress gauge
     top_draw_text(130, 142, "PRESION OLEADA:", COLOR_WHITE);
-    top_draw_gauge(130, 152, 114, 6, g_game.enemies_killed, TOTAL_WAVE_ENEMIES, COLOR_AMBER, COLOR_BLACK);
+    top_draw_gauge(130, 152, 114, 6, g_game.enemies_killed, total_enemies, COLOR_AMBER, COLOR_BLACK);
 }
 
 static void render_tab_forge(void) {

@@ -132,8 +132,29 @@ typedef enum {
     MODE_PREPARATION = 0,
     MODE_WAVE,
     MODE_GAME_OVER,
-    MODE_WORKSHOP
+    MODE_WORKSHOP,
+    MODE_CALIBRATION
 } GameMode;
+
+#define CALIBRATION_ROWS 12
+
+typedef struct {
+    int enemy_count;          // 5..50, default: 12
+    int enemy_hp;             // 5..60, default: 15
+    int enemy_speed_int;      // speed in tenths of px/f: 4..20 (0.4..2.0), default: 8
+    int spawn_delay;          // 15..90 frames, default: 40
+    int turret_damage;        // 2..25, default: 5
+    int turret_fire_rate;     // 4..20 frames, default: 8
+    int cone_spread;          // 10..90 deg, default: 35
+    int sweep_speed;          // 1..4 deg/f, default: 1
+    int turret_range;         // 40..90 px, default: 65
+    int starting_scrap;       // 50..500 $, default: 150
+    int core_lives;           // 1..30 HP, default: 10
+    int selected_map;         // 0..2 (0=Trinchera, 1=Doble S, 2=Rotonda)
+    int selected_row;         // 0..11
+} RunCalibration;
+
+extern RunCalibration g_calibration;
 
 typedef struct {
     int firerate_lvl;
@@ -173,7 +194,9 @@ extern Turret g_turrets[MAX_TURRETS];
 extern Enemy g_enemies[MAX_ENEMIES];
 extern Bullet g_bullets[MAX_BULLETS];
 extern Splatter g_splatters[MAX_SPLATTERS];
-extern const Waypoint g_waypoints[MAX_WAYPOINTS];
+extern Waypoint g_waypoints[MAX_WAYPOINTS];
+extern int g_waypoint_count;
+extern const uint16_t *g_current_map_bg;
 extern uint16_t g_backbuffer[SCREEN_W * SCREEN_H];
 
 // Math
@@ -189,7 +212,12 @@ void game_update_simulation(void);
 void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_workshop(touchPosition touch, int keys_down, int keys_held);
+void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held);
 void game_reset_to_prep(void);
+void map_select(int map_index);
+void calibration_init(void);
+void calibration_apply_settings(void);
+void calibration_apply_and_start(void);
 void game_add_splatter(int x, int y, uint16_t color);
 int game_is_pos_valid(int x, int y);
 
@@ -210,6 +238,7 @@ void renderer_draw_bullets(void);
 void renderer_draw_splatters(void);
 void renderer_draw_ui_prep(void);
 void renderer_draw_ui_workshop(void);
+void renderer_draw_ui_calibration(void);
 void renderer_present(void);
 
 // Telemetry (Top Cogitator)

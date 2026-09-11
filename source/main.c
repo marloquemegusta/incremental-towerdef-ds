@@ -23,7 +23,16 @@ int main(void) {
         telemetry_gfx_update(keys_down, keys_held);
 
         // Bottom Screen Input processing
-        if (g_game.mode == MODE_PREPARATION) {
+        if (keys_down & KEY_SELECT) {
+            if (g_game.mode == MODE_CALIBRATION) {
+                calibration_apply_settings();
+                g_game.mode = MODE_PREPARATION;
+            } else {
+                g_game.mode = MODE_CALIBRATION;
+            }
+        } else if (g_game.mode == MODE_CALIBRATION) {
+            game_handle_input_calibration(touch, keys_down, keys_held);
+        } else if (g_game.mode == MODE_PREPARATION) {
             game_handle_input_prep(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_WAVE) {
             game_handle_input_wave(touch, keys_down, keys_held);
@@ -41,7 +50,6 @@ int main(void) {
 
         // Visual render (Bottom Screen)
         if (g_game.mode == MODE_PREPARATION || g_game.mode == MODE_WAVE) {
-            renderer_clear(COLOR_DECK_FLOOR);
             renderer_draw_trench_path();
             renderer_draw_splatters();
             renderer_draw_enemies();
@@ -56,13 +64,17 @@ int main(void) {
             }
 
             renderer_draw_ui_prep();
+        } else if (g_game.mode == MODE_CALIBRATION) {
+            renderer_draw_ui_calibration();
         } else {
             renderer_draw_ui_workshop();
         }
-        renderer_present();
 
         // Visual render (Top Screen 16-bit Telemetry)
         telemetry_gfx_render();
+
+        // Single Synchronized VBlank Presentation for Both Screens
+        renderer_present();
         telemetry_gfx_present();
     }
 

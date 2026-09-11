@@ -21,7 +21,8 @@ Write-Host "Subiendo $rom a $remote"
 & $curl.Source --connect-timeout 8 --max-time 60 --fail --show-error --ftp-pasv --user "$User`:$Password" --upload-file $rom $remote
 if ($LASTEXITCODE -ne 0) { throw "FTP falló. Valida IP=$HostName, puerto=$Port y que la DS esté disponible." }
 $listing = & $curl.Source --connect-timeout 8 --max-time 20 --fail --silent --show-error --ftp-pasv --user "$User`:$Password" "$base/"
-if ($LASTEXITCODE -ne 0 -or $listing -notmatch "(?m)$([regex]::Escape($RemoteName))\s*$") {
+$listingText = $listing -join "`n"
+if ($LASTEXITCODE -ne 0 -or $listingText -notmatch "(?m)$([regex]::Escape($RemoteName))\s*$") {
     throw "La subida no pudo verificarse. Valida IP=$HostName, puerto=$Port, ruta=$RemoteDirectory y nombre=$RemoteName."
 }
 Write-Output "FTP_UPLOAD_RESULT=PASS remote=$remote"

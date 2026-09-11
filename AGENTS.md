@@ -19,3 +19,25 @@
    - **Alineación Estricta a Frontera de Retícula (Coordenadas 0 y 31):** La línea exterior del bordillo se fija invariablemente en la frontera del bloque modular (coordenadas 0 y 31). De este modo, los tiles de suelo contiguos y su retícula de baldosas permanecen 100% íntegros y nunca son intersectados, recortados ni invadidos por franjas arbitrarias de hormigón. En giros de 90°, los codos interiores coinciden con los vértices exactos de la rejilla (0, 31), (31, 0), etc., y los arcos exteriores curvan con radio exacto \(R=31\text{ px}\).
    - **Tridimensionalidad de Trinchera Hundida:** La calzada es una trinchera balística hundida a cota inferior respecto a la acera/plaza. El desnivel se representa obligatoriamente con sombra arrojada profunda (3-4 px) bajo el labio del bordillo, y se acentúa mediante escalinatas de piedra de 3 peldaños (`curb_stairs`), sumideros con rejillas de fundición (`curb_drain`), colectores pluviales (`curb_pipe`) y parapetos de sacos terreros en las cornisas elevadas.
 
+## Protocolo de Sesiones Atómicas, Ramas y Worktrees
+1. **Un Chat = Una Sesión Atómica (Feature-Scoped):** Cada nueva conversación con el asistente se dedica exclusivamente a una feature, fix o iteración concreta, evitando dispersión de contexto.
+2. **Estrategia de Ramas:**
+   - `main`: Rama de producción/estable. Solo contiene código probado en hardware/emulación y aprobado por el usuario.
+   - `feat/<nombre-feature>`: Rama de trabajo creada al inicio de la sesión.
+3. **Uso de Git Worktrees para Aislamiento:**
+   - Cuando se requiere trabajar en paralelo o aislar dependencias/artefactos de compilación sin ensuciar el árbol principal:
+     ```bash
+     git worktree add ../towerds-<feature> -b feat/<feature>
+     ```
+   - Al concluir y fusionar a `main`, el worktree se limpia:
+     ```bash
+     git worktree remove ../towerds-<feature>
+     ```
+4. **Cierre y Entrega de Sesión:**
+   - Compilación limpia con `scripts/build-project.ps1` (Docker BlocksDS).
+   - Validación visual determinista con `scripts/run-scenario.ps1` (DeSmuME headless).
+   - Subida opcional a la consola mediante `scripts/upload-rom.ps1`.
+   - Commit semántico en la rama de la feature.
+   - Aprobación explícita del usuario antes de merge a `main` o tagging de versión (`v0.1`, `v0.2`, etc.).
+
+
