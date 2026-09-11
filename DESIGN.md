@@ -58,6 +58,14 @@ Selección oficial de enemigos para el motor de juego (con todas las 18 variante
 | **Tier 4** | **4B. Haruspex Fauces Vivas** | $20 \times 20$ px | Bestia de asedio pesada con boca circular dentada y tentáculos prensiles. | 2.8k HP \| 5 Arm \| 850 Chatarra |
 | **Tier 5** | **5A. Bio-Titán Hierofante** | $28 \times 28$ px | Coloso arácnido de 4 zancas titánicas, chimeneas de bio-humo y cañones. | 40k HP \| 8 Arm \| 20.000 Chatarra |
 
+### Paleta Cromática Canónica del Enjambre (Regla de Exclusividad)
+Para garantizar legibilidad visual inmediata contra el suelo metálico de las trincheras (`RGB 18, 18, 24`), la gama violeta/púrpura queda **estrictamente reservada para las entidades del enjambre**:
+- **Blanco Hueso / Exoesqueleto:** `RGB(250, 245, 235)` (brillo primario) y `RGB(215, 205, 190)` (tono medio).
+- **Quitina Violeta Radiante (Silueta & Patas):** `RGB(115, 35, 155)` (base sólida) y `RGB(155, 55, 195)` (medio).
+- **Bioluminiscencia & Extremidades Menores:** `RGB(205, 85, 240)` y resalte `RGB(240, 150, 255)`.
+- **Órganos Sensoriales & Toxinas:** Ojos en Rojo Sangre `RGB(255, 40, 30)` y bio-vapores Verde Neón `RGB(65, 255, 50)`.
+*Regla de exclusividad:* Queda terminantemente prohibido utilizar matices púrpuras o magentas en los tiles de suelo, paredes, aceras o estructuras del Adeptus Mechanicus, asegurando un contraste figura-fondo infinito en cualquier pantalla de Nintendo DS.
+
 ---
 
 ## 5. Progresión Incremental (De 20 a 20.000.000)

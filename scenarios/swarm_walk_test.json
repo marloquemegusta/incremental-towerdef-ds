@@ -1,0 +1,36 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 30,
+      "capture": "01_boot_prep"
+    },
+    {
+      "tap": {
+        "x": 200,
+        "y": 10
+      },
+      "frames": 5
+    },
+    {
+      "release": true,
+      "frames": 80,
+      "capture": "02_swarm_emerging"
+    },
+    {
+      "frames": 80,
+      "capture": "03_swarm_in_trench"
+    },
+    {
+      "frames": 100,
+      "capture": "04_heavy_beasts_march"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_boot_prep",
+      "to": "03_swarm_in_trench",
+      "min_changed_pixels": 200
+    }
+  }
+}

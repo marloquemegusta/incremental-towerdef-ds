@@ -54,12 +54,12 @@
 #define COLOR_CONE_LINE      (RGB15(18, 14, 2) | BIT(15))
 #define COLOR_CONE_DASH      (RGB15(28, 22, 0) | BIT(15))
 
-// Xenos / Tyranid bio-mass
-#define COLOR_XENOS_CHITIN   (RGB15(18, 8, 12) | BIT(15))
-#define COLOR_XENOS_FLESH    (RGB15(28, 14, 16) | BIT(15))
-#define COLOR_XENOS_EYE      (RGB15(31, 28, 2) | BIT(15))
-#define COLOR_XENOS_ICHOR    (RGB15(4, 28, 6) | BIT(15))
-#define COLOR_BLOOD_DARK     (RGB15(12, 1, 1) | BIT(15))
+// Xenos / Tyranid bio-mass (High-Contrast Radiant Violet Palette - Exclusively for Bioclasts)
+#define COLOR_XENOS_CHITIN   (RGB15(14, 4, 19) | BIT(15))  // RGB(115, 35, 155) Radiant Violet Chitin
+#define COLOR_XENOS_FLESH    (RGB15(25, 10, 30) | BIT(15)) // RGB(205, 85, 240) Luminous Bioluminescence
+#define COLOR_XENOS_EYE      (RGB15(31, 5, 4) | BIT(15))   // Pure Piercing Red
+#define COLOR_XENOS_ICHOR    (RGB15(8, 31, 6) | BIT(15))   // Toxic Green
+#define COLOR_BLOOD_DARK     (RGB15(16, 2, 8) | BIT(15))   // Deep Xenos Splatter
 
 // UI / Terminal
 #define COLOR_PHOSPHOR_GREEN (RGB15(6, 31, 10) | BIT(15))
@@ -87,6 +87,7 @@ typedef struct {
 } Enemy;
 
 typedef struct {
+    int type;            // 0 = Bolter, 1 = Lascannon
     int x, y;            // Screen coordinates
     int center_angle;    // 0..255
     int current_angle;   // 0..255
