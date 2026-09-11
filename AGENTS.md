@@ -27,12 +27,13 @@
 2. **Estrategia de Ramas:**
    - `main`: Rama de producción/estable. Solo contiene código probado en hardware/emulación y aprobado por el usuario.
    - `feat/<nombre-feature>`: Rama de trabajo creada al inicio de la sesión.
-3. **Uso de Git Worktrees para Aislamiento:**
-   - Cuando se requiere trabajar en paralelo o aislar dependencias/artefactos de compilación sin ensuciar el árbol principal:
+3. **Uso Obligatorio de Git Worktrees para Aislamiento:**
+   - En cada nueva sesión, se debe instanciar obligatoriamente un worktree físico separado fuera del árbol principal para mantener el entorno aislado:
      ```bash
      git worktree add ../towerds-<feature> -b feat/<feature>
      ```
-   - Al concluir y fusionar a `main`, el worktree se limpia:
+   - Todo el trabajo de la sesión se desarrolla dentro de dicho worktree.
+   - Al concluir, ser aprobado y fusionar a `main`, el worktree se limpia:
      ```bash
      git worktree remove ../towerds-<feature>
      ```
