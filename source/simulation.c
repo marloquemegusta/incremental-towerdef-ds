@@ -314,8 +314,7 @@ void game_reset_to_prep(void) {
     g_game.enemies_alive = 0;
     g_game.enemies_killed = 0;
     g_game.enemies_breached = 0;
-    g_game.spawn_timer_small = 0;
-    g_game.spawn_timer_large = 0;
+    memset(g_game.spawn_timers, 0, sizeof(g_game.spawn_timers));
     g_game.sim_ticks_elapsed = 0;
 
     memset(g_enemies, 0, sizeof(g_enemies));
@@ -363,7 +362,8 @@ void game_start_wave(void) {
     g_game.selected_turret = 0;
 }
 
-static void spawn_enemy_caste(int is_large) {
+static void spawn_enemy_variant(int variant) {
+    if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) {
             g_enemies[i].active = 1;
@@ -377,13 +377,7 @@ static void spawn_enemy_caste(int is_large) {
             int base_spd = (g_calibration.enemy_speed_int > 0) ? ((g_calibration.enemy_speed_int * FP_ONE) / 10) : FP_ONE;
             int jitter = ((rand() % 21) - 10) * (FP_ONE / 100);
             
-            // Small: T0 (Larva), T1 (Ripper), T2 (Hormagaunt)
-            // Large: T3 (Ravener), T4 (Carnifex), T5 (Hierophant)
-            if (is_large) {
-                g_enemies[i].variant = 3 + (rand() % 3);
-            } else {
-                g_enemies[i].variant = rand() % 3;
-            }
+            g_enemies[i].variant = variant;
             
             // Speed scaled by biocaste (Swarm runs fast, Colossals tread slowly)
             // T0: 1.2x, T1: 1.3x, T2: 1.5x, T3: 1.1x, T4: 0.6x, T5: 0.35x
@@ -395,13 +389,13 @@ static void spawn_enemy_caste(int is_large) {
                  60, // T4 Carnifex
                  35  // T5 Hierophant
             };
-            int tier_mult = s_tier_speed_mult[g_enemies[i].variant];
+            int tier_mult = s_tier_speed_mult[variant];
             int caste_spd = (base_spd * tier_mult) / 100;
             g_enemies[i].speed = caste_spd + jitter;
             // Scale HP proportionally by caste: Larva (4), Ripper (12), Hormagaunt (25), Ravener (50), Carnifex (100), Hierophant (200)
             static const int s_tier_hp_base[ENEMY_VARIANT_COUNT] = { 4, 10, 22, 45, 90, 180 };
             int calib_mult = (g_calibration.enemy_hp > 0) ? g_calibration.enemy_hp : 15;
-            g_enemies[i].hp = (s_tier_hp_base[g_enemies[i].variant] * calib_mult) / 15;
+            g_enemies[i].hp = (s_tier_hp_base[variant] * calib_mult) / 15;
 
             // Initial position (check if first segment is vertical or horizontal)
             if (g_waypoint_count > 1 && g_waypoints[0].x == g_waypoints[1].x) {
@@ -441,25 +435,20 @@ void game_update_simulation(void) {
 
     g_game.sim_ticks_elapsed++;
 
-    // 1. Spawning (Supports Infinite Waves when enemy_count == 0)
+    // 1. Spawning (Supports Infinite Waves when enemy_count == 0, and individual delays per biocaste)
     int is_infinite = (g_calibration.enemy_count == 0);
     int max_to_spawn = is_infinite ? 99999999 : g_calibration.enemy_count;
-    int delay_small = (g_calibration.spawn_delay_small > 0) ? g_calibration.spawn_delay_small : 25;
-    int delay_large = (g_calibration.spawn_delay_large > 0) ? g_calibration.spawn_delay_large : 80;
 
-    if (g_game.enemies_spawned < max_to_spawn) {
-        g_game.spawn_timer_small++;
-        if (g_game.spawn_timer_small >= delay_small) {
-            g_game.spawn_timer_small = 0;
-            spawn_enemy_caste(0); // Small xenos (T0..T2)
-        }
-    }
+    for (int v = 0; v < ENEMY_VARIANT_COUNT; v++) {
+        int delay = g_calibration.spawn_delay[v];
+        if (delay <= 0) continue; // 0 = disabled / OFF for this biocaste
 
-    if (g_game.enemies_spawned < max_to_spawn) {
-        g_game.spawn_timer_large++;
-        if (g_game.spawn_timer_large >= delay_large) {
-            g_game.spawn_timer_large = 0;
-            spawn_enemy_caste(1); // Large xenos (T3..T5)
+        if (g_game.enemies_spawned < max_to_spawn) {
+            g_game.spawn_timers[v]++;
+            if (g_game.spawn_timers[v] >= delay) {
+                g_game.spawn_timers[v] = 0;
+                spawn_enemy_variant(v);
+            }
         }
     }
 
@@ -850,8 +839,15 @@ void calibration_init(void) {
     g_calibration.enemy_count = 12;
     g_calibration.enemy_hp = 15;
     g_calibration.enemy_speed_int = 8;     // 0.8 px/frame
-    g_calibration.spawn_delay_small = 25;  // 25 frames (T0-T2: Larva, Ripper, Hormagaunt)
-    g_calibration.spawn_delay_large = 80;  // 80 frames (T3-T5: Ravener, Carnifex, Hierophant)
+    
+    // Per-variant spawn delays in frames (0 = OFF)
+    g_calibration.spawn_delay[0] = 20;     // T0 Larva (frequent)
+    g_calibration.spawn_delay[1] = 35;     // T1 Ripper
+    g_calibration.spawn_delay[2] = 50;     // T2 Hormagaunt
+    g_calibration.spawn_delay[3] = 75;     // T3 Ravener
+    g_calibration.spawn_delay[4] = 120;    // T4 Carnifex
+    g_calibration.spawn_delay[5] = 180;    // T5 Hierophant
+
     g_calibration.explosion_force = 2;     // 2 (normal/satisfying)
     g_calibration.turret_damage = 5;
     g_calibration.turret_fire_rate = 8;    // 8 frames
@@ -885,52 +881,58 @@ static void modify_param(int row, int delta) {
             if (g_calibration.enemy_speed_int < 3) g_calibration.enemy_speed_int = 3;
             if (g_calibration.enemy_speed_int > 25) g_calibration.enemy_speed_int = 25;
             break;
-        case 4:
-            g_calibration.spawn_delay_small += delta * 2;
-            if (g_calibration.spawn_delay_small < 5) g_calibration.spawn_delay_small = 5;
-            if (g_calibration.spawn_delay_small > 180) g_calibration.spawn_delay_small = 180;
+
+        // Individual spawn delays per biocaste (0 = OFF, 5..300 frames)
+        case 4: // T0: Larva
+        case 5: // T1: Ripper
+        case 6: // T2: Hormagaunt
+        case 7: // T3: Ravener
+        case 8: // T4: Carnifex
+        case 9: // T5: Hierophant
+            {
+                int v = row - 4;
+                g_calibration.spawn_delay[v] += delta * 2;
+                if (g_calibration.spawn_delay[v] < 0) g_calibration.spawn_delay[v] = 0;
+                if (g_calibration.spawn_delay[v] > 300) g_calibration.spawn_delay[v] = 300;
+            }
             break;
-        case 5:
-            g_calibration.spawn_delay_large += delta * 5;
-            if (g_calibration.spawn_delay_large < 10) g_calibration.spawn_delay_large = 10;
-            if (g_calibration.spawn_delay_large > 300) g_calibration.spawn_delay_large = 300;
-            break;
-        case 6:
+
+        case 10:
             g_calibration.explosion_force += delta;
             if (g_calibration.explosion_force < 1) g_calibration.explosion_force = 1;
             if (g_calibration.explosion_force > 5) g_calibration.explosion_force = 5;
             break;
-        case 7:
+        case 11:
             g_calibration.turret_damage += delta;
             if (g_calibration.turret_damage < 1) g_calibration.turret_damage = 1;
             if (g_calibration.turret_damage > 50) g_calibration.turret_damage = 50;
             break;
-        case 8:
+        case 12:
             g_calibration.turret_fire_rate += delta;
             if (g_calibration.turret_fire_rate < 3) g_calibration.turret_fire_rate = 3;
             if (g_calibration.turret_fire_rate > 30) g_calibration.turret_fire_rate = 30;
             break;
-        case 9:
+        case 13:
             g_calibration.cone_spread += delta * 5;
             if (g_calibration.cone_spread < 10) g_calibration.cone_spread = 10;
             if (g_calibration.cone_spread > 120) g_calibration.cone_spread = 120;
             break;
-        case 10:
+        case 14:
             g_calibration.sweep_speed += delta;
             if (g_calibration.sweep_speed < 1) g_calibration.sweep_speed = 1;
             if (g_calibration.sweep_speed > 6) g_calibration.sweep_speed = 6;
             break;
-        case 11:
+        case 15:
             g_calibration.turret_range += delta * 5;
             if (g_calibration.turret_range < 30) g_calibration.turret_range = 30;
             if (g_calibration.turret_range > 120) g_calibration.turret_range = 120;
             break;
-        case 12:
+        case 16:
             g_calibration.starting_scrap += delta * 25;
             if (g_calibration.starting_scrap < 0) g_calibration.starting_scrap = 0;
             if (g_calibration.starting_scrap > 999) g_calibration.starting_scrap = 999;
             break;
-        case 13:
+        case 17:
             g_calibration.core_lives += delta;
             if (g_calibration.core_lives < 1) g_calibration.core_lives = 1;
             if (g_calibration.core_lives > 50) g_calibration.core_lives = 50;
@@ -1005,30 +1007,35 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
             return;
         }
 
-        // Bottom [RESET (Y)]: (x: 6..82, y: 166..190)
-        if (touch.px >= 6 && touch.px <= 82 && touch.py >= 166 && touch.py <= 190) {
+        // Bottom [RESET (Y)]: (x: 6..82, y: 168..190)
+        if (touch.px >= 6 && touch.px <= 82 && touch.py >= 168 && touch.py <= 190) {
             calibration_init();
             return;
         }
 
-        // Bottom [PROBAR PARTIDA (A)]: (x: 86..252, y: 166..190)
-        if (touch.px >= 86 && touch.px <= 252 && touch.py >= 166 && touch.py <= 190) {
+        // Bottom [PROBAR PARTIDA (A)]: (x: 86..252, y: 168..190)
+        if (touch.px >= 86 && touch.px <= 252 && touch.py >= 168 && touch.py <= 190) {
             calibration_apply_and_start();
             return;
         }
 
-        // Calibration rows: (y: 20 + i * 10)
-        for (int i = 0; i < CALIBRATION_ROWS; i++) {
-            int ry = 20 + i * 10;
+        // Calibration rows: visible in scroll view (12 visible rows from scroll_top)
+        int scroll_top = g_calibration.selected_row - 6;
+        if (scroll_top < 0) scroll_top = 0;
+        if (scroll_top > CALIBRATION_ROWS - 12) scroll_top = CALIBRATION_ROWS - 12;
+
+        for (int v = 0; v < 12; v++) {
+            int row_idx = scroll_top + v;
+            int ry = 22 + v * 11;
             if (touch.py >= ry - 1 && touch.py <= ry + 9) {
-                g_calibration.selected_row = i;
+                g_calibration.selected_row = row_idx;
                 // [-] button: x: 104..128
                 if (touch.px >= 104 && touch.px <= 128) {
-                    modify_param(i, -1);
+                    modify_param(row_idx, -1);
                 }
                 // [+] button: x: 184..210
                 else if (touch.px >= 184 && touch.px <= 210) {
-                    modify_param(i, 1);
+                    modify_param(row_idx, 1);
                 }
                 break;
             }
