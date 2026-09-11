@@ -54,6 +54,7 @@ int main(void) {
             renderer_draw_splatters();
             renderer_draw_enemies();
             renderer_draw_bullets();
+            renderer_draw_death_particles();
 
             // Render all placed turrets
             for (int t = 0; t < MAX_TURRETS; t++) {

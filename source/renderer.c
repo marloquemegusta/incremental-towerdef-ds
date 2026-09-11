@@ -277,13 +277,82 @@ void renderer_draw_splatters(void) {
         int sx = g_splatters[i].x;
         int sy = g_splatters[i].y;
         uint16_t col = g_splatters[i].color;
+        int sz = g_splatters[i].size;
+        int life = g_splatters[i].life;
 
-        renderer_draw_pixel(sx, sy, col);
-        renderer_draw_pixel(sx + 1, sy, col);
-        renderer_draw_pixel(sx, sy + 1, COLOR_BLOOD_DARK);
-        if (g_splatters[i].life > 30) {
+        // Visual degradation / shrinking as puddle dries and seeps into iron deck
+        if (life < 30) {
+            // Fading single dot
+            renderer_draw_pixel(sx, sy, COLOR_BLOOD_DARK);
+            continue;
+        }
+
+        if (sz == 0) {
+            // Small droplet (1-2 pixels)
+            renderer_draw_pixel(sx, sy, col);
+            if (life > 60) {
+                renderer_draw_pixel(sx + 1, sy, COLOR_BLOOD_DARK);
+            }
+        } else if (sz == 1) {
+            // Medium splatter (2x2 cluster + shadow rim)
+            renderer_draw_pixel(sx, sy, col);
+            renderer_draw_pixel(sx + 1, sy, col);
+            renderer_draw_pixel(sx, sy + 1, COLOR_BLOOD_DARK);
+            renderer_draw_pixel(sx + 1, sy + 1, COLOR_BLOOD_DARK);
+            if (life > 90) {
+                renderer_draw_pixel(sx - 1, sy, col);
+                renderer_draw_pixel(sx, sy - 1, col);
+            }
+        } else {
+            // Large bio-pool / gore chunk (3x3 organic blob)
+            renderer_draw_pixel(sx, sy, col);
+            renderer_draw_pixel(sx + 1, sy, col);
             renderer_draw_pixel(sx - 1, sy, col);
-            renderer_draw_pixel(sx + 1, sy + 1, col);
+            renderer_draw_pixel(sx, sy - 1, col);
+            renderer_draw_pixel(sx, sy + 1, COLOR_BLOOD_DARK);
+            renderer_draw_pixel(sx + 1, sy + 1, COLOR_BLOOD_DARK);
+            renderer_draw_pixel(sx - 1, sy + 1, COLOR_BLOOD_DARK);
+            if (life > 80) {
+                renderer_draw_pixel(sx + 2, sy, col);
+                renderer_draw_pixel(sx, sy + 2, COLOR_BLOOD_DARK);
+            }
+        }
+    }
+}
+
+void renderer_draw_death_particles(void) {
+    for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
+        if (!g_death_particles[i].active) continue;
+
+        int ground_x = FROM_FP(g_death_particles[i].x);
+        int ground_y = FROM_FP(g_death_particles[i].y);
+        int height_z = FROM_FP(g_death_particles[i].z);
+
+        if (ground_x < 0 || ground_x >= SCREEN_W || ground_y < 0 || ground_y >= SCREEN_H) continue;
+
+        // 1. Draw pseudo-3D ground shadow underneath airborne particle
+        if (height_z > 2 && ground_y + 1 < SCREEN_H) {
+            renderer_draw_pixel(ground_x, ground_y, COLOR_HAZARD_BLACK);
+        }
+
+        // 2. Projected airborne position
+        int air_y = ground_y - height_z;
+        if (air_y >= 0 && air_y < SCREEN_H) {
+            uint16_t col = g_death_particles[i].color;
+            if (g_death_particles[i].size == 0) {
+                // 1x1 fast projectile drop
+                renderer_draw_pixel(ground_x, air_y, col);
+            } else {
+                // 2x2 heavy organ/carapace chunk
+                renderer_draw_pixel(ground_x, air_y, col);
+                if (ground_x + 1 < SCREEN_W) {
+                    renderer_draw_pixel(ground_x + 1, air_y, col);
+                    renderer_draw_pixel(ground_x + 1, air_y + 1, COLOR_BLOOD_DARK);
+                }
+                if (air_y + 1 < SCREEN_H) {
+                    renderer_draw_pixel(ground_x, air_y + 1, COLOR_BLOOD_DARK);
+                }
+            }
         }
     }
 }
