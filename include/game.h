@@ -151,14 +151,13 @@ typedef enum {
     MODE_CALIBRATION
 } GameMode;
 
-#define CALIBRATION_ROWS 14
+#define CALIBRATION_ROWS 18
 
 typedef struct {
     int enemy_count;          // 0..300, 0 = INF, default: 12
     int enemy_hp;             // 5..100, default: 15
     int enemy_speed_int;      // speed in tenths of px/f: 3..25 (0.3..2.5), default: 8
-    int spawn_delay_small;    // 5..120 frames, default: 25 (T0-T2: Larva, Ripper, Hormagaunt)
-    int spawn_delay_large;    // 15..240 frames, default: 80 (T3-T5: Ravener, Carnifex, Hierophant)
+    int spawn_delay[6];       // delays in frames for T0 Larva, T1 Ripper, T2 Hormagaunt, T3 Ravener, T4 Carnifex, T5 Hierophant (0 = off)
     int explosion_force;      // 1..5 multiplier, default: 2 (1=soft, 2=normal, 3=energetic, 4=extreme, 5=cataclysm)
     int turret_damage;        // 1..50, default: 5
     int turret_fire_rate;     // 3..30 frames, default: 8
@@ -168,7 +167,7 @@ typedef struct {
     int starting_scrap;       // 0..999 $, default: 150
     int core_lives;           // 1..50 HP, default: 10
     int selected_map;         // 0..2 (0=Trinchera, 1=Doble S, 2=Rotonda)
-    int selected_row;         // 0..13
+    int selected_row;         // 0..17
 } RunCalibration;
 
 extern RunCalibration g_calibration;
@@ -190,8 +189,7 @@ typedef struct {
     int enemies_alive;
     int enemies_killed;
     int enemies_breached;
-    int spawn_timer_small;
-    int spawn_timer_large;
+    int spawn_timers[6];
 
     int fast_forward;
     int sim_ticks_elapsed;
