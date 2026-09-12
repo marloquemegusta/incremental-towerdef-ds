@@ -1,10 +1,10 @@
 """
-Script de generación del tileset 32x32 de Tierra Árida / Yermo Balístico para Nintendo DS.
-Cumple estrictamente con:
-1. Regla Canónica de Geometría de Carreteras y Desnivel 3D (sombra arrojada 3-4px, modulación 32px).
-2. Regla Canónica de Exclusividad Cromática Xenos (cero púrpuras, cero blanco hueso).
-3. Salida de cada tile en 1x (32x32) y 8x (256x256).
-4. Hoja de catálogo global y mockup escénico DS (256x192) usando assets reales canónicos.
+Script de generación del tileset 32x32 de Tierra Árida / Yermo Balístico para Nintendo DS (v2).
+Optimizaciones basadas en feedback del usuario:
+1. Eliminado entramado de rombos/patrón sinusoidal regular del suelo base.
+2. Tonos de suelo mucho más claros y uniformes para maximizar contraste con enemigos xenos oscuros.
+3. Reemplazado el tile de sacos de arena (T15) por una red densa de fracturas y barro cuarteado por sequedad extrema (T15_cracked_network).
+4. Mantener y potenciar fracturas, grietas tectónicas y formaciones rocosas.
 """
 
 import os
@@ -15,36 +15,35 @@ from PIL import Image, ImageDraw
 OUTPUT_DIR = "assets/tiles/wasteland"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Paleta canónica BGR555 aproximada para Yermo Balístico
-# Sin púrpuras (R y B altos con G bajo) ni blanco hueso (RGB > 240)
+# Paleta luminosa de suelo árido (alto contraste con enjambre xenos oscuro)
+# Auditada contra Regla 8: Cero púrpuras, cero blanco hueso saturado (>230 en todos)
 PALETTE = {
-    # Cota alta / Suelo árido
-    "sand_hi": (194, 164, 120),    # #C2A478
-    "sand_mid": (169, 136, 88),    # #A98858
-    "sand_low": (142, 109, 62),    # #8E6D3E
-    "clay_hi": (117, 83, 46),      # #75532E
-    "clay_mid": (92, 62, 32),      # #5C3E20
-    "clay_dark": (70, 44, 22),     # #462C16
+    # Cota alta / Suelo árido luminoso (tonos claros predominantes)
+    "sand_top": (224, 210, 180),    # Resalte superior suave
+    "sand_hi": (210, 192, 156),     # Tono base principal (claro, limpio)
+    "sand_mid": (192, 172, 136),    # Variación suave
+    "sand_low": (172, 150, 114),    # Transición cálida
+    "clay_light": (148, 126, 92),   # Matiz terroso suave
     
-    # Sombras profundas y grietas
-    "shadow_deep": (44, 26, 13),   # #2C1A0D
-    "shadow_abyss": (25, 15, 8),   # #190F08
-    "void": (11, 6, 3),            # #0B0603
+    # Grietas y sombras profundas (alto contraste local)
+    "shadow_deep": (44, 26, 13),    # #2C1A0D
+    "shadow_abyss": (25, 15, 8),    # #190F08
+    "void": (11, 6, 3),             # #0B0603
 
     # Rocas y grava basáltica
-    "rock_hi": (102, 97, 88),      # #666158
-    "rock_mid": (75, 70, 62),      # #4B463E
-    "rock_dark": (50, 46, 40),     # #322E28
+    "rock_hi": (130, 125, 115),     # Roca iluminada
+    "rock_mid": (92, 86, 78),       # Cuerpo de roca
+    "rock_dark": (58, 52, 45),      # Base de roca
     
     # Metal oxidado / Mechanicus
-    "rust_hi": (138, 74, 40),      # #8A4A28
-    "rust_dark": (94, 47, 22),     # #5E2F16
-    "steel_hi": (110, 115, 120),   # #6E7378
-    "steel_mid": (75, 80, 85),     # #4B5055
-    "steel_dark": (45, 48, 52),    # #2D3034
+    "rust_hi": (148, 82, 45),
+    "rust_dark": (98, 50, 24),
+    "steel_hi": (125, 130, 135),
+    "steel_mid": (85, 90, 95),
+    "steel_dark": (48, 52, 56),
 
-    # Caliche / polvo mineral seco (resaltes seguros)
-    "dust_crust": (212, 191, 148), # #D4BF94
+    # Caliche / costra de polvo seco (muy claro pero sin saturar)
+    "dust_crust": (228, 216, 192),
 }
 
 def verify_color(color):
@@ -60,56 +59,58 @@ for k, c in PALETTE.items():
     verify_color(c)
 
 def create_base_ground(rng_seed=42):
-    """Crea una textura de base de 32x32 de tierra árida con enlosado orgánico y seamless."""
-    img = Image.new("RGBA", (32, 32), PALETTE["sand_mid"])
+    """Crea una base lisa y clara de suelo árido sin patrones regulares ni rombos."""
+    img = Image.new("RGBA", (32, 32), PALETTE["sand_hi"])
     pixels = img.load()
     rng = random.Random(rng_seed)
     
+    # Textura muy suave y orgánica basada en ruido perlino de gradiente muy bajo
+    # Sin senos ni cosenos multiplicados que provoquen rombos o rejillas
     for y in range(32):
         for x in range(32):
+            # Gradiente suave toroidal
             nx = (x / 32.0) * 2 * math.pi
             ny = (y / 32.0) * 2 * math.pi
-            val = (math.sin(nx * 2) * math.cos(ny * 2) + 
-                   math.sin(nx * 4 + 1.2) * math.cos(ny * 4 + 0.8) * 0.5 +
-                   rng.uniform(-0.35, 0.35))
+            # Armónicos suaves no alineados en producto ortogonal
+            wave = (math.sin(nx + 0.5) * 0.3 + 
+                    math.cos(ny * 1.5 + 0.3) * 0.25 + 
+                    math.sin(nx * 2 + ny * 1.5) * 0.2 + 
+                    rng.uniform(-0.15, 0.15))
             
-            if val > 0.45:
+            if wave > 0.35:
+                pixels[x, y] = PALETTE["sand_top"]
+            elif wave > -0.15:
                 pixels[x, y] = PALETTE["sand_hi"]
-            elif val > 0.1:
+            elif wave > -0.45:
                 pixels[x, y] = PALETTE["sand_mid"]
-            elif val > -0.3:
-                pixels[x, y] = PALETTE["sand_low"]
             else:
-                pixels[x, y] = PALETTE["clay_hi"]
+                pixels[x, y] = PALETTE["sand_low"]
                 
-    for _ in range(12):
+    # Micro-motas de polvo árido y salitre disperso (muy sutil, sin formar cuadrícula)
+    for _ in range(7):
         rx, ry = rng.randint(0, 31), rng.randint(0, 31)
         pixels[rx, ry] = PALETTE["dust_crust"]
-        if rx < 31:
-            pixels[rx + 1, ry] = PALETTE["sand_hi"]
-            
-    for _ in range(8):
+        
+    for _ in range(4):
         rx, ry = rng.randint(0, 31), rng.randint(0, 31)
-        pixels[rx, ry] = PALETTE["clay_dark"]
-        if ry < 31:
-            pixels[rx, ry + 1] = PALETTE["shadow_deep"]
+        pixels[rx, ry] = PALETTE["clay_light"]
 
     return img
 
 def tile_t00_wasteland_plain():
-    """T00: Tierra árida lisa continua (seamless)."""
+    """T00: Tierra árida lisa continua (seamless), limpia y clara."""
     return create_base_ground(101)
 
 def tile_t01_wasteland_cracked():
-    """T01: Tierra árida con grietas superficiales por desecación térmica."""
+    """T01: Tierra árida con finas grietas superficiales por sequedad."""
     img = create_base_ground(102)
     pixels = img.load()
     
     crack_paths = [
-        [(4, 8), (7, 10), (12, 11), (15, 14), (17, 19), (21, 23), (26, 25)],
-        [(15, 14), (19, 12), (24, 10), (28, 11)],
-        [(17, 19), (14, 23), (12, 28)],
-        [(6, 20), (9, 22), (12, 23)]
+        [(5, 7), (8, 9), (13, 11), (16, 14), (18, 20), (22, 23), (27, 24)],
+        [(16, 14), (20, 12), (25, 11), (29, 12)],
+        [(18, 20), (15, 24), (13, 29)],
+        [(7, 21), (10, 23), (13, 24)]
     ]
     
     for path in crack_paths:
@@ -125,12 +126,10 @@ def tile_t01_wasteland_cracked():
                     pixels[cx, cy] = PALETTE["shadow_deep"]
                     if cy > 0 and (cx, cy - 1) not in path:
                         pixels[cx, cy - 1] = PALETTE["dust_crust"]
-                    if cx > 0 and (cx - 1, cy) not in path:
-                        pixels[cx - 1, cy] = PALETTE["sand_hi"]
     return img
 
 def tile_t02_wasteland_fissure_deep():
-    """T02: Fisura tectónica profunda con estrías de sombra y roca expuesta."""
+    """T02: Fisura tectónica profunda con sombra abismal y roca basáltica expuesta."""
     img = create_base_ground(103)
     pixels = img.load()
     
@@ -154,7 +153,7 @@ def tile_t02_wasteland_fissure_deep():
                 if cy > 0:
                     pixels[cx, cy - 1] = PALETTE["dust_crust"]
                 if cy > 1:
-                    pixels[cx, cy - 2] = PALETTE["sand_hi"]
+                    pixels[cx, cy - 2] = PALETTE["sand_top"]
                     
     branch = [(16, 17), (20, 16), (25, 14), (29, 13)]
     for i in range(len(branch) - 1):
@@ -168,11 +167,11 @@ def tile_t02_wasteland_fissure_deep():
             if 0 <= cx < 32 and 0 <= cy < 32:
                 pixels[cx, cy] = PALETTE["shadow_deep"]
                 if cy > 0:
-                    pixels[cx, cy - 1] = PALETTE["sand_hi"]
+                    pixels[cx, cy - 1] = PALETTE["dust_crust"]
     return img
 
 def tile_t03_wasteland_gravel_rocks():
-    """T03: Esparcimiento de rocas y gravilla basáltica."""
+    """T03: Esparcimiento de rocas y peñascos basálticos sobre arena clara."""
     img = create_base_ground(104)
     pixels = img.load()
     
@@ -203,148 +202,131 @@ def tile_t03_wasteland_gravel_rocks():
 
 def tile_t04_path_straight_v():
     """T04: Trinchera/sendero vertical hundido (32px de ancho).
-    Cumple Regla 7: calzada como trinchera balística hundida con sombra arrojada de 3-4px."""
-    img = Image.new("RGBA", (32, 32), PALETTE["clay_dark"])
+    Suelo de sendero en tono medio/claro con sombra balística profunda de 4px en el labio oeste."""
+    img = Image.new("RGBA", (32, 32), PALETTE["sand_mid"])
     pixels = img.load()
-    
     rng = random.Random(201)
+    
+    # Fondo del sendero compacto y limpio
     for y in range(32):
         for x in range(32):
             val = rng.uniform(0, 1)
-            if val > 0.65:
-                pixels[x, y] = PALETTE["clay_mid"]
-            elif val > 0.35:
-                pixels[x, y] = PALETTE["clay_dark"]
-            else:
-                pixels[x, y] = PALETTE["shadow_deep"]
-                
-    for y in range(32):
-        if rng.random() > 0.2:
-            pixels[11, y] = PALETTE["shadow_deep"]
-            pixels[12, y] = PALETTE["clay_dark"]
-        if rng.random() > 0.2:
-            pixels[20, y] = PALETTE["shadow_deep"]
-            pixels[21, y] = PALETTE["clay_dark"]
+            pixels[x, y] = PALETTE["sand_mid"] if val > 0.4 else PALETTE["sand_low"]
             
+    # Huellas de rodada sutiles
     for y in range(32):
-        pixels[0, y] = PALETTE["sand_mid"]
-        pixels[1, y] = PALETTE["sand_low"]
-        pixels[2, y] = PALETTE["clay_hi"]
+        if rng.random() > 0.3:
+            pixels[11, y] = PALETTE["clay_light"]
+        if rng.random() > 0.3:
+            pixels[20, y] = PALETTE["clay_light"]
+            
+    # Borde oeste (coordenadas 0 a 5): Cornisa alta clara y sombra profunda arrojada (4px)
+    for y in range(32):
+        pixels[0, y] = PALETTE["sand_top"]
+        pixels[1, y] = PALETTE["sand_hi"]
+        pixels[2, y] = PALETTE["clay_light"]
         pixels[3, y] = PALETTE["void"]
         pixels[4, y] = PALETTE["shadow_abyss"]
         pixels[5, y] = PALETTE["shadow_deep"]
         
+    # Borde este (coordenadas 28 a 31): Labio opuesto iluminado
     for y in range(32):
-        pixels[28, y] = PALETTE["clay_mid"]
-        pixels[29, y] = PALETTE["sand_low"]
+        pixels[28, y] = PALETTE["sand_low"]
+        pixels[29, y] = PALETTE["sand_mid"]
         pixels[30, y] = PALETTE["dust_crust"]
-        pixels[31, y] = PALETTE["sand_mid"]
+        pixels[31, y] = PALETTE["sand_top"]
 
     return img
 
 def tile_t05_path_straight_h():
     """T05: Trinchera/sendero horizontal hundido (32px de ancho).
-    Sombra profunda bajo labio superior (coordenadas Y 0 a 5)."""
-    img = Image.new("RGBA", (32, 32), PALETTE["clay_dark"])
+    Cornisa norte clara con sombra profunda arrojada de 4px."""
+    img = Image.new("RGBA", (32, 32), PALETTE["sand_mid"])
     pixels = img.load()
-    
     rng = random.Random(202)
+    
     for y in range(32):
         for x in range(32):
             val = rng.uniform(0, 1)
-            if val > 0.65:
-                pixels[x, y] = PALETTE["clay_mid"]
-            elif val > 0.35:
-                pixels[x, y] = PALETTE["clay_dark"]
-            else:
-                pixels[x, y] = PALETTE["shadow_deep"]
-                
-    for x in range(32):
-        if rng.random() > 0.2:
-            pixels[x, 11] = PALETTE["shadow_deep"]
-            pixels[x, 12] = PALETTE["clay_dark"]
-        if rng.random() > 0.2:
-            pixels[x, 20] = PALETTE["shadow_deep"]
-            pixels[x, 21] = PALETTE["clay_dark"]
+            pixels[x, y] = PALETTE["sand_mid"] if val > 0.4 else PALETTE["sand_low"]
             
     for x in range(32):
-        pixels[x, 0] = PALETTE["sand_mid"]
-        pixels[x, 1] = PALETTE["sand_low"]
-        pixels[x, 2] = PALETTE["clay_hi"]
+        if rng.random() > 0.3:
+            pixels[x, 11] = PALETTE["clay_light"]
+        if rng.random() > 0.3:
+            pixels[x, 20] = PALETTE["clay_light"]
+            
+    # Borde superior (Y 0..5): Cornisa y sombra profunda arrojada de 4px
+    for x in range(32):
+        pixels[x, 0] = PALETTE["sand_top"]
+        pixels[x, 1] = PALETTE["sand_hi"]
+        pixels[x, 2] = PALETTE["clay_light"]
         pixels[x, 3] = PALETTE["void"]
         pixels[x, 4] = PALETTE["shadow_abyss"]
         pixels[x, 5] = PALETTE["shadow_deep"]
         
+    # Borde inferior (Y 28..31): Labio iluminado
     for x in range(32):
-        pixels[x, 28] = PALETTE["clay_mid"]
-        pixels[x, 29] = PALETTE["sand_low"]
+        pixels[x, 28] = PALETTE["sand_low"]
+        pixels[x, 29] = PALETTE["sand_mid"]
         pixels[x, 30] = PALETTE["dust_crust"]
-        pixels[x, 31] = PALETTE["sand_mid"]
+        pixels[x, 31] = PALETTE["sand_top"]
 
     return img
 
 def tile_t06_path_corner_turn():
-    """T06: Curva/codo del camino (conexión Norte -> Este)."""
-    img = Image.new("RGBA", (32, 32), PALETTE["clay_dark"])
+    """T06: Curva/codo del sendero conectando Norte con Este."""
+    img = Image.new("RGBA", (32, 32), PALETTE["sand_mid"])
     pixels = img.load()
     rng = random.Random(203)
     
     for y in range(32):
         for x in range(32):
             val = rng.uniform(0, 1)
-            pixels[x, y] = PALETTE["clay_dark"] if val > 0.4 else PALETTE["clay_mid"]
+            pixels[x, y] = PALETTE["sand_mid"] if val > 0.4 else PALETTE["sand_low"]
             
     for y in range(32):
         for x in range(32):
+            # Cornisa alta en ángulo NO
             if x <= 5 and y <= 31:
-                if x <= 1:
-                    pixels[x, y] = PALETTE["sand_mid"]
-                elif x == 2:
-                    pixels[x, y] = PALETTE["clay_hi"]
-                elif x in (3, 4):
-                    pixels[x, y] = PALETTE["void"]
-                else:
-                    pixels[x, y] = PALETTE["shadow_abyss"]
+                if x <= 1: pixels[x, y] = PALETTE["sand_top"]
+                elif x == 2: pixels[x, y] = PALETTE["clay_light"]
+                elif x in (3, 4): pixels[x, y] = PALETTE["void"]
+                else: pixels[x, y] = PALETTE["shadow_abyss"]
             if y <= 5 and x <= 31:
-                if y <= 1:
-                    pixels[x, y] = PALETTE["sand_mid"]
-                elif y == 2:
-                    pixels[x, y] = PALETTE["clay_hi"]
-                elif y in (3, 4):
-                    pixels[x, y] = PALETTE["void"]
-                else:
-                    pixels[x, y] = PALETTE["shadow_abyss"]
+                if y <= 1: pixels[x, y] = PALETTE["sand_top"]
+                elif y == 2: pixels[x, y] = PALETTE["clay_light"]
+                elif y in (3, 4): pixels[x, y] = PALETTE["void"]
+                else: pixels[x, y] = PALETTE["shadow_abyss"]
                     
+            # Labio receptor SE
             if x >= 27 and y >= 27:
                 pixels[x, y] = PALETTE["dust_crust"]
                 
     return img
 
 def tile_t07_path_junction():
-    """T07: Intersección / bifurcación de caminos con marcas de tráfico."""
-    img = Image.new("RGBA", (32, 32), PALETTE["clay_dark"])
+    """T07: Intersección / bifurcación limpia de senderos."""
+    img = Image.new("RGBA", (32, 32), PALETTE["sand_mid"])
     pixels = img.load()
     rng = random.Random(204)
     
     for y in range(32):
         for x in range(32):
-            dist_center = math.hypot(x - 15.5, y - 15.5)
             val = rng.uniform(0, 1)
-            if dist_center < 7:
-                pixels[x, y] = PALETTE["shadow_deep"] if val > 0.4 else PALETTE["clay_dark"]
-            else:
-                pixels[x, y] = PALETTE["clay_mid"] if val > 0.5 else PALETTE["clay_dark"]
-                
+            pixels[x, y] = PALETTE["sand_mid"] if val > 0.45 else PALETTE["sand_low"]
+            
+    # Marcas suaves de rodaduras cruzadas
     for i in range(5, 27, 4):
-        pixels[i, 15] = PALETTE["void"]
-        pixels[i+1, 15] = PALETTE["shadow_abyss"]
-        pixels[15, i] = PALETTE["void"]
-        pixels[15, i+1] = PALETTE["shadow_abyss"]
+        pixels[i, 15] = PALETTE["clay_light"]
+        pixels[i+1, 15] = PALETTE["clay_light"]
+        pixels[15, i] = PALETTE["clay_light"]
+        pixels[15, i+1] = PALETTE["clay_light"]
         
     return img
 
 def tile_t08_path_crater():
-    """T08: Cráter de artillería en el sendero."""
+    """T08: Cráter de artillería en el sendero con eyección de escombros basálticos."""
     img = tile_t04_path_straight_v()
     pixels = img.load()
     
@@ -364,22 +346,23 @@ def tile_t08_path_crater():
                     if y < cy:
                         pixels[x, y] = PALETTE["dust_crust"]
                     else:
-                        pixels[x, y] = PALETTE["clay_hi"]
+                        pixels[x, y] = PALETTE["sand_low"]
             elif d < radius + 2 and y < cy and abs(x - cx) < 8:
-                pixels[x, y] = PALETTE["sand_hi"]
+                pixels[x, y] = PALETTE["sand_top"]
                 
     return img
 
 def tile_t09_cliff_edge_s():
     """T09: Farallón rocoso orientado al Sur."""
-    img = Image.new("RGBA", (32, 32), PALETTE["sand_mid"])
+    img = Image.new("RGBA", (32, 32), PALETTE["sand_hi"])
     pixels = img.load()
     rng = random.Random(301)
     
+    # Cota alta clara
     for y in range(16):
         for x in range(32):
             val = rng.uniform(0, 1)
-            pixels[x, y] = PALETTE["sand_hi"] if val > 0.6 else PALETTE["sand_mid"]
+            pixels[x, y] = PALETTE["sand_top"] if val > 0.6 else PALETTE["sand_hi"]
             
     for x in range(32):
         pixels[x, 15] = PALETTE["dust_crust"]
@@ -394,20 +377,20 @@ def tile_t09_cliff_edge_s():
             elif dy < 12:
                 pixels[x, y] = PALETTE["rock_dark"]
             else:
-                pixels[x, y] = PALETTE["clay_dark"] if rng.random() > 0.4 else PALETTE["rock_mid"]
+                pixels[x, y] = PALETTE["sand_low"] if rng.random() > 0.4 else PALETTE["rock_mid"]
                 
     return img
 
 def tile_t10_cliff_edge_n():
     """T10: Farallón orientado al Norte."""
-    img = Image.new("RGBA", (32, 32), PALETTE["clay_mid"])
+    img = Image.new("RGBA", (32, 32), PALETTE["sand_mid"])
     pixels = img.load()
     rng = random.Random(302)
     
     for y in range(16, 32):
         for x in range(32):
             val = rng.uniform(0, 1)
-            pixels[x, y] = PALETTE["clay_mid"] if val > 0.5 else PALETTE["sand_low"]
+            pixels[x, y] = PALETTE["sand_hi"] if val > 0.5 else PALETTE["sand_mid"]
             
     for y in range(16):
         for x in range(32):
@@ -423,7 +406,7 @@ def tile_t10_cliff_edge_n():
     return img
 
 def tile_t11_boulder_formation():
-    """T11: Formación de grandes rocas monolíticas."""
+    """T11: Formación de grandes rocas monolíticas erosionadas."""
     img = create_base_ground(303)
     pixels = img.load()
     
@@ -566,39 +549,44 @@ def tile_t14_pipeline_exposed():
         
     return img
 
-def tile_t15_sandbag_fortification():
-    """T15: Nido defensivo de sacos terreros y alambre de espino."""
+def tile_t15_cracked_network():
+    """T15: Red intrincada de fracturas y barro cuarteado por sequedad extrema.
+    Reemplaza a los antiguos sacos de arena a petición directa del usuario."""
     img = create_base_ground(403)
     pixels = img.load()
     
-    bags = [
-        (3, 18, 8, 4), (12, 18, 8, 4), (21, 18, 8, 4),
-        (6, 14, 8, 4), (15, 14, 8, 4),
-        (10, 11, 8, 3)
+    # Red poligonal de cuarteamiento árido (desiccation cracks)
+    fissure_segments = [
+        [(2, 10), (8, 11), (13, 8), (17, 10), (24, 7), (29, 9)],
+        [(8, 11), (9, 18), (6, 24), (4, 30)],
+        [(13, 8), (14, 2), (15, 0)],
+        [(17, 10), (18, 17), (15, 23), (17, 30)],
+        [(18, 17), (23, 20), (28, 18), (31, 21)],
+        [(23, 20), (25, 27), (27, 31)],
+        [(9, 18), (15, 23)],
+        [(6, 24), (11, 27), (15, 28)]
     ]
     
-    for bx, by, bw, bh in bags:
-        for x in range(bx + 1, bx + bw + 2):
-            for y in range(by + bh, by + bh + 3):
-                if 0 <= x < 32 and 0 <= y < 32:
-                    pixels[x, y] = PALETTE["shadow_deep"]
-                    
-    for bx, by, bw, bh in bags:
-        for y in range(by, by + bh):
-            for x in range(bx, bx + bw):
-                if 0 <= x < 32 and 0 <= y < 32:
-                    if x in (bx, bx + bw - 1) or y == by + bh - 1:
-                        pixels[x, y] = PALETTE["clay_dark"]
-                    elif y == by:
-                        pixels[x, y] = PALETTE["sand_hi"]
-                    else:
-                        pixels[x, y] = PALETTE["sand_low"]
+    for seg in fissure_segments:
+        for i in range(len(seg) - 1):
+            x0, y0 = seg[i]
+            x1, y1 = seg[i+1]
+            dist = max(abs(x1 - x0), abs(y1 - y0))
+            for s in range(dist + 1):
+                t = s / dist if dist > 0 else 0
+                cx = int(x0 + (x1 - x0) * t)
+                cy = int(y0 + (y1 - y0) * t)
+                if 0 <= cx < 32 and 0 <= cy < 32:
+                    pixels[cx, cy] = PALETTE["shadow_deep"]
+                    # Reborde iluminado
+                    if cy > 0:
+                        pixels[cx, cy - 1] = PALETTE["dust_crust"]
                         
-    for y in range(7, 18):
-        pixels[28, y] = PALETTE["steel_mid"]
-    pixels[27, 8] = PALETTE["steel_hi"]
-    pixels[29, 12] = PALETTE["steel_hi"]
-    pixels[27, 15] = PALETTE["steel_hi"]
+    # Añadir micro-bloques cuarteados con variación de tono
+    polygons_centers = [(10, 6), (22, 13), (13, 16), (20, 25), (8, 22)]
+    for px, py in polygons_centers:
+        if 0 <= px < 32 and 0 <= py < 32:
+            pixels[px, py] = PALETTE["sand_top"]
 
     return img
 
@@ -619,13 +607,13 @@ TILES = [
     ("T12_scree_slope", tile_t12_scree_slope),
     ("T13_turret_pad_plate", tile_t13_turret_pad_plate),
     ("T14_pipeline_exposed", tile_t14_pipeline_exposed),
-    ("T15_sandbag_fortification", tile_t15_sandbag_fortification),
+    ("T15_cracked_network", tile_t15_cracked_network),
 ]
 
 def main():
     generated_images = {}
     
-    print("--- Generando 16 tiles modulares 32x32 para Yermo Balístico ---")
+    print("--- Generando 16 tiles modulares 32x32 para Yermo Balístico (v2) ---")
     for name, func in TILES:
         img_1x = func()
         p1x = os.path.join(OUTPUT_DIR, f"{name}_1x.png")
@@ -638,7 +626,7 @@ def main():
         generated_images[name] = img_1x
         print(f"  [OK] {name} (1x: 32x32, 8x: 256x256)")
         
-    catalog_sheet = Image.new("RGBA", (4 * 128, 4 * 128), (20, 15, 10, 255))
+    catalog_sheet = Image.new("RGBA", (4 * 128, 4 * 128), (24, 20, 16, 255))
     for idx, (name, _) in enumerate(TILES):
         row = idx // 4
         col = idx % 4
@@ -648,10 +636,11 @@ def main():
     catalog_sheet.save(catalog_path)
     print(f"Catálogo completo guardado en: {catalog_path}")
 
+    # Mockup escénico actualizado
     mockup_map = [
         ["T00_wasteland_plain", "T09_cliff_edge_s", "T11_boulder_formation", "T00_wasteland_plain", "T04_path_straight_v", "T00_wasteland_plain", "T03_wasteland_gravel_rocks", "T00_wasteland_plain"],
         ["T13_turret_pad_plate", "T00_wasteland_plain", "T01_wasteland_cracked", "T06_path_corner_turn", "T07_path_junction", "T05_path_straight_h", "T05_path_straight_h", "T06_path_corner_turn"],
-        ["T00_wasteland_plain", "T13_turret_pad_plate", "T00_wasteland_plain", "T04_path_straight_v", "T08_path_crater", "T00_wasteland_plain", "T15_sandbag_fortification", "T04_path_straight_v"],
+        ["T00_wasteland_plain", "T13_turret_pad_plate", "T00_wasteland_plain", "T04_path_straight_v", "T08_path_crater", "T00_wasteland_plain", "T15_cracked_network", "T04_path_straight_v"],
         ["T02_wasteland_fissure_deep", "T00_wasteland_plain", "T12_scree_slope", "T04_path_straight_v", "T00_wasteland_plain", "T13_turret_pad_plate", "T00_wasteland_plain", "T04_path_straight_v"],
         ["T14_pipeline_exposed", "T01_wasteland_cracked", "T00_wasteland_plain", "T06_path_corner_turn", "T05_path_straight_h", "T05_path_straight_h", "T05_path_straight_h", "T07_path_junction"],
         ["T00_wasteland_plain", "T03_wasteland_gravel_rocks", "T10_cliff_edge_n", "T00_wasteland_plain", "T00_wasteland_plain", "T01_wasteland_cracked", "T13_turret_pad_plate", "T04_path_straight_v"]
