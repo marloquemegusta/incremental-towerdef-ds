@@ -1,38 +1,37 @@
-# Wasteland / Yermo Balístico Tileset (32x32)
+# Wasteland / Yermo Balístico Tileset (32x32) — Arena Abierta
 
-Tileset modular para bioma de tierra árida, yermo y desierto balístico para Nintendo DS (256x192).
+Tileset modular y periódico para bioma de tierra árida y yermo balístico en Nintendo DS (256x192).
 
-## Especificaciones Técnicas
-- **Resolución unitaria:** 32x32 píxeles (4x4 tiles de hardware NDS de 8x8 px).
-- **Relación de pantalla:** 8 columnas × 6 filas = 48 tiles por viewport DS completo.
-- **Paleta de color:** BGR555 en tonos luminosos de arena desecada, arcilla calcárea, arenisca, roca basáltica y acero oxidado.
-- **Regla cromática canónica:** Cero tonalidades púrpuras/violetas y cero blanco hueso (estrictamente reservadas para el enjambre xenos).
-- **Regla balística 3D:** Trincheras de paso de 32 px de ancho con 3-4 px de sombra arrojada profunda en voladizos.
-- **Contraste:** Fondo de terreno predominantemente claro y suave para maximizar la lectura visual de los enjambres enemigos oscuros.
+## Filosofía de Diseño
+- **Arena abierta sin caminos fijos:** El mapa es un campo abierto de supervivencia donde los enjambres asedian desde todas las direcciones hacia el búnker.
+- **100% periódico y tileable:** Todos los tiles enlazan sin costuras (seamless) perimetrales (ancho 2 px de borde estandarizado con `T00`), permitiendo combinaciones procedurales libres sin saltos de costura.
+- **Conectores tectónicos continuos:** Las fallas `T04` (horizontal) y `T05` (vertical) son continuas de borde a borde para formar grietas infinitas o redes cruzadas con `T06`.
+- **Alto contraste figura-fondo:** Fondo claro en tonos arena y caliche (`#D4C29E`) para maximizar la visibilidad instantánea del enjambre xenos.
+- **Regla cromática canónica:** Cero tonalidades púrpuras/violetas y cero blanco hueso en el entorno.
 
-## Catálogo de Tiles
+## Catálogo de Tiles (16 Tiles Modulares)
 
 | ID | Nombre | Descripción |
 |---|---|---|
-| `T00` | `T00_wasteland_plain` | Tierra árida clara continua (tiling seamless orgánico sin rejillas) con micro-polvo. |
-| `T01` | `T01_wasteland_cracked` | Suelo árido claro con patrón de fisuras superficiales por choque térmico. |
-| `T02` | `T02_wasteland_fissure_deep` | Fisura profunda transversal con estrías de sombra y roca basáltica expuesta. |
-| `T03` | `T03_wasteland_gravel_rocks` | Esparcimiento de gravilla suelta y piedras basálticas con bisel luminoso. |
-| `T04` | `T04_path_straight_v` | Trinchera/sendero vertical hundido con rodadas y sombra profunda de 4 px (labio O). |
-| `T05` | `T05_path_straight_h` | Trinchera/sendero horizontal hundido con sombra profunda de 4 px (labio N). |
-| `T06` | `T06_path_corner_turn` | Codo de sendero conectando Norte con Este respetando la retícula balística. |
-| `T07` | `T07_path_junction` | Intersección / bifurcación de senderos clara y transitable. |
-| `T08` | `T08_path_crater` | Cráter de impacto de artillería en mitad del sendero con eyección de escombros. |
-| `T09` | `T09_cliff_edge_s` | Farallón rocoso orientado al Sur (cota alta arriba, pared vertical y sombra abajo). |
-| `T10` | `T10_cliff_edge_n` | Farallón orientado al Norte (cota baja abajo, sombra cenital al pie del talud). |
-| `T11` | `T11_boulder_formation` | Formación monolítica erosionada por viento abrasivo; bloquea línea de paso. |
-| `T12` | `T12_scree_slope` | Canchal / pedregal inclinado de derrumbe que conecta cotas. |
-| `T13` | `T13_turret_pad_plate` | Plataforma Mechanicus de anclaje de torretas 32x32 en acero biselado y remachado. |
-| `T14` | `T14_pipeline_exposed` | Conducción industrial de refrigerante/fuel fracturada y semienterrada en arena. |
-| `T15` | `T15_cracked_network` | Red intrincada de fracturas y barro cuarteado por sequedad extrema. |
+| `T00` | `T00_wasteland_plain` | Tierra árida clara continua (tiling toroidal seamless) con micro-polvo. |
+| `T01` | `T01_cracks_light` | Suelo árido claro con finas fracturas térmicas aisladas (tileable). |
+| `T02` | `T02_cracks_medium` | Fracturas intermedias ramificadas con estrías oscuras (tileable). |
+| `T03` | `T03_cracks_dense` | Cuarteamiento denso poligonal de barro desecado al sol (tileable). |
+| `T04` | `T04_fissure_h` | Falla tectónica horizontal continua (seamless en X, conecta borde a borde). |
+| `T05` | `T05_fissure_v` | Falla tectónica vertical continua (seamless en Y, conecta borde a borde). |
+| `T06` | `T06_fissure_cross` | Cruce tectónico 4 direcciones (conecta con `T04` en X y con `T05` en Y). |
+| `T07` | `T07_fissure_abyss` | Fosa tectónica con abismo oscuro central y biseles iluminados (tileable). |
+| `T08` | `T08_crater_large` | Gran cráter de impacto de 20 px con eyección basáltica y reborde claro (tileable). |
+| `T09` | `T09_craters_cluster` | Grupo de 3 impactos de proyectiles de mortero/metralla (tileable). |
+| `T10` | `T10_rocks_scatter` | Gravilla y fragmentos basálticos dispersos sobre arena clara (tileable). |
+| `T11` | `T11_boulders_central` | Formación de peñascos monolíticos erosionados por viento árido (tileable). |
+| `T12` | `T12_dust_dune` | Duna eólica suave con cresta iluminada (seamless en X). |
+| `T13` | `T13_turret_pad_plate` | Plataforma Mechanicus de anclaje de torretas 32x32 en acero y óxido (tileable). |
+| `T14` | `T14_conduit_plate` | Placa/rejilla blindada de conducción energética a ras de suelo (tileable). |
+| `T15` | `T15_scorched_caliche` | Zona calcinada por deflagración térmica con costra de caliche mineral (tileable). |
 
 ## Archivos Generados
 - `*_1x.png`: Asset maestro canónico (32x32 px).
 - `*_8x.png`: Preview de alta fidelidad pixel-art (256x256 px).
-- `wasteland_tileset_catalog_4x.png`: Vista completa de los 16 tiles a escala 4x (512x512 px).
-- `wasteland_scene_mockup_3x.png`: Composición escénica real DS (256x192 escalada 3x a 768x576) integrando torretas Heavy Bolter y enjambre xenos.
+- `wasteland_tileset_catalog_4x.png`: Catálogo completo de los 16 tiles a escala 4x (512x512 px).
+- `wasteland_scene_mockup_3x.png`: Mockup de arena abierta DS (256x192 escalado 3x) con torretas Heavy Bolter y asedio xenos multidireccional.
