@@ -184,6 +184,8 @@ static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
             int spd = base_spd + ((rand() % 5) - 2);
             if (spd < 10) spd = 10;
             g_enemies[i].speed = spd;
+            g_enemies[i].vx = 0;
+            g_enemies[i].vy = (spd * FP_ONE) / 60;
 
             g_enemies[i].dir = 1; // South
             g_enemies[i].anim_frame = 0;
@@ -197,6 +199,8 @@ static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
     }
 }
 
+#define BULLET_SPEED 12
+
 static void spawn_bullet(int x, int y, int angle, int turret_idx, uint64_t dmg) {
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (!g_bullets[i].active) {
@@ -204,10 +208,10 @@ static void spawn_bullet(int x, int y, int angle, int turret_idx, uint64_t dmg) 
             g_bullets[i].turret_idx = turret_idx;
             g_bullets[i].x = TO_FP(x);
             g_bullets[i].y = TO_FP(y);
-            // 8 px/frame bullet velocity (faster so enemies don't dodge it)
-            g_bullets[i].vx = (fixed_cos(angle) * 8);
-            g_bullets[i].vy = (fixed_sin(angle) * 8);
-            g_bullets[i].life = 35;
+            // 12 px/frame high-velocity bolter tracers
+            g_bullets[i].vx = (fixed_cos(angle) * BULLET_SPEED);
+            g_bullets[i].vy = (fixed_sin(angle) * BULLET_SPEED);
+            g_bullets[i].life = 25;
             g_bullets[i].damage = dmg;
             break;
         }
@@ -373,8 +377,6 @@ void game_update_simulation(void) {
     }
 
     // 4. Update Enemies (Descending vertically and converging towards central bunker at x=128, y=360)
-    int target_base_x = TO_FP(128);
-
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
 
@@ -447,16 +449,27 @@ void game_update_simulation(void) {
             continue;
         }
 
-        // Advance: vertical downward + funnel convergence to center (128)
+        // Advance: vertical downward in parallel lanes across top screen and upper bottom screen
         int spd = (g_enemies[i].speed * FP_ONE) / 60;
         if (spd < 1) spd = 1;
 
         g_enemies[i].y += spd;
+        g_enemies[i].vy = spd;
+        g_enemies[i].vx = 0;
 
-        // Converge X towards 128 as it approaches bottom screen
-        if (py > 80) {
-            if (ex < target_base_x) ex += (spd / 2);
-            else if (ex > target_base_x) ex -= (spd / 2);
+        // Funnel X towards Sanctum bunker front ONLY in lower bottom screen (py > 255)
+        if (py > 255) {
+            // Distribute across bunker front width (x: 110..146) based on initial lane
+            int target_x = TO_FP(110 + ((ex >> FP_SHIFT) * 36) / 256);
+            int h_spd = spd / 3;
+            if (h_spd < 1) h_spd = 1;
+            if (ex < target_x - TO_FP(4)) {
+                ex += h_spd;
+                g_enemies[i].vx = h_spd;
+            } else if (ex > target_x + TO_FP(4)) {
+                ex -= h_spd;
+                g_enemies[i].vx = -h_spd;
+            }
             g_enemies[i].x = ex;
         }
     }
@@ -542,7 +555,30 @@ void game_update_simulation(void) {
         if (target_enemy >= 0) {
             int gx = FROM_FP(g_enemies[target_enemy].x);
             int local_y = FROM_FP(g_enemies[target_enemy].y) - 192;
-            tur->target_angle = fixed_atan2(local_y - tur->y, gx - tur->x);
+
+            // Lead target prediction: calculate future intercept point based on bullet flight time
+            int ddx = gx - tur->x;
+            int ddy = local_y - tur->y;
+            int dsq = ddx * ddx + ddy * ddy;
+            int dist = 0;
+            while ((dist + 1) * (dist + 1) <= dsq) dist++;
+
+            int t_frames = dist / BULLET_SPEED;
+            if (t_frames < 1) t_frames = 1;
+
+            int evx_px = FROM_FP(g_enemies[target_enemy].vx);
+            int evy_px = FROM_FP(g_enemies[target_enemy].vy);
+
+            int pred_x = gx + (evx_px * t_frames);
+            int pred_y = local_y + (evy_px * t_frames);
+
+            // Clamp predicted point inside valid battlefield bounds
+            if (pred_x < 8) pred_x = 8;
+            if (pred_x > 248) pred_x = 248;
+            if (pred_y < 0) pred_y = 0;
+            if (pred_y > 185) pred_y = 185;
+
+            tur->target_angle = fixed_atan2(pred_y - tur->y, pred_x - tur->x);
             tur->current_angle = tur->target_angle;
 
             // Firing strictly consumes ammo!
@@ -574,12 +610,15 @@ void game_update_simulation(void) {
                     int bx = tur->x + ((perp_x * s) >> FP_SHIFT);
                     int by = tur->y + ((perp_y * s) >> FP_SHIFT);
 
+                    // Dual barrel convergence directly towards predicted impact point
+                    int fire_angle = fixed_atan2(pred_y - by, pred_x - bx);
+
                     // Multiplicative damage: Base 2 -> 3 -> 4 -> 6 -> 8
                     static const uint64_t s_dmg[5] = { 2, 3, 4, 6, 8 };
                     int c_lvl = g_game.upgrades.caliber_lvl;
                     uint64_t dmg = (c_lvl < 5) ? s_dmg[c_lvl] : 8;
 
-                    spawn_bullet(bx, by, ang, t, dmg);
+                    spawn_bullet(bx, by, fire_angle, t, dmg);
                     tur->shots_fired++;
                 }
             } else {
@@ -591,15 +630,20 @@ void game_update_simulation(void) {
         }
     }
 
-    // 6. Update Bullets & Collisions
+    // 6. Update Bullets & Continuous Collisions
     for (int b = 0; b < MAX_BULLETS; b++) {
         if (!g_bullets[b].active) continue;
+        int prev_bx = FROM_FP(g_bullets[b].x);
+        int prev_by = FROM_FP(g_bullets[b].y);
+
         g_bullets[b].x += g_bullets[b].vx;
         g_bullets[b].y += g_bullets[b].vy;
         g_bullets[b].life--;
 
-        int bx = FROM_FP(g_bullets[b].x);
-        int by = FROM_FP(g_bullets[b].y);
+        int curr_bx = FROM_FP(g_bullets[b].x);
+        int curr_by = FROM_FP(g_bullets[b].y);
+        int mid_bx = (prev_bx + curr_bx) / 2;
+        int mid_by = (prev_by + curr_by) / 2;
 
         int hit = 0;
         for (int e = 0; e < MAX_ENEMIES; e++) {
@@ -609,9 +653,14 @@ void game_update_simulation(void) {
             int local_y = gy - 192;
             int gx = FROM_FP(g_enemies[e].x);
 
-            static const int s_hit_r[ENEMY_VARIANT_COUNT] = { 5, 6, 8, 11, 15, 18 };
+            static const int s_hit_r[ENEMY_VARIANT_COUNT] = { 6, 7, 9, 12, 16, 18 };
             int r = s_hit_r[g_enemies[e].variant];
-            if (abs(bx - gx) <= r && abs(by - local_y) <= r) {
+
+            // Check collision at both current position and midpoint to prevent tunneling
+            int hit_curr = (abs(curr_bx - gx) <= r && abs(curr_by - local_y) <= r);
+            int hit_mid = (abs(mid_bx - gx) <= r && abs(mid_by - local_y) <= r);
+
+            if (hit_curr || hit_mid) {
                 hit = 1;
                 uint64_t dmg = g_bullets[b].damage;
                 if (g_enemies[e].hp > dmg) {
@@ -639,7 +688,7 @@ void game_update_simulation(void) {
             }
         }
 
-        if (!hit && (g_bullets[b].life <= 0 || bx < 0 || bx >= SCREEN_W || by < 0 || by >= SCREEN_H)) {
+        if (!hit && (g_bullets[b].life <= 0 || curr_bx < 0 || curr_bx >= SCREEN_W || curr_by < 0 || curr_by >= SCREEN_H)) {
             g_bullets[b].active = 0;
         }
     }
@@ -686,7 +735,12 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
         g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
     }
 
-    if (keys_down & KEY_TOUCH) {
+    static int s_prep_touching = 0;
+    int is_touch = (keys_held & KEY_TOUCH) || (touch.px > 0 && touch.py > 0);
+    int touch_press = ((keys_down & KEY_TOUCH) || (is_touch && !s_prep_touching));
+    s_prep_touching = is_touch;
+
+    if (touch_press) {
         // [START] Button: drawn at (190, 150, 60, 36) -> generous hitbox (180..255, 144..191)
         if (touch.px >= 180 && touch.px <= 255 && touch.py >= 144 && touch.py <= 191) {
             game_start_wave();
@@ -735,8 +789,13 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
         g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
     }
 
+    static int s_wave_touching = 0;
+    int is_touch = (keys_held & KEY_TOUCH) || (touch.px > 0 && touch.py > 0);
+    int touch_press = ((keys_down & KEY_TOUCH) || (is_touch && !s_wave_touching));
+    s_wave_touching = is_touch;
+
     // Touch down: Clicker attack on enemies, start ammo drag, or toggle pause
-    if (keys_down & KEY_TOUCH) {
+    if (touch_press) {
         // [PAUSA] Button in wave HUD: (215..250, 0..14)
         if (touch.px >= 215 && touch.px <= 250 && touch.py <= 14) {
             game_toggle_pause();
@@ -751,8 +810,9 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
             return;
         }
 
-        // Target designated enemy in bottom screen with stylus
+        // Target designated enemy in bottom screen with stylus (generous closest selection)
         int clicked_enemy = -1;
+        int best_dist_sq = 28 * 28;
         for (int e = 0; e < MAX_ENEMIES; e++) {
             if (!g_enemies[e].active) continue;
             int gy = FROM_FP(g_enemies[e].y);
@@ -760,9 +820,12 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
             int local_y = gy - 192;
             int gx = FROM_FP(g_enemies[e].x);
 
-            if (abs(touch.px - gx) <= 16 && abs(touch.py - local_y) <= 16) {
+            int ddx = touch.px - gx;
+            int ddy = touch.py - local_y;
+            int dsq = ddx * ddx + ddy * ddy;
+            if (dsq <= best_dist_sq) {
+                best_dist_sq = dsq;
                 clicked_enemy = e;
-                break;
             }
         }
 

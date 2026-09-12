@@ -65,6 +65,7 @@
 
 typedef struct {
     int x, y;            // Q8 fixed point in global space [0..255, 0..383]
+    int vx, vy;          // Q8 velocities for lead-target prediction
     uint64_t hp;
     uint64_t max_hp;
     int active;
