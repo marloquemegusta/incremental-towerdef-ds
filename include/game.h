@@ -11,7 +11,7 @@
 #define SCREEN_H 192
 #define FIELD_H  384 // Vertical unified battlefield (256x384)
 
-#define MAX_ENEMIES 128
+#define MAX_ENEMIES 384
 #define MAX_BULLETS 64
 #define MAX_SPLATTERS 256
 #define MAX_DEATH_PARTICLES 256
@@ -98,6 +98,7 @@ typedef struct {
     int flash_timer;
 
     // Recoil animation & sparks
+    int anim_frame;
     int barrel_recoil_l;
     int barrel_recoil_r;
     int last_barrel;
@@ -144,24 +145,51 @@ typedef enum {
     MODE_WAVE,
     MODE_PAUSED,
     MODE_GAME_OVER,
-    MODE_UPGRADES
+    MODE_UPGRADES,
+    MODE_CALIBRATION
 } GameMode;
+
+// Editable configuration per enemy tier inside each Wave
+typedef struct {
+    int count;       // Total enemies to spawn of this tier in this wave
+    int delay;       // Spawn interval (in frames) for this tier
+    int speed;       // Speed in px/s (e.g. 15..120)
+    int hp;          // Base HP for this tier in this wave
+} WaveTierConfig;
+
+// Editable configuration per Wave
+typedef struct {
+    WaveTierConfig tiers[3]; // Tier 0 (Larva), Tier 1 (Ripper), Tier 2 (Hormagaunt)
+    uint64_t scrap_base;
+} WaveDef;
+
+typedef struct {
+    WaveDef waves[20];
+    uint32_t magic;           // 0x544F5744 ("TOWD")
+} GameBalanceConfig;
+
+extern GameBalanceConfig g_balance;
+void balance_config_init(void);
+void balance_config_save(void);
+void balance_config_load(void);
+void balance_config_reset_defaults(void);
 
 // Incremental Upgrades
 typedef struct {
     // Branch A: Battery Stats
-    int caliber_lvl;     // +Damage per bullet
-    int firerate_lvl;    // +Cadence
-    int range_lvl;       // +Range radius
-    int mag_size_lvl;    // +Max ammo capacity
+    int caliber_lvl;     // +Damage per bullet (Base 2 -> 3 -> 4 -> 6 -> 8)
+    int firerate_lvl;    // +Cadence (Interval 18 -> 14 -> 10 -> 6)
+    int range_lvl;       // +Range radius (65 -> 80 -> 100 -> 125)
+    int mag_size_lvl;    // +Max ammo capacity (20 -> 35 -> 50 -> 80)
 
     // Branch B: Economy
     int bio_harvest_lvl; // Extra scrap multiplier
     int bunker_armor_lvl;// Bunker HP and DR
 
-    // Branch C: Automation (Factorio style)
-    int auto_target;     // 0=Manual click target, 1=Auto-target nearest
-    int conveyor_lvl;    // 0=Manual reload drag, 1=1 ammo/s, 2=3 ammo/s, 3=Continuous
+    // Branch C: Automation
+    int continuous_fire; // 0=Click per shot, 1=Continuous hold spray
+    int auto_target;     // 0=Manual, 1=Nearest, 2=Strongest
+    int conveyor_lvl;    // 0=Manual reload, 1=1/s, 2=3/s, 3=6/s
     int extra_turrets;   // Extra unlocked turrets (0..3)
 } UpgradeTree;
 
@@ -191,9 +219,25 @@ typedef struct {
     int drag_turret_slot;
     int drag_x, drag_y;
     int selected_turret;
+    int upgrade_flash_timer;
+    int upgrade_flash_idx;
+
+    int wave_spawned_tier[3];    // Number of enemies spawned so far for Tier 0..2 in current wave
+    int wave_spawn_timer_tier[3];// Timers for each tier spawn in current wave
+
+    // Calibration UI navigation
+    int calib_row;               // 0..8 (3 rows per tier: Count, Delay, Speed)
+    int calib_wave_idx;          // 0..19 (Wave 1..20)
+    int calib_hold_timer;        // For autorepeat continuous adjustment
+    int calib_saved_timer;       // Feedback notification ("SAVED")
 
     UpgradeTree upgrades;
 } GameContext;
+
+// Upgrades helper
+uint64_t upgrade_get_cost(int idx);
+int upgrade_can_afford(int idx);
+void upgrade_purchase(int idx);
 
 // Global declarations
 extern GameContext g_game;
@@ -221,6 +265,7 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_held);
+void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held);
 void game_toggle_pause(void);
 void game_reset_to_prep(void);
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration);
@@ -255,6 +300,7 @@ void renderer_draw_ui_wave(void);
 void renderer_draw_ui_pause(void);
 void renderer_draw_ui_game_over(void);
 void renderer_draw_ui_upgrades(void);
+void renderer_draw_ui_calibration(void);
 void renderer_present(void);
 
 // Top screen presentation

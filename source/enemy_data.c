@@ -154,8 +154,8 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
     },
 };
 
-void enemy_draw_sprite_to_buffer(uint16_t *buf, int cx, int cy, int variant, int frame, int dir) {
-    if (!buf) return;
+void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir) {
+    if (!buffer) return;
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
     frame = frame & 3;
 
@@ -183,7 +183,7 @@ void enemy_draw_sprite_to_buffer(uint16_t *buf, int cx, int cy, int variant, int
 
             uint16_t col = src[y * w + x];
             if (col & 0x8000) {
-                buf[dst_y * SCREEN_W + draw_x] = col;
+                buffer[dst_y * SCREEN_W + draw_x] = col;
             }
         }
     }

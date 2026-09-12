@@ -240,8 +240,16 @@ void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir);
 
     print(f"  -> Generated source/enemy_data.c and include/enemy_data.h ({enemy_count} biocasts)")
 
+def rotsprite_pil(img, angle):
+    """Applies RotSprite-like rotation using 8x nearest scaling, bicubic rotation, and nearest downscale."""
+    w, h = img.size
+    scaled = img.resize((w * 8, h * 8), Image.NEAREST)
+    rotated = scaled.rotate(angle, resample=Image.BICUBIC)
+    downscaled = rotated.resize((w, h), Image.NEAREST)
+    return downscaled
+
 def build_turrets():
-    print("[3/3] Building Turret Arsenal Sprites...")
+    print("[3/3] Building Turret Arsenal Sprites (16 Uniform Angles)...")
     turrets_dir = "assets/sprites/turrets"
 
     turret_defs = [
@@ -261,17 +269,9 @@ def build_turrets():
 #define TURRET_TYPE_COUNT     2
 
 #define TURRET_FRAME_SIZE 32
+#define TURRET_ANGLE_COUNT 16
 
-typedef struct {
-    uint8_t frame_count;
-    uint8_t frame_w;
-    uint8_t frame_h;
-    const uint16_t *frames;
-} TurretSpriteDef;
-
-extern const TurretSpriteDef g_turret_sprites[TURRET_TYPE_COUNT];
-
-void turret_draw_sprite_frame(int cx, int cy, int type, int frame_idx, int is_selected);
+void turret_draw_frame_angle(int cx, int cy, int type, int frame_idx, int angle_16, int is_selected);
 
 #endif // TURRET_DATA_H
 ''')
@@ -280,7 +280,7 @@ void turret_draw_sprite_frame(int cx, int cy, int type, int frame_idx, int is_se
     with open("source/turret_data.c", "w") as fc:
         fc.write('#include "turret_data.h"\n#include "game.h"\n\n')
 
-        turrets_meta = []
+        angles = [i * (360.0 / 16.0) for i in range(16)]
 
         for name, strip_file, fw, fh in turret_defs:
             path = os.path.join(turrets_dir, strip_file)
@@ -290,63 +290,66 @@ void turret_draw_sprite_frame(int cx, int cy, int type, int frame_idx, int is_se
             im = Image.open(path).convert("RGBA")
             num_frames = im.width // fw
 
-            total_pixels = num_frames * fw * fh
-            fc.write(f"static const uint16_t s_{name}_frames[{total_pixels}] __attribute__((aligned(4))) = {{\n")
+            fc.write(f"// {name}: {num_frames} frames x 16 angles\n")
+            fc.write(f"static const uint16_t s_{name}_anim[{num_frames}][16][1024] __attribute__((aligned(4))) = {{\n")
 
             for f_idx in range(num_frames):
-                box = (f_idx * fw, 0, (f_idx + 1) * fw, fh)
-                frame_crop = im.crop(box)
-                pixels = [to_bgr555(*p) for p in get_image_pixels(frame_crop)]
+                fc.write(f"  // Frame {f_idx}\n  {{\n")
+                crop = im.crop((f_idx * fw, 0, (f_idx + 1) * fw, fh))
 
-                fc.write(f"  // Frame {f_idx}\n")
-                for y in range(fh):
-                    line = "  " + ", ".join(f"0x{p:04X}" for p in pixels[y * fw : (y + 1) * fw]) + ",\n"
-                    fc.write(line)
+                for a_idx, ang in enumerate(angles):
+                    rot = rotsprite_pil(crop, -ang)
+                    pixels = [to_bgr555(*p) for p in get_image_pixels(rot)]
+                    fc.write(f"    // Angle {a_idx} ({ang:.1f} deg)\n    {{\n")
+                    for y in range(fh):
+                        line = "      " + ", ".join(f"0x{p:04X}" for p in pixels[y * fw : (y + 1) * fw]) + ",\n"
+                        fc.write(line)
+                    fc.write("    },\n")
+                fc.write("  },\n")
 
             fc.write("};\n\n")
-            turrets_meta.append((name, num_frames, fw, fh))
 
-        # Array of turret sprite definitions
-        fc.write("const TurretSpriteDef g_turret_sprites[TURRET_TYPE_COUNT] = {\n")
-        for name, nframes, fw, fh in turrets_meta:
-            fc.write(f"    {{ {nframes}, {fw}, {fh}, s_{name}_frames }},\n")
-        fc.write("};\n\n")
-
-        # Drawing routine for direct rendering onto g_backbuffer
-        fc.write('''void turret_draw_sprite_frame(int cx, int cy, int type, int frame_idx, int is_selected) {
+        # Turret drawing function
+        fc.write('''void turret_draw_frame_angle(int cx, int cy, int type, int frame_idx, int angle_16, int is_selected) {
     if (type < 0 || type >= TURRET_TYPE_COUNT) type = 0;
-    const TurretSpriteDef *def = &g_turret_sprites[type];
-    frame_idx = frame_idx % def->frame_count;
+    angle_16 = angle_16 & 15;
 
-    int w = def->frame_w;
-    int h = def->frame_h;
-    const uint16_t *src = &def->frames[frame_idx * w * h];
+    const uint16_t *src;
+    if (type == TURRET_TYPE_LASCANNON) {
+        if (frame_idx < 0 || frame_idx >= 6) frame_idx = 0;
+        src = s_lascannon_anim[frame_idx][angle_16];
+    } else {
+        if (frame_idx < 0 || frame_idx >= 11) frame_idx = 0;
+        src = s_heavy_bolter_anim[frame_idx][angle_16];
+    }
 
-    int ox = cx - (w / 2);
-    int oy = cy - (h / 2);
+    int ox = cx - 16;
+    int oy = cy - 16;
 
-    for (int y = 0; y < h; y++) {
+    for (int y = 0; y < 32; y++) {
         int dst_y = oy + y;
         if (dst_y < 0 || dst_y >= SCREEN_H) continue;
+        int row_idx = dst_y * SCREEN_W;
+        int src_idx = y * 32;
 
-        for (int x = 0; x < w; x++) {
+        for (int x = 0; x < 32; x++) {
             int dst_x = ox + x;
             if (dst_x < 0 || dst_x >= SCREEN_W) continue;
 
-            uint16_t col = src[y * w + x];
+            uint16_t col = src[src_idx + x];
             if (col & 0x8000) {
-                g_backbuffer[dst_y * SCREEN_W + dst_x] = col;
+                g_backbuffer[row_idx + dst_x] = col;
             }
         }
     }
 
     if (is_selected) {
-        renderer_draw_rect(ox - 1, oy - 1, w + 2, h + 2, COLOR_HAZARD_YELLOW);
+        renderer_draw_rect(ox - 1, oy - 1, 34, 34, COLOR_HAZARD_YELLOW);
     }
 }
 ''')
 
-    print(f"  -> Generated source/turret_data.c and include/turret_data.h ({len(turret_defs)} turret types)")
+    print(f"  -> Generated source/turret_data.c and include/turret_data.h ({len(turret_defs)} turret types, 16 uniform angles)")
 
 def main():
     parser = argparse.ArgumentParser(description="Build Nintendo DS assets from PNG files.")

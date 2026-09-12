@@ -1,0 +1,26 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 30, "capture": "01_boot_prep"},
+    {"tap": {"x": 80, "y": 165}, "frames": 5},
+    {"release": true, "frames": 15, "capture": "02_upgrades_menu"},
+    {"tap": {"x": 128, "y": 165}, "frames": 5},
+    {"release": true, "frames": 15, "capture": "03_back_to_prep"},
+    {"tap": {"x": 220, "y": 165}, "frames": 5},
+    {"release": true, "frames": 180, "capture_sequence": "04_combat_wave", "capture_every": 15, "capture": "04_combat_wave_running"},
+    {"tap": {"x": 128, "y": 60}, "frames": 5},
+    {"release": true, "frames": 60, "capture": "05_turret_target_firing"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_boot_prep",
+      "to": "02_upgrades_menu",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {"from": "01_boot_prep", "to": "02_upgrades_menu", "min_changed_pixels": 100},
+      {"from": "02_upgrades_menu", "to": "03_back_to_prep", "min_changed_pixels": 100},
+      {"from": "03_back_to_prep", "to": "04_combat_wave_running", "min_changed_pixels": 100}
+    ]
+  }
+}
