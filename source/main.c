@@ -31,11 +31,13 @@ int main(void) {
             if (g_game.mode == MODE_UPGRADES) {
                 g_game.mode = (g_game.previous_mode == MODE_UPGRADES || g_game.previous_mode == MODE_PAUSED) 
                               ? MODE_PREPARATION : g_game.previous_mode;
-            } else if (g_game.mode != MODE_GAME_OVER) {
+            } else if (g_game.mode != MODE_GAME_OVER && g_game.mode != MODE_CALIBRATION) {
                 g_game.previous_mode = g_game.mode;
                 g_game.mode = MODE_UPGRADES;
             }
         }
+
+
 
         // Bottom Screen mode-specific input
         if (g_game.mode == MODE_PAUSED) {
@@ -46,6 +48,8 @@ int main(void) {
             game_handle_input_wave(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_UPGRADES) {
             game_handle_input_upgrades(touch, keys_down, keys_held);
+        } else if (g_game.mode == MODE_CALIBRATION) {
+            game_handle_input_calibration(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_GAME_OVER) {
             game_handle_input_game_over(touch, keys_down, keys_held);
         }
@@ -67,6 +71,8 @@ int main(void) {
         // Visual render (Bottom Screen: Urban Ground + Bunker + Turrets + Inbound Swarm + UI)
         if (g_game.mode == MODE_UPGRADES) {
             renderer_draw_ui_upgrades();
+        } else if (g_game.mode == MODE_CALIBRATION) {
+            renderer_draw_ui_calibration();
         } else {
             renderer_draw_battlefield_bottom();
             renderer_draw_splatters_bottom();

@@ -175,9 +175,9 @@ def main() -> int:
         for event in events:
             handle.write(json.dumps(event, separators=(",", ":")) + "\n")
     if not changed:
-        print("DSM_SCENARIO_RESULT=FAIL reason=screen_unchanged")
+        print("DSM_SCENARIO_RESULT=FAIL reason=screen_unchanged", flush=True)
         return 1
-    print(f"DSM_SCENARIO_RESULT=PASS captures={len(captures)} events={len(events)}")
+    print(f"DSM_SCENARIO_RESULT=PASS captures={len(captures)} events={len(events)}", flush=True)
     return 0
 
 

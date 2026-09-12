@@ -1,0 +1,29 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 30, "capture": "01_boot_prep"},
+    {"button_down": "Y", "frames": 5},
+    {"button_up": "Y", "frames": 15, "capture": "02_calibration_waves_screen"},
+    {"tap": {"x": 160, "y": 28}, "frames": 5},
+    {"release": true, "frames": 15, "capture": "03_calibration_tiers_screen"},
+    {"button_down": "R", "frames": 5},
+    {"button_up": "R", "frames": 15, "capture": "04_calibration_tier1_ripper"},
+    {"button_down": "RIGHT", "frames": 25},
+    {"button_up": "RIGHT", "frames": 10, "capture": "05_calibration_autorepeat_val"},
+    {"tap": {"x": 200, "y": 170}, "frames": 5},
+    {"release": true, "frames": 20, "capture": "06_resumed_game"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_boot_prep",
+      "to": "02_calibration_waves_screen",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {"from": "01_boot_prep", "to": "02_calibration_waves_screen", "min_changed_pixels": 100},
+      {"from": "02_calibration_waves_screen", "to": "03_calibration_tiers_screen", "min_changed_pixels": 100},
+      {"from": "03_calibration_tiers_screen", "to": "04_calibration_tier1_ripper", "min_changed_pixels": 50},
+      {"from": "05_calibration_autorepeat_val", "to": "06_resumed_game", "min_changed_pixels": 100}
+    ]
+  }
+}

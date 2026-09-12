@@ -38,9 +38,10 @@
      git worktree remove ../towerds-<feature>
      ```
 4. **Cierre y Entrega de Sesión:**
-   - Compilación limpia con `scripts/build-project.ps1` (Docker BlocksDS).
-   - Validación visual determinista con `scripts/run-scenario.ps1` (DeSmuME headless).
-   - Subida opcional a la consola mediante `scripts/upload-rom.ps1`.
+   - Compilación limpia con `scripts/build-project.ps1` (Docker BlocksDS). Todo prototipo o función implementada en `.c` debe declararse debidamente en su cabecera `.h` para evitar fallos de compilación `-Wimplicit-function-declaration`.
+   - Validación visual determinista con `scripts/run-scenario.ps1 -RomPath <rom> -ScenarioPath <scenario> -OutputPath <dir>` (DeSmuME headless). Prohibido omitir argumentos mandatorios y usar escenarios con aserciones o hitboxes obsoletas.
+   - Subida a la consola mediante `scripts/upload-rom.ps1 -ProjectPath . -RomPath game.nds -ConfirmUpload`:
+     - El archivo remoto canónico en la microSD de la DS es invariablemente **`towerdefense.nds`** (configurado en `$RemoteName = 'towerdefense.nds'`). Queda terminantemente prohibido subir con `game.nds` u otro nombre no canónico.
    - Commit semántico en la rama de la feature.
    - Aprobación explícita del usuario antes de merge a `main` o tagging de versión (`v0.1`, `v0.2`, etc.).
 

@@ -73,6 +73,8 @@ static const uint8_t font4x6[128][6] = {
     ['x'] = {0x0, 0x5, 0x2, 0x5, 0x0, 0},
     ['$'] = {0x7, 0xA, 0x7, 0x2, 0x7, 0},
     ['!'] = {0x2, 0x2, 0x2, 0x0, 0x2, 0},
+    ['<'] = {0x2, 0x4, 0x8, 0x4, 0x2, 0},
+    ['>'] = {0x8, 0x4, 0x2, 0x4, 0x8, 0},
 };
 
 void renderer_init(void) {
@@ -240,17 +242,9 @@ void renderer_draw_turret(const Turret *t, int is_selected) {
         renderer_draw_circle(t->x, t->y, t->range, COLOR_AMBER, 0);
     }
 
-    // Draw canonical 32-angle discrete RotSprite turret
-    turret_draw_angle(t->x, t->y, t->type, t->current_angle, is_selected);
-
-    // Muzzle flash when firing
-    if (t->flash_timer > 0) {
-        int tip_dist = 14;
-        int fx = t->x + ((fixed_cos(t->current_angle) * tip_dist) >> FP_SHIFT);
-        int fy = t->y + ((fixed_sin(t->current_angle) * tip_dist) >> FP_SHIFT);
-        renderer_draw_circle(fx, fy, 2, COLOR_MUZZLE_FLASH, 1);
-        renderer_draw_pixel(fx, fy, COLOR_WHITE);
-    }
+    // Draw canonical 16-angle animated RotSprite turret
+    int angle_16 = ((t->current_angle + 8) >> 4) & 15;
+    turret_draw_frame_angle(t->x, t->y, t->type, t->anim_frame, angle_16, is_selected);
 
     // Ammo bar above turret
     int bar_w = 20;
@@ -411,9 +405,14 @@ void renderer_draw_ui_prep(void) {
     renderer_draw_text(198, 164, "START", COLOR_BLACK);
 
     // Upgrade button
-    renderer_fill_rect(60, 156, 50, 24, COLOR_IRON_PANEL);
-    renderer_draw_rect(60, 156, 50, 24, COLOR_AMBER);
-    renderer_draw_text(65, 164, "UPGRADES", COLOR_AMBER);
+    renderer_fill_rect(54, 156, 48, 24, COLOR_IRON_PANEL);
+    renderer_draw_rect(54, 156, 48, 24, COLOR_AMBER);
+    renderer_draw_text(58, 164, "UPGRADE", COLOR_AMBER);
+
+    // Calibration button
+    renderer_fill_rect(108, 156, 40, 24, COLOR_IRON_PANEL);
+    renderer_draw_rect(108, 156, 40, 24, COLOR_PHOSPHOR_GREEN);
+    renderer_draw_text(114, 164, "CALIB", COLOR_PHOSPHOR_GREEN);
 
     // Instruction banner
     renderer_draw_text(50, 138, "DRAG AMMO TO RELOAD / TAP ENEMY", COLOR_WHITE);
@@ -475,7 +474,7 @@ void renderer_draw_ui_game_over(void) {
 void renderer_draw_ui_upgrades(void) {
     renderer_fill_rect(0, 0, SCREEN_W, SCREEN_H, COLOR_BLACK);
     renderer_draw_rect(2, 2, SCREEN_W - 4, SCREEN_H - 4, COLOR_IRON_BORDER);
-    renderer_draw_text(75, 8, "SANCTUM UPGRADES", COLOR_AMBER);
+    renderer_draw_text(65, 8, "SANCTUM UPGRADES", COLOR_AMBER);
 
     char scrap_buf[32];
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
@@ -483,52 +482,167 @@ void renderer_draw_ui_upgrades(void) {
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
     renderer_draw_text(160, 8, buf, COLOR_PHOSPHOR_GREEN);
 
-    // Tab 1: Caliber
-    renderer_fill_rect(10, 24, 110, 32, COLOR_IRON_PANEL);
-    renderer_draw_rect(10, 24, 110, 32, COLOR_IRON_BORDER);
-    snprintf(buf, sizeof(buf), "CALIBER LV%d", g_game.upgrades.caliber_lvl);
-    renderer_draw_text(14, 28, buf, COLOR_WHITE);
-    renderer_draw_text(14, 40, "+DMG 100$", COLOR_AMBER);
+    static const struct {
+        int x, y, w, h;
+        const char *title;
+    } s_card_pos[6] = {
+        { 10, 24, 110, 32, "CALIBER" },
+        { 130, 24, 110, 32, "FIRE RATE" },
+        { 10, 62, 110, 32, "MAG SIZE" },
+        { 130, 62, 110, 32, "BIO HARVEST" },
+        { 10, 100, 110, 32, "AUTO SUPPLY" },
+        { 130, 100, 110, 32, "AUTO TARGET" }
+    };
 
-    // Tab 2: Cadence
-    renderer_fill_rect(130, 24, 110, 32, COLOR_IRON_PANEL);
-    renderer_draw_rect(130, 24, 110, 32, COLOR_IRON_BORDER);
-    snprintf(buf, sizeof(buf), "FIRE RATE LV%d", g_game.upgrades.firerate_lvl);
-    renderer_draw_text(134, 28, buf, COLOR_WHITE);
-    renderer_draw_text(134, 40, "+ROF 150$", COLOR_AMBER);
+    for (int i = 0; i < 6; i++) {
+        int x = s_card_pos[i].x;
+        int y = s_card_pos[i].y;
+        int w = s_card_pos[i].w;
+        int h = s_card_pos[i].h;
 
-    // Tab 3: Ammo Cap
-    renderer_fill_rect(10, 62, 110, 32, COLOR_IRON_PANEL);
-    renderer_draw_rect(10, 62, 110, 32, COLOR_IRON_BORDER);
-    snprintf(buf, sizeof(buf), "MAG SIZE LV%d", g_game.upgrades.mag_size_lvl);
-    renderer_draw_text(14, 66, buf, COLOR_WHITE);
-    renderer_draw_text(14, 78, "+50 AMMO 80$", COLOR_AMBER);
+        uint64_t cost = upgrade_get_cost(i);
+        int can_buy = upgrade_can_afford(i);
+        int is_flashing = (g_game.upgrade_flash_timer > 0 && g_game.upgrade_flash_idx == i);
 
-    // Tab 4: Bio Harvest
-    renderer_fill_rect(130, 62, 110, 32, COLOR_IRON_PANEL);
-    renderer_draw_rect(130, 62, 110, 32, COLOR_IRON_BORDER);
-    snprintf(buf, sizeof(buf), "BIO HARVEST LV%d", g_game.upgrades.bio_harvest_lvl);
-    renderer_draw_text(134, 66, buf, COLOR_WHITE);
-    renderer_draw_text(134, 78, "+SCRAP 200$", COLOR_AMBER);
+        uint16_t border_col = is_flashing ? COLOR_WHITE : (can_buy ? COLOR_PHOSPHOR_GREEN : COLOR_IRON_BORDER);
+        uint16_t bg_col = is_flashing ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL;
+        uint16_t text_col = can_buy ? COLOR_WHITE : RGB15(15, 15, 17) | BIT(15);
+        uint16_t cost_col = can_buy ? COLOR_AMBER : RGB15(18, 14, 8) | BIT(15);
 
-    // Tab 5: Conveyor Loader (Automation)
-    renderer_fill_rect(10, 100, 110, 32, COLOR_IRON_PANEL);
-    renderer_draw_rect(10, 100, 110, 32, COLOR_IRON_BORDER);
-    snprintf(buf, sizeof(buf), "CONVEYOR LV%d", g_game.upgrades.conveyor_lvl);
-    renderer_draw_text(14, 104, buf, COLOR_WHITE);
-    renderer_draw_text(14, 116, "AUTO-LOAD 500$", COLOR_AMBER);
+        renderer_fill_rect(x, y, w, h, bg_col);
+        renderer_draw_rect(x, y, w, h, border_col);
 
-    // Tab 6: Auto Targeting
-    renderer_fill_rect(130, 100, 110, 32, COLOR_IRON_PANEL);
-    renderer_draw_rect(130, 100, 110, 32, COLOR_IRON_BORDER);
-    snprintf(buf, sizeof(buf), "AUTO-TARGET: %s", g_game.upgrades.auto_target ? "ON" : "OFF");
-    renderer_draw_text(134, 104, buf, COLOR_WHITE);
-    renderer_draw_text(134, 116, "COGITATOR 750$", COLOR_AMBER);
+        char cost_str[32];
+        format_number_compact(cost_str, sizeof(cost_str), cost);
+
+        if (i == 0) {
+            snprintf(buf, sizeof(buf), "CALIBER LV%d", g_game.upgrades.caliber_lvl);
+            renderer_draw_text(x + 4, y + 4, buf, text_col);
+            snprintf(buf, sizeof(buf), "+DMG %s$", cost_str);
+            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+        } else if (i == 1) {
+            snprintf(buf, sizeof(buf), "FIRE RATE LV%d", g_game.upgrades.firerate_lvl);
+            renderer_draw_text(x + 4, y + 4, buf, text_col);
+            snprintf(buf, sizeof(buf), "+ROF %s$", cost_str);
+            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+        } else if (i == 2) {
+            snprintf(buf, sizeof(buf), "MAG SIZE LV%d", g_game.upgrades.mag_size_lvl);
+            renderer_draw_text(x + 4, y + 4, buf, text_col);
+            snprintf(buf, sizeof(buf), "+AMMO %s$", cost_str);
+            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+        } else if (i == 3) {
+            snprintf(buf, sizeof(buf), "HARVEST LV%d", g_game.upgrades.bio_harvest_lvl);
+            renderer_draw_text(x + 4, y + 4, buf, text_col);
+            snprintf(buf, sizeof(buf), "+SCRAP %s$", cost_str);
+            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+        } else if (i == 4) {
+            snprintf(buf, sizeof(buf), "SUPPLY LV%d", g_game.upgrades.conveyor_lvl);
+            renderer_draw_text(x + 4, y + 4, buf, text_col);
+            snprintf(buf, sizeof(buf), "FEED %s$", cost_str);
+            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+        } else if (i == 5) {
+            snprintf(buf, sizeof(buf), "TARGET: %s", g_game.upgrades.auto_target ? "ON" : "OFF");
+            renderer_draw_text(x + 4, y + 4, buf, text_col);
+            if (!g_game.upgrades.auto_target) {
+                snprintf(buf, sizeof(buf), "COGIT %s$", cost_str);
+            } else {
+                snprintf(buf, sizeof(buf), "MAXED");
+            }
+            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+        }
+    }
+
+    if (g_game.upgrade_flash_timer > 0) g_game.upgrade_flash_timer--;
 
     // Return button
     renderer_fill_rect(90, 150, 76, 28, COLOR_LED_GREEN);
     renderer_draw_rect(90, 150, 76, 28, COLOR_WHITE);
     renderer_draw_text(108, 160, "BACK", COLOR_BLACK);
+}
+
+void renderer_draw_ui_calibration(void) {
+    // Background plate
+    renderer_fill_rect(0, 0, SCREEN_W, SCREEN_H, COLOR_BLACK);
+    renderer_draw_rect(2, 2, SCREEN_W - 4, SCREEN_H - 4, COLOR_IRON_BORDER);
+
+    // Title banner
+    renderer_draw_text(6, 4, "WAVE CALIBRATION", COLOR_AMBER);
+    if (g_game.calib_saved_timer > 0) {
+        g_game.calib_saved_timer--;
+        renderer_draw_text(180, 4, "SAVED (SD)", COLOR_PHOSPHOR_GREEN);
+    }
+
+    // Wave Selector Bar: [<] WAVE X/20 [>]
+    renderer_fill_rect(8, 16, 26, 16, COLOR_IRON_PANEL);
+    renderer_draw_rect(8, 16, 26, 16, COLOR_AMBER);
+    renderer_draw_text(18, 20, "<", COLOR_AMBER);
+
+    renderer_fill_rect(222, 16, 26, 16, COLOR_IRON_PANEL);
+    renderer_draw_rect(222, 16, 26, 16, COLOR_AMBER);
+    renderer_draw_text(232, 20, ">", COLOR_AMBER);
+
+    char buf[64];
+    snprintf(buf, sizeof(buf), "SELECT WAVE: %d/20 (L/R)", g_game.calib_wave_idx + 1);
+    renderer_draw_text(52, 20, buf, COLOR_WHITE);
+
+    int w = g_game.calib_wave_idx;
+    const WaveDef *wd = &g_balance.waves[w];
+
+    // 9 Rows grouped across the 3 Tiers (Tier 0: Larva, Tier 1: Ripper, Tier 2: Hormagaunt)
+    static const char *row_labels[9] = {
+        "T1 LARVA COUNT", "T1 LARVA DELAY", "T1 LARVA SPEED",
+        "T2 RIPPER COUNT", "T2 RIPPER DELAY", "T2 RIPPER SPEED",
+        "T3 HORMAG COUNT", "T3 HORMAG DELAY", "T3 HORMAG SPEED"
+    };
+
+    for (int r = 0; r < 9; r++) {
+        int tier = r / 3;
+        int param = r % 3;
+        int val = 0;
+        if (param == 0) val = wd->tiers[tier].count;
+        else if (param == 1) val = wd->tiers[tier].delay;
+        else if (param == 2) val = wd->tiers[tier].speed;
+
+        int y = 36 + r * 13;
+        int is_sel = (g_game.calib_row == r);
+        uint16_t row_bg = is_sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL;
+        uint16_t row_border = is_sel ? COLOR_AMBER : COLOR_IRON_BORDER;
+        uint16_t txt_col = is_sel ? COLOR_WHITE : RGB15(20, 20, 22) | BIT(15);
+
+        // Highlight header tier group with slightly warmer text
+        if (param == 0 && !is_sel) txt_col = COLOR_AMBER;
+
+        renderer_fill_rect(6, y, 244, 12, row_bg);
+        renderer_draw_rect(6, y, 244, 12, row_border);
+
+        renderer_draw_text(10, y + 2, row_labels[r], txt_col);
+
+        snprintf(buf, sizeof(buf), "%d", val);
+        renderer_draw_text(142, y + 2, buf, COLOR_PHOSPHOR_GREEN);
+
+        // [-] button
+        renderer_fill_rect(178, y + 1, 24, 10, COLOR_BLACK);
+        renderer_draw_rect(178, y + 1, 24, 10, COLOR_IRON_BORDER);
+        renderer_draw_text(187, y + 2, "-", COLOR_WHITE);
+
+        // [+] button
+        renderer_fill_rect(214, y + 1, 24, 10, COLOR_BLACK);
+        renderer_draw_rect(214, y + 1, 24, 10, COLOR_IRON_BORDER);
+        renderer_draw_text(223, y + 2, "+", COLOR_WHITE);
+    }
+
+    // Bottom action buttons: [RESTART W1] [RESET DEFAULTS] [RESUME]
+    renderer_fill_rect(8, 158, 76, 26, COLOR_LED_RED);
+    renderer_draw_rect(8, 158, 76, 26, COLOR_WHITE);
+    renderer_draw_text(14, 166, "RESTART W1", COLOR_WHITE);
+
+    renderer_fill_rect(90, 158, 72, 26, COLOR_IRON_PANEL);
+    renderer_draw_rect(90, 158, 72, 26, COLOR_AMBER);
+    renderer_draw_text(98, 166, "DEFAULTS", COLOR_AMBER);
+
+    renderer_fill_rect(168, 158, 78, 26, COLOR_LED_GREEN);
+    renderer_draw_rect(168, 158, 78, 26, COLOR_WHITE);
+    renderer_draw_text(182, 166, "RESUME", COLOR_BLACK);
 }
 
 void renderer_present(void) {
