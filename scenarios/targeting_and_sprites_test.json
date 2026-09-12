@@ -1,0 +1,87 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 30,
+      "capture": "01_prep"
+    },
+    {
+      "tap": {
+        "x": 240,
+        "y": 180
+      },
+      "frames": 5
+    },
+    {
+      "release": true,
+      "frames": 5
+    },
+    {
+      "button_down": "A",
+      "frames": 5
+    },
+    {
+      "button_up": "A",
+      "frames": 5
+    },
+    {
+      "button_down": "R",
+      "frames": 5
+    },
+    {
+      "button_up": "R",
+      "frames": 10
+    },
+    {
+      "frames": 150,
+      "capture": "02_top_swarm"
+    },
+    {
+      "frames": 180,
+      "capture": "03_bottom_swarm"
+    },
+    {
+      "tap": {
+        "x": 124,
+        "y": 70
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 5
+    },
+    {
+      "frames": 40,
+      "capture": "04_lead_fire"
+    },
+    {
+      "frames": 80,
+      "capture": "05_enemy_destroyed"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_prep",
+      "to": "02_top_swarm",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {
+        "from": "01_prep",
+        "to": "02_top_swarm",
+        "min_changed_pixels": 10
+      },
+      {
+        "from": "02_top_swarm",
+        "to": "03_bottom_swarm",
+        "min_changed_pixels": 10
+      },
+      {
+        "from": "03_bottom_swarm",
+        "to": "05_enemy_destroyed",
+        "min_changed_pixels": 10
+      }
+    ]
+  }
+}
