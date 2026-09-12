@@ -154,7 +154,8 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
     },
 };
 
-void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
+void enemy_draw_sprite_to_buffer(uint16_t *buf, int cx, int cy, int variant, int frame, int dir) {
+    if (!buf) return;
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
     frame = frame & 3;
 
@@ -163,7 +164,6 @@ void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
     int h = fd->h;
     const uint16_t *src = fd->pixels;
 
-    // Center sprite around (cx, cy)
     int ox = cx - (w / 2);
     int oy = cy - (h / 2);
 
@@ -174,10 +174,8 @@ void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
         for (int x = 0; x < w; x++) {
             int draw_x;
             if (dir == 2) {
-                // West (-X): flip horizontally
                 draw_x = ox + (w - 1 - x);
             } else {
-                // East (+X, default)
                 draw_x = ox + x;
             }
 
@@ -185,8 +183,13 @@ void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
 
             uint16_t col = src[y * w + x];
             if (col & 0x8000) {
-                g_backbuffer[dst_y * SCREEN_W + draw_x] = col;
+                buf[dst_y * SCREEN_W + draw_x] = col;
             }
         }
     }
 }
+
+void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
+    enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir);
+}
+

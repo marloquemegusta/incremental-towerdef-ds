@@ -1,10 +1,10 @@
-﻿{
+{
   "rom": "game.nds",
   "steps": [
     {"frames": 30, "capture": "boot"},
-    {"tap": {"x": 200, "y": 10}, "frames": 5},
+    {"tap": {"x": 220, "y": 182}, "frames": 5},
     {"release": true, "frames": 10},
-    {"frames": 500, "capture_sequence": "combat_1x", "capture_every": 2, "capture": "end"}
+    {"frames": 500, "capture_sequence": "combat_1x", "capture_every": 20, "capture": "end"}
   ],
   "assertions": {
     "screen_changed": {
