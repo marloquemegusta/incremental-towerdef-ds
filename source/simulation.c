@@ -424,15 +424,32 @@ void game_update_simulation(void) {
             continue; // Stop advancing while biting
         }
 
-        // Check if hitting Bunker Sanctum:
-        // Bunker visual footprint is centered at (128, 172) on bottom screen, global y = 364, height 42 -> top is y=344.
-        // Guarantee that any enemy reaching global y >= 344 bites the bunker, never walking off-screen!
-        if (py >= 344) {
-            // Clamp enemy position at bunker front wall so it doesn't escape out of screen bounds
-            g_enemies[i].y = TO_FP(344);
-            if (px < 100) g_enemies[i].x = TO_FP(100);
-            if (px > 156) g_enemies[i].x = TO_FP(156);
+        // Compute base movement speed
+        int spd = (g_enemies[i].speed * FP_ONE) / 60;
+        if (spd < 1) spd = 1;
 
+        // Check if reaching Bunker Sanctum baseline (py >= 344):
+        // Never teleport! If outside the bunker front width (104..152), walk purely horizontally.
+        if (py >= 344) {
+            g_enemies[i].y = TO_FP(344);
+            g_enemies[i].vy = 0;
+
+            if (px < 104) {
+                g_enemies[i].x += spd;
+                g_enemies[i].vx = spd;
+                g_enemies[i].dir = 0; // East
+                g_enemies[i].biting_target = -1;
+                continue;
+            } else if (px > 152) {
+                g_enemies[i].x -= spd;
+                g_enemies[i].vx = -spd;
+                g_enemies[i].dir = 2; // West
+                g_enemies[i].biting_target = -1;
+                continue;
+            }
+
+            // Arrived at Bunker front wall: bite the Sanctum!
+            g_enemies[i].vx = 0;
             g_enemies[i].biting_target = 99;
             g_enemies[i].bite_timer++;
             if (g_enemies[i].bite_timer >= 40) {
@@ -450,9 +467,6 @@ void game_update_simulation(void) {
         }
 
         // Advance: vertical downward in parallel lanes across top screen and upper bottom screen
-        int spd = (g_enemies[i].speed * FP_ONE) / 60;
-        if (spd < 1) spd = 1;
-
         g_enemies[i].y += spd;
         g_enemies[i].vy = spd;
         g_enemies[i].vx = 0;
