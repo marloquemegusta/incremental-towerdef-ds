@@ -1,6 +1,7 @@
 #include "game.h"
 #include "enemy_data.h"
 #include "tiles.h"
+#include "turret_data.h"
 
 GameContext g_game;
 Turret g_turrets[MAX_TURRETS];
@@ -8,79 +9,62 @@ Enemy g_enemies[MAX_ENEMIES];
 Bullet g_bullets[MAX_BULLETS];
 Splatter g_splatters[MAX_SPLATTERS];
 DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
-RunCalibration g_calibration;
 
-Waypoint g_waypoints[MAX_WAYPOINTS];
-int g_waypoint_count = 5;
-const uint16_t *g_current_map_bg = NULL;
+// Wave enemy distribution table (20 waves)
+typedef struct {
+    int total_enemies;
+    int spawn_interval; // frames between spawns
+    int primary_variant;
+    int secondary_variant;
+    int secondary_ratio; // 0..10
+    uint64_t hp_base;
+    uint64_t scrap_base;
+} WaveDef;
 
-void map_select(int map_index) {
-    if (map_index < 0 || map_index >= 3) map_index = 0;
-    g_calibration.selected_map = map_index;
-    g_current_map_bg = g_map_backgrounds[map_index];
-    g_waypoint_count = g_map_waypoint_counts[map_index];
-    for (int i = 0; i < g_waypoint_count && i < MAX_WAYPOINTS; i++) {
-        g_waypoints[i] = g_map_waypoints[map_index][i];
-    }
+static const WaveDef s_wave_table[20] = {
+    // W1..W5: Early clicker & manual tutorial
+    { 14, 75, 0, 0, 0, 6, 1 },              // W1: 14 Larvas (contacto)
+    { 20, 60, 0, 0, 0, 8, 1 },              // W2: 20 Larvas
+    { 28, 48, 0, 1, 3, 14, 2 },             // W3: Larvas + Rippers
+    { 38, 38, 1, 0, 2, 24, 4 },             // W4: Rippers veloces
+    { 65, 24, 0, 1, 5, 36, 6 },             // W5: Mini-Horda They Are Billions
 
-    // Set thematic initial position for default Turret 0
-    if (map_index == 0) { // La Trinchera con Chicana
-        g_turrets[0].x = 150;
-        g_turrets[0].y = 145;
-        g_turrets[0].center_angle = 192; // Aim North towards highway
-        g_turrets[0].current_angle = 192;
-    } else if (map_index == 1) { // La Doble S (rowshift: fila superior en y=32)
-        g_turrets[0].x = 115;
-        g_turrets[0].y = 60;  // Between upper and middle roads (was 75 before row shift)
-        g_turrets[0].center_angle = 64;  // Aim South towards highway
-        g_turrets[0].current_angle = 64;
-    } else if (map_index == 2) { // Rotonda del Sanctum
-        g_turrets[0].x = 128;
-        g_turrets[0].y = 112; // In center plaza between roads
-        g_turrets[0].center_angle = 192;
-        g_turrets[0].current_angle = 192;
-    }
-}
+    // W6..W10: Hormagaunts & Logistics
+    { 50, 32, 1, 2, 4, 60, 10 },            // W6: Entra T2 con 1 Armadura
+    { 60, 28, 2, 1, 3, 100, 15 },           // W7: T2 dominante
+    { 85, 20, 0, 2, 4, 180, 25 },           // W8: Escala 1.5K
+    { 75, 22, 2, 3, 3, 300, 45 },           // W9: Entra T3 Ravener
+    { 130, 14, 1, 2, 5, 550, 70 },          // W10: Gran Horda Sectorial
+
+    // W11..W15: Heavy Armor & Factorio Automation
+    { 80, 20, 3, 2, 4, 1200, 150 },         // W11: Raveners pesados
+    { 110, 15, 2, 3, 5, 2400, 300 },        // W12: Escala 15K
+    { 150, 12, 1, 3, 4, 4800, 500 },        // W13: Enjambre masivo
+    { 140, 12, 3, 2, 6, 9500, 800 },        // W14: Asedio de choque
+    { 180, 10, 2, 4, 3, 18000, 1500 },      // W15: Asedio Carnifex
+
+    // W16..W20: Millions Cataclysm
+    { 70, 24, 4, 3, 5, 45000, 4000 },       // W16: Tanques Carnifex
+    { 160, 10, 3, 4, 4, 90000, 8000 },      // W17: Horda mixta blindada
+    { 220, 8, 2, 4, 5, 180000, 15000 },     // W18: Salto a Millones
+    { 200, 8, 4, 5, 2, 400000, 35000 },     // W19: Vanguardia Titánica
+    { 320, 5, 3, 5, 4, 1000000, 80000 }     // W20: Cataclismo Final
+};
 
 int game_is_pos_valid(int x, int y) {
-    if (x < 12 || x > 244) return 0;
-    if (y < 4 || y > 168) return 0;
+    // Valid deployment area in bottom screen (local y: 20..150, x: 20..236)
+    if (x < 24 || x > 232) return 0;
+    if (y < 24 || y > 146) return 0;
 
-    // Check distance to all active road segments
-    for (int wp = 0; wp < g_waypoint_count - 1; wp++) {
-        int x0 = g_waypoints[wp].x;
-        int y0 = g_waypoints[wp].y;
-        int x1 = g_waypoints[wp + 1].x;
-        int y1 = g_waypoints[wp + 1].y;
+    // Do not overlap central bunker area (x: 96..160, y >= 148)
+    if (x >= 90 && x <= 166 && y >= 144) return 0;
 
-        int dx = x1 - x0;
-        int dy = y1 - y0;
-        int len_sq = dx * dx + dy * dy;
-
-        int cx = x0;
-        int cy = y0;
-        if (len_sq > 0) {
-            int t = ((x - x0) * dx + (y - y0) * dy);
-            if (t < 0) t = 0;
-            else if (t > len_sq) t = len_sq;
-            cx = x0 + (t * dx) / len_sq;
-            cy = y0 + (t * dy) / len_sq;
-        }
-
-        int dist_x = x - cx;
-        int dist_y = y - cy;
-        // Road half-width is 16px + turret radius 8px = 24px clearance (use 22 for slight leeway)
-        if (dist_x * dist_x + dist_y * dist_y < (22 * 22)) {
-            return 0; // Overlaps road trench
-        }
-    }
-
-    // Must not overlap another placed turret
+    // Check distance to other placed turrets (min 32px separation)
     for (int t = 0; t < MAX_TURRETS; t++) {
         if (g_turrets[t].placed) {
-            int tdx = x - g_turrets[t].x;
-            int tdy = y - g_turrets[t].y;
-            if (tdx * tdx + tdy * tdy < (16 * 16)) return 0;
+            int dx = x - g_turrets[t].x;
+            int dy = y - g_turrets[t].y;
+            if (dx * dx + dy * dy < (32 * 32)) return 0;
         }
     }
 
@@ -88,172 +72,106 @@ int game_is_pos_valid(int x, int y) {
 }
 
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration) {
-    if (x < 2 || x >= SCREEN_W - 2 || y < 2 || y >= SCREEN_H - 2) return;
+    if (x < 2 || x >= SCREEN_W - 2 || y < 2 || y >= FIELD_H - 2) return;
 
-    // Find first empty slot or oldest slot
     int best_slot = -1;
-    int min_life = 999999;
     for (int i = 0; i < MAX_SPLATTERS; i++) {
         if (g_splatters[i].life <= 0) {
             best_slot = i;
             break;
         }
-        if (g_splatters[i].life < min_life) {
-            min_life = g_splatters[i].life;
-            best_slot = i;
-        }
     }
+    if (best_slot < 0) best_slot = rand() % MAX_SPLATTERS;
 
-    if (best_slot >= 0) {
-        g_splatters[best_slot].x = x;
-        g_splatters[best_slot].y = y;
-        g_splatters[best_slot].life = duration;
-        g_splatters[best_slot].max_life = duration;
-        g_splatters[best_slot].size = size;
-        g_splatters[best_slot].color = color;
-    }
-}
-
-void game_add_splatter(int x, int y, uint16_t color) {
-    game_add_splatter_ex(x, y, color, 1, 180);
+    g_splatters[best_slot].x = x;
+    g_splatters[best_slot].y = y;
+    g_splatters[best_slot].color = color;
+    g_splatters[best_slot].size = size;
+    g_splatters[best_slot].life = duration;
+    g_splatters[best_slot].max_life = duration;
 }
 
 void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
-    // 1. Determine base explosion characteristics by enemy tier
-    int particle_count = 6;
-    int base_burst_speed = 2;  // base velocity magnitude
-    int gore_spread = 8;       // radius for initial puddle
-    int puddle_drops = 5;
+    if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
 
-    switch (variant) {
-        case 0: // T0: Larva (4x4) - Tiny pop
-            particle_count = 5;
-            base_burst_speed = 2;
-            gore_spread = 6;
-            puddle_drops = 4;
-            break;
-        case 1: // T1: Ripper (6x5) - Small spray
-            particle_count = 8;
-            base_burst_speed = 2;
-            gore_spread = 10;
-            puddle_drops = 7;
-            break;
-        case 2: // T2: Hormagaunt (9x9) - Medium bloody burst
-            particle_count = 14;
-            base_burst_speed = 3;
-            gore_spread = 14;
-            puddle_drops = 12;
-            break;
-        case 3: // T3: Ravener (15x11) - Large violent rupture
-            particle_count = 24;
-            base_burst_speed = 3;
-            gore_spread = 18;
-            puddle_drops = 18;
-            break;
-        case 4: // T4: Carnifex (21x21) - Massive heavy explosion
-            particle_count = 45;
-            base_burst_speed = 4;
-            gore_spread = 24;
-            puddle_drops = 30;
-            break;
-        case 5: // T5: Hierophant (30x30) - Colossal bio-cataclysm
-            particle_count = 60;
-            base_burst_speed = 5;
-            gore_spread = 32;
-            puddle_drops = 45;
-            break;
-        default:
-            particle_count = 12;
-            base_burst_speed = 2;
-            gore_spread = 10;
-            puddle_drops = 8;
-            break;
-    }
-
-    // Modulate by user-calibrated explosion_force (1..5, default: 2)
-    int force = g_calibration.explosion_force;
-    if (force < 1) force = 1;
-    if (force > 5) force = 5;
-    // burst_speed scaled gently so particles stay well contained in view
-    // force=1: 60%, force=2: 80%, force=3: 100%, force=4: 120%, force=5: 140%
-    int burst_speed = (base_burst_speed * (60 + (force - 1) * 20)) / 100;
-    if (burst_speed < 1) burst_speed = 1;
-
-    // Particle count slightly scales with force
-    particle_count = (particle_count * (75 + force * 15)) / 100;
-
-    // 2. Primary blood colors according to canonical Xenos lore
+    int particle_count = 10 + variant * 8;
     uint16_t col_primary = (variant == 0 || variant == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
     uint16_t col_secondary = COLOR_XENOS_FLESH;
-    uint16_t col_chitin = COLOR_XENOS_CHITIN;
 
-    // 3. Deposit immediate core blood puddles on the ground (large coverage)
-    // Center dense puddle
-    int puddle_size = (variant >= 4) ? 2 : ((variant >= 2) ? 1 : 1);
-    game_add_splatter_ex(x, y, col_primary, puddle_size, 450 + (rand() % 150));
+    // Ground puddles
+    game_add_splatter_ex(x, y, col_primary, (variant >= 2 ? 1 : 0), 400 + (rand() % 100));
     if (variant >= 1) {
-        // Satellite cluster pools for rich ground coverage
-        game_add_splatter_ex(x - 3, y - 2, col_secondary, (variant >= 4 ? 2 : 1), 450 + (rand() % 150));
-        game_add_splatter_ex(x + 3, y + 2, col_primary, (variant >= 4 ? 2 : 1), 450 + (rand() % 150));
-    }
-    if (variant >= 3) {
-        // Extra dense satellite core pools for colossal bio-titans
-        game_add_splatter_ex(x + 2, y - 4, col_chitin, 1, 450 + (rand() % 150));
-        game_add_splatter_ex(x - 2, y + 4, col_primary, 1, 450 + (rand() % 150));
-        game_add_splatter_ex(x - 5, y + 1, col_secondary, 2, 450 + (rand() % 150));
-        game_add_splatter_ex(x + 5, y - 1, col_primary, 2, 450 + (rand() % 150));
+        game_add_splatter_ex(x - 2, y + 1, col_secondary, 0, 350 + (rand() % 100));
+        game_add_splatter_ex(x + 2, y - 1, col_primary, 0, 350 + (rand() % 100));
     }
 
-    // Satellite splatter drops (soaking the ground in visceral blood)
-    for (int d = 0; d < puddle_drops; d++) {
-        int ox = (rand() % (gore_spread * 2 + 1)) - gore_spread;
-        int oy = (rand() % (gore_spread * 2 + 1)) - gore_spread;
-        uint16_t c = (rand() % 3 == 0) ? col_secondary : col_primary;
-        int sz = (rand() % 2 == 0 && variant >= 1) ? 1 : 0;
-        int dur = 350 + (rand() % 250);
-        game_add_splatter_ex(x + ox, y + oy, c, sz, dur);
-    }
-
-    // 4. Spawn airborne pseudo-3D ballistic particles (contained velocity)
+    // Airborne ballistic particles
     int spawned = 0;
-    int bullet_dir_bias_x = bvx / 8; // gentle momentum transfer from projectile
-    int bullet_dir_bias_y = bvy / 8;
-
     for (int i = 0; i < MAX_DEATH_PARTICLES && spawned < particle_count; i++) {
         if (!g_death_particles[i].active) {
             g_death_particles[i].active = 1;
             g_death_particles[i].x = TO_FP(x) + ((rand() % 7 - 3) << FP_SHIFT);
             g_death_particles[i].y = TO_FP(y) + ((rand() % 7 - 3) << FP_SHIFT);
-            // Starting height Z (Q8) based on creature size
-            g_death_particles[i].z = TO_FP(3 + (variant * 2));
+            g_death_particles[i].z = TO_FP(3 + variant * 2);
 
-            // Radial burst velocities (contained nicely inside the screen)
             int ang = rand() % 256;
-            int spd = (rand() % (burst_speed * 90)) + TO_FP(1);
-            g_death_particles[i].vx = ((fixed_cos(ang) * spd) >> FP_SHIFT) + bullet_dir_bias_x;
-            g_death_particles[i].vy = ((fixed_sin(ang) * spd) >> FP_SHIFT) + bullet_dir_bias_y;
-            // Vertical upward ejection velocity
-            g_death_particles[i].vz = TO_FP(1) + (rand() % (TO_FP(burst_speed) + TO_FP(1)));
-
-            g_death_particles[i].life = 40;
-
-            // Particle type / color / size
-            int roll = rand() % 100;
-            if (roll < 45) {
-                // Liquid blood / ichor drop
-                g_death_particles[i].color = col_primary;
-                g_death_particles[i].size = (variant >= 3 && (rand() % 2 == 0)) ? 1 : 0;
-            } else if (roll < 75) {
-                // Bioluminescent flesh
-                g_death_particles[i].color = col_secondary;
-                g_death_particles[i].size = (variant >= 3) ? 1 : 0;
-            } else {
-                // Hard chitin / exoskeleton shrapnel
-                g_death_particles[i].color = col_chitin;
-                g_death_particles[i].size = (variant >= 2 && (rand() % 2 == 0)) ? 1 : 0;
-            }
-
+            int spd = (rand() % TO_FP(3)) + TO_FP(1);
+            g_death_particles[i].vx = ((fixed_cos(ang) * spd) >> FP_SHIFT) + (bvx / 10);
+            g_death_particles[i].vy = ((fixed_sin(ang) * spd) >> FP_SHIFT) + (bvy / 10);
+            g_death_particles[i].vz = TO_FP(1) + (rand() % TO_FP(3));
+            g_death_particles[i].life = 35;
+            g_death_particles[i].color = (rand() % 2 == 0) ? col_primary : col_secondary;
+            g_death_particles[i].size = (variant >= 3 && (rand() % 2 == 0)) ? 1 : 0;
             spawned++;
+        }
+    }
+}
+
+static void spawn_enemy(int variant, uint64_t hp) {
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (!g_enemies[i].active) {
+            g_enemies[i].active = 1;
+            g_enemies[i].variant = variant;
+            g_enemies[i].hp = hp;
+            g_enemies[i].max_hp = hp;
+
+            // Spawn at top edge (y = 0) with random x spread (16..240)
+            int sx = 16 + (rand() % 224);
+            g_enemies[i].x = TO_FP(sx);
+            g_enemies[i].y = 0;
+
+            // Base speed by caste: Larva (35), Ripper (45), Hormag (55), Ravener (28), Carnifex (18)
+            static const int s_speeds[ENEMY_VARIANT_COUNT] = {
+                160, 200, 240, 130, 90, 60
+            };
+            int spd = s_speeds[variant] + ((rand() % 21) - 10);
+            g_enemies[i].speed = spd;
+
+            g_enemies[i].dir = 1; // South
+            g_enemies[i].anim_frame = 0;
+            g_enemies[i].biting_target = -1;
+            g_enemies[i].bite_timer = 0;
+
+            g_game.enemies_spawned++;
+            g_game.enemies_alive++;
+            break;
+        }
+    }
+}
+
+static void spawn_bullet(int x, int y, int angle, int turret_idx, uint64_t dmg) {
+    for (int i = 0; i < MAX_BULLETS; i++) {
+        if (!g_bullets[i].active) {
+            g_bullets[i].active = 1;
+            g_bullets[i].turret_idx = turret_idx;
+            g_bullets[i].x = TO_FP(x);
+            g_bullets[i].y = TO_FP(y);
+            // 5 px/frame bullet velocity
+            g_bullets[i].vx = (fixed_cos(angle) * 5);
+            g_bullets[i].vy = (fixed_sin(angle) * 5);
+            g_bullets[i].life = 45;
+            g_bullets[i].damage = dmg;
+            break;
         }
     }
 }
@@ -266,171 +184,89 @@ void game_init(void) {
     memset(g_splatters, 0, sizeof(g_splatters));
     memset(g_death_particles, 0, sizeof(g_death_particles));
 
-    calibration_init();
-    map_select(0);
-
     g_game.mode = MODE_PREPARATION;
     g_game.wave_number = 1;
-    g_game.core_hp = g_calibration.core_lives;
-    g_game.core_max_hp = g_calibration.core_lives;
-    g_game.scrap = g_calibration.starting_scrap;
+    g_game.total_waves = 20;
+    g_game.bunker_hp = 100;
+    g_game.bunker_max_hp = 100;
+    g_game.scrap = 10;
     g_game.fast_forward = 1;
-    g_game.turret_dock_count = 2; // Extra batteries available
-    g_game.selected_turret = 0;
 
-    int half_angle_units = (g_calibration.cone_spread * 64) / 90;
-    if (half_angle_units < 4) half_angle_units = 4;
+    // Upgrades initial state
+    g_game.upgrades.caliber_lvl = 0;
+    g_game.upgrades.firerate_lvl = 0;
+    g_game.upgrades.range_lvl = 0;
+    g_game.upgrades.mag_size_lvl = 0;
+    g_game.upgrades.auto_target = 0; // Starts requiring stylus targeting!
+    g_game.upgrades.conveyor_lvl = 0; // Starts requiring manual ammo drag!
+    g_game.upgrades.extra_turrets = 0;
 
-    // Heavy Bolter Default Profile for Turret 0
+    // Initial Turret #0: Deployed right in front of the Sanctum
     g_turrets[0].id = 0;
-    g_turrets[0].sweep_amplitude = half_angle_units;
-    g_turrets[0].sweep_speed = g_calibration.sweep_speed;
-    g_turrets[0].sweep_dir = 1;
-    g_turrets[0].fire_interval = g_calibration.turret_fire_rate;
-    g_turrets[0].range = g_calibration.turret_range;
+    g_turrets[0].type = TURRET_TYPE_BOLTER;
+    g_turrets[0].x = 128;
+    g_turrets[0].y = 124; // Local y on bottom screen
+    g_turrets[0].current_angle = 192; // Aiming North (towards oncoming swarm)
+    g_turrets[0].target_angle = 192;
+    g_turrets[0].range = 65;
     g_turrets[0].placed = 1;
     g_turrets[0].active = 1;
-    g_turrets[0].flash_timer = 0;
+    g_turrets[0].hp = 50;
+    g_turrets[0].max_hp = 50;
+    g_turrets[0].ammo = 20;
+    g_turrets[0].max_ammo = 20;
+    g_turrets[0].fire_interval = 18; // ~3 shots per second
+    g_turrets[0].fire_cooldown = 0;
+    g_turrets[0].locked_enemy_idx = -1;
 
-    for (int i = 1; i < MAX_TURRETS; i++) {
-        g_turrets[i].id = i;
-        g_turrets[i].center_angle = 192;
-        g_turrets[i].current_angle = 192;
-        g_turrets[i].sweep_amplitude = half_angle_units;
-        g_turrets[i].sweep_speed = g_calibration.sweep_speed;
-        g_turrets[i].sweep_dir = 1;
-        g_turrets[i].fire_interval = g_calibration.turret_fire_rate;
-        g_turrets[i].range = g_calibration.turret_range;
-        g_turrets[i].placed = 0;
-        g_turrets[i].active = 0;
-    }
-
-    skills_init();
-}
-
-void game_reset_to_prep(void) {
-    g_game.mode = MODE_PREPARATION;
-    g_game.enemies_spawned = 0;
-    g_game.enemies_alive = 0;
-    g_game.enemies_killed = 0;
-    g_game.enemies_breached = 0;
-    memset(g_game.spawn_timers, 0, sizeof(g_game.spawn_timers));
-    g_game.sim_ticks_elapsed = 0;
-
-    memset(g_enemies, 0, sizeof(g_enemies));
-    memset(g_bullets, 0, sizeof(g_bullets));
-    memset(g_splatters, 0, sizeof(g_splatters));
-    memset(g_death_particles, 0, sizeof(g_death_particles));
-
-    int base_interval = (g_calibration.turret_fire_rate > 0) ? g_calibration.turret_fire_rate : 8;
-    int interval = base_interval - g_skill_tree.bonus_firerate;
-    if (interval < 3) interval = 3;
-
-    int half_angle_units = (g_calibration.cone_spread > 0) ? ((g_calibration.cone_spread * 64) / 90) : 16;
-    if (half_angle_units < 4) half_angle_units = 4;
-
-    for (int t = 0; t < MAX_TURRETS; t++) {
-        g_turrets[t].shots_fired = 0;
-        g_turrets[t].hits_confirmed = 0;
-        g_turrets[t].wasted_shots = 0;
-        g_turrets[t].damage_dealt = 0;
-        g_turrets[t].fire_cooldown = 0;
-        g_turrets[t].flash_timer = 0;
-        g_turrets[t].fire_interval = interval;
-        g_turrets[t].sweep_speed = (g_calibration.sweep_speed > 0) ? g_calibration.sweep_speed : 1;
-        if (g_turrets[t].sweep_amplitude < 4) {
-            g_turrets[t].sweep_amplitude = half_angle_units;
-        }
-        if (g_turrets[t].range <= 0) {
-            g_turrets[t].range = (g_calibration.turret_range > 0) ? g_calibration.turret_range : 75;
-        }
+    for (int t = 1; t < MAX_TURRETS; t++) {
+        g_turrets[t].id = t;
+        g_turrets[t].current_angle = 192;
+        g_turrets[t].target_angle = 192;
+        g_turrets[t].range = 65;
+        g_turrets[t].placed = 0;
+        g_turrets[t].active = 0;
+        g_turrets[t].hp = 50;
+        g_turrets[t].max_hp = 50;
+        g_turrets[t].ammo = 20;
+        g_turrets[t].max_ammo = 20;
+        g_turrets[t].fire_interval = 18;
+        g_turrets[t].locked_enemy_idx = -1;
     }
 }
 
 void game_start_wave(void) {
-    int any_placed = 0;
-    for (int t = 0; t < MAX_TURRETS; t++) {
-        if (g_turrets[t].placed) { any_placed = 1; break; }
-    }
-    if (!any_placed) {
-        g_turrets[0].x = 100;
-        g_turrets[0].y = 136;
-        g_turrets[0].center_angle = 192;
-        g_turrets[0].current_angle = 192;
-        g_turrets[0].placed = 1;
-        g_turrets[0].active = 1;
-    }
-
-    game_reset_to_prep();
     g_game.mode = MODE_WAVE;
-    g_game.selected_turret = 0;
-}
+    g_game.wave_timer = 1800; // 30 seconds at 60 FPS
+    g_game.enemies_spawned = 0;
+    g_game.enemies_alive = 0;
+    g_game.spawn_timer = 0;
 
-static void spawn_enemy_variant(int variant) {
-    if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
-    for (int i = 0; i < MAX_ENEMIES; i++) {
-        if (!g_enemies[i].active) {
-            g_enemies[i].active = 1;
-            g_enemies[i].waypoint_idx = 0;
+    int w_idx = g_game.wave_number - 1;
+    if (w_idx < 0) w_idx = 0;
+    if (w_idx >= 20) w_idx = 19;
+    g_game.enemies_to_spawn = s_wave_table[w_idx].total_enemies;
 
-            // Wide Swarm Dispersion across 32px highway: (-10 to +10 px)
-            int offset = ((rand() % 21) - 10);
-            g_enemies[i].lateral_offset = TO_FP(offset);
-            
-            // Speed jitter based on calibrated speed (enemy_speed_int is tenths of px/frame)
-            int base_spd = (g_calibration.enemy_speed_int > 0) ? ((g_calibration.enemy_speed_int * FP_ONE) / 10) : FP_ONE;
-            int jitter = ((rand() % 21) - 10) * (FP_ONE / 100);
-            
-            g_enemies[i].variant = variant;
-            
-            // Speed scaled by biocaste (Swarm runs fast, Colossals tread slowly)
-            // T0: 1.2x, T1: 1.3x, T2: 1.5x, T3: 1.1x, T4: 0.6x, T5: 0.35x
-            static const int s_tier_speed_mult[ENEMY_VARIANT_COUNT] = {
-                120, // T0 Larva
-                130, // T1 Ripper
-                150, // T2 Hormagaunt
-                110, // T3 Ravener
-                 60, // T4 Carnifex
-                 35  // T5 Hierophant
-            };
-            int tier_mult = s_tier_speed_mult[variant];
-            int caste_spd = (base_spd * tier_mult) / 100;
-            g_enemies[i].speed = caste_spd + jitter;
-            // Scale HP proportionally by caste: Larva (4), Ripper (12), Hormagaunt (25), Ravener (50), Carnifex (100), Hierophant (200)
-            static const int s_tier_hp_base[ENEMY_VARIANT_COUNT] = { 4, 10, 22, 45, 90, 180 };
-            int calib_mult = (g_calibration.enemy_hp > 0) ? g_calibration.enemy_hp : 15;
-            g_enemies[i].hp = (s_tier_hp_base[variant] * calib_mult) / 15;
+    memset(g_bullets, 0, sizeof(g_bullets));
+    memset(g_enemies, 0, sizeof(g_enemies));
+    memset(g_death_particles, 0, sizeof(g_death_particles));
 
-            // Initial position (check if first segment is vertical or horizontal)
-            if (g_waypoint_count > 1 && g_waypoints[0].x == g_waypoints[1].x) {
-                g_enemies[i].x = TO_FP(g_waypoints[0].x) + g_enemies[i].lateral_offset;
-                g_enemies[i].y = TO_FP(g_waypoints[0].y);
-            } else {
-                g_enemies[i].x = TO_FP(g_waypoints[0].x);
-                g_enemies[i].y = TO_FP(g_waypoints[0].y) + g_enemies[i].lateral_offset;
-            }
-
-            g_game.enemies_spawned++;
-            g_game.enemies_alive++;
-            break;
-        }
+    // Reset locked targets
+    for (int t = 0; t < MAX_TURRETS; t++) {
+        g_turrets[t].locked_enemy_idx = -1;
     }
 }
 
-static void spawn_bullet(int x, int y, int angle, int turret_idx) {
-    for (int i = 0; i < MAX_BULLETS; i++) {
-        if (!g_bullets[i].active) {
-            g_bullets[i].active = 1;
-            g_bullets[i].turret_idx = turret_idx;
-            g_bullets[i].x = TO_FP(x);
-            g_bullets[i].y = TO_FP(y);
-            // Speed = 4 pixels per frame
-            g_bullets[i].vx = (fixed_cos(angle) * 4);
-            g_bullets[i].vy = (fixed_sin(angle) * 4);
-            int rng = (turret_idx >= 0 && turret_idx < MAX_TURRETS) ? g_turrets[turret_idx].range : 75;
-            g_bullets[i].life = (rng / 4) + 2;
-            break;
-        }
+void game_reset_to_prep(void) {
+    g_game.mode = MODE_PREPARATION;
+    memset(g_bullets, 0, sizeof(g_bullets));
+    memset(g_enemies, 0, sizeof(g_enemies));
+    memset(g_death_particles, 0, sizeof(g_death_particles));
+
+    // Repair turrets back to full between waves
+    for (int t = 0; t < MAX_TURRETS; t++) {
+        g_turrets[t].hp = g_turrets[t].max_hp;
+        g_turrets[t].locked_enemy_idx = -1;
     }
 }
 
@@ -438,151 +274,134 @@ void game_update_simulation(void) {
     if (g_game.mode != MODE_WAVE) return;
 
     g_game.sim_ticks_elapsed++;
+    if (g_game.wave_timer > 0) g_game.wave_timer--;
 
-    // 1. Spawning (Supports Infinite Waves when enemy_count == 0, and individual delays per biocaste)
-    int is_infinite = (g_calibration.enemy_count == 0);
-    int max_to_spawn = is_infinite ? 99999999 : g_calibration.enemy_count;
+    int w_idx = g_game.wave_number - 1;
+    if (w_idx < 0) w_idx = 0;
+    if (w_idx >= 20) w_idx = 19;
+    const WaveDef *wdef = &s_wave_table[w_idx];
 
-    for (int v = 0; v < ENEMY_VARIANT_COUNT; v++) {
-        int delay = g_calibration.spawn_delay[v];
-        if (delay <= 0) continue; // 0 = disabled / OFF for this biocaste
-
-        if (g_game.enemies_spawned < max_to_spawn) {
-            g_game.spawn_timers[v]++;
-            if (g_game.spawn_timers[v] >= delay) {
-                g_game.spawn_timers[v] = 0;
-                spawn_enemy_variant(v);
+    // 1. Spawning
+    if (g_game.enemies_spawned < g_game.enemies_to_spawn) {
+        g_game.spawn_timer++;
+        if (g_game.spawn_timer >= wdef->spawn_interval) {
+            g_game.spawn_timer = 0;
+            int v = wdef->primary_variant;
+            if (wdef->secondary_ratio > 0 && (rand() % 10) < wdef->secondary_ratio) {
+                v = wdef->secondary_variant;
             }
+            spawn_enemy(v, wdef->hp_base);
         }
     }
 
-    // 2. Update Splatters life
+    // 2. Splatters life
     for (int i = 0; i < MAX_SPLATTERS; i++) {
         if (g_splatters[i].life > 0) g_splatters[i].life--;
     }
 
-    // 2b. Update Airborne Ballistic Death Particles (Pseudo-3D)
+    // 3. Death particles
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
         if (!g_death_particles[i].active) continue;
-
-        // Apply horizontal velocities and air friction
         g_death_particles[i].x += g_death_particles[i].vx;
         g_death_particles[i].y += g_death_particles[i].vy;
-        g_death_particles[i].vx = (g_death_particles[i].vx * 31) / 32;
-        g_death_particles[i].vy = (g_death_particles[i].vy * 31) / 32;
-
-        // Vertical pseudo-3D ballistic flight with gravity
         g_death_particles[i].z += g_death_particles[i].vz;
-        g_death_particles[i].vz -= (FP_ONE / 8); // Gravity: 0.125 px/frame^2 (floatier, more visible trajectory)
-
+        g_death_particles[i].vz -= (FP_ONE / 8); // Gravity
         g_death_particles[i].life--;
 
-        // Ground collision (Z <= 0) or timeout
         if (g_death_particles[i].z <= 0 || g_death_particles[i].life <= 0) {
             int px = FROM_FP(g_death_particles[i].x);
             int py = FROM_FP(g_death_particles[i].y);
-            // On ground impact, deposit a lasting blood droplet / giblet on the deck!
-            if (px >= 2 && px < SCREEN_W - 2 && py >= 2 && py < SCREEN_H - 2) {
-                int dur = 150 + (rand() % 120);
-                game_add_splatter_ex(px, py, g_death_particles[i].color, g_death_particles[i].size, dur);
+            if (px >= 2 && px < SCREEN_W - 2 && py >= 2 && py < FIELD_H - 2) {
+                game_add_splatter_ex(px, py, g_death_particles[i].color, g_death_particles[i].size, 300);
             }
             g_death_particles[i].active = 0;
         }
     }
 
-    // 3. Update Enemies (Following Waypoints with lateral corridor offset)
+    // 4. Update Enemies (Descending vertically and converging towards central bunker at x=128, y=360)
+    int target_base_x = TO_FP(128);
+
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
 
-        int curr_wp = g_enemies[i].waypoint_idx;
-        int next_wp = curr_wp + 1;
-        if (next_wp >= g_waypoint_count) {
-            // Reached Bunker Core!
-            g_enemies[i].active = 0;
-            g_game.enemies_alive--;
-            g_game.enemies_breached++;
-            g_game.core_hp--;
-            // No death explosion when breaching core — enemies enter the bunker alive!
-            if (g_game.core_hp <= 0) {
-                g_game.core_hp = 0;
-                g_game.mode = MODE_GAME_OVER;
-                return;
+        int ex = g_enemies[i].x;
+        int ey = g_enemies[i].y;
+        int px = FROM_FP(ex);
+        int py = FROM_FP(ey);
+
+        // Animation frame
+        g_enemies[i].anim_frame = (g_game.sim_ticks_elapsed / 8) % 4;
+
+        // Check if hitting any placed turret (physical obstruction & biting!)
+        int hitting_turret = -1;
+        if (py >= 192) {
+            int local_y = py - 192;
+            for (int t = 0; t < MAX_TURRETS; t++) {
+                if (g_turrets[t].placed) {
+                    int tdx = px - g_turrets[t].x;
+                    int tdy = local_y - g_turrets[t].y;
+                    if (tdx * tdx + tdy * tdy < (14 * 14)) {
+                        hitting_turret = t;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (hitting_turret >= 0) {
+            // Bite Turret!
+            g_enemies[i].biting_target = hitting_turret;
+            g_enemies[i].bite_timer++;
+            if (g_enemies[i].bite_timer >= 45) { // Bite every 0.75s
+                g_enemies[i].bite_timer = 0;
+                int bite_dmg = 1 + g_enemies[i].variant * 2;
+                if (g_turrets[hitting_turret].hp > bite_dmg) {
+                    g_turrets[hitting_turret].hp -= bite_dmg;
+                } else {
+                    // Turret destroyed!
+                    g_turrets[hitting_turret].hp = 0;
+                    g_turrets[hitting_turret].placed = 0;
+                    g_turrets[hitting_turret].active = 0;
+                    game_spawn_death_gore(g_turrets[hitting_turret].x, 192 + g_turrets[hitting_turret].y, 0, 0, 4);
+                }
+            }
+            continue; // Stop advancing while biting
+        }
+
+        // Check if hitting Bunker Sanctum (x: 96..160, global y >= 348)
+        if (py >= 348 && px >= 96 && px <= 160) {
+            // Bite Bunker!
+            g_enemies[i].biting_target = 99;
+            g_enemies[i].bite_timer++;
+            if (g_enemies[i].bite_timer >= 40) {
+                g_enemies[i].bite_timer = 0;
+                uint64_t bite_dmg = 1 + g_enemies[i].variant * 2;
+                if (g_game.bunker_hp > bite_dmg) {
+                    g_game.bunker_hp -= bite_dmg;
+                } else {
+                    g_game.bunker_hp = 0;
+                    g_game.mode = MODE_GAME_OVER;
+                    return;
+                }
             }
             continue;
         }
 
-        int x0 = g_waypoints[curr_wp].x, y0 = g_waypoints[curr_wp].y;
-        int x1 = g_waypoints[next_wp].x, y1 = g_waypoints[next_wp].y;
+        // Advance: vertical downward + funnel convergence to center
+        int spd = (g_enemies[i].speed * FP_ONE) / 60;
+        if (spd < 1) spd = 1;
 
-        int target_x, target_y;
-        if (x0 == x1) {
-            // Vertical corridor: lateral offset applies horizontally
-            target_x = TO_FP(x1) + g_enemies[i].lateral_offset;
-            target_y = TO_FP(y1);
-        } else if (y0 == y1) {
-            // Horizontal corridor: lateral offset applies vertically
-            target_x = TO_FP(x1);
-            target_y = TO_FP(y1) + g_enemies[i].lateral_offset;
-        } else {
-            // Transition / diagonal segment: center line
-            target_x = TO_FP(x1);
-            target_y = TO_FP(y1);
-        }
+        g_enemies[i].y += spd;
 
-        int dx = target_x - g_enemies[i].x;
-        int dy = target_y - g_enemies[i].y;
-        int spd = g_enemies[i].speed;
-
-        if (abs(dy) > abs(dx)) {
-            g_enemies[i].dir = (dy > 0) ? 1 : 3; // 1 = South, 3 = North
-        } else {
-            g_enemies[i].dir = (dx > 0) ? 0 : 2; // 0 = East, 2 = West
-        }
-        // Animation frequency based on biocaste:
-        // Swarm (T0-T2): rapid scuttling (every 3 ticks)
-        // Mid (T3): fluid serpentine motion (every 5 ticks)
-        // Heavy (T4-T5): heavy, deliberate steps (every 8-10 ticks)
-        static const uint8_t s_anim_div[ENEMY_VARIANT_COUNT] = {
-            3, // T0 Larva (frenetic crawl)
-            3, // T1 Ripper (rapid undulating bite)
-            4, // T2 Hormagaunt (galloping scythe strides)
-            5, // T3 Ravener (rhythmic burrowing wave)
-            8, // T4 Carnifex (heavy pillar stomps)
-           10  // T5 Hierophant (colossal titan strides)
-        };
-        int v = g_enemies[i].variant;
-        if (v < 0 || v >= ENEMY_VARIANT_COUNT) v = 0;
-        int div = s_anim_div[v];
-        int phase_offset = (i * 3 + v * 2);
-        g_enemies[i].anim_frame = ((g_game.sim_ticks_elapsed + phase_offset) / div) % 4;
-
-        if (dx > 0) {
-            g_enemies[i].x += (dx < spd) ? dx : spd;
-        } else if (dx < 0) {
-            g_enemies[i].x += (dx > -spd) ? dx : -spd;
-        }
-
-        if (dy > 0) {
-            g_enemies[i].y += (dy < spd) ? dy : spd;
-        } else if (dy < 0) {
-            g_enemies[i].y += (dy > -spd) ? dy : -spd;
-        }
-
-        // Swarm ground bio-trail: enemies secrete ichor and slime as they advance through the trench
-        if ((g_game.sim_ticks_elapsed + i * 7) % 28 == 0) {
-            int ex = FROM_FP(g_enemies[i].x);
-            int ey = FROM_FP(g_enemies[i].y);
-            uint16_t trail_col = (v == 0 || v == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
-            game_add_splatter_ex(ex, ey, trail_col, (v >= 3 ? 1 : 0), 300 + (rand() % 120));
-        }
-
-        // Reached waypoint?
-        if (abs(g_enemies[i].x - target_x) < (FP_ONE) && abs(g_enemies[i].y - target_y) < (FP_ONE)) {
-            g_enemies[i].waypoint_idx++;
+        // Converge X towards 128 as it approaches the bottom screen
+        if (py > 120) {
+            if (ex < target_base_x) ex += (spd / 4);
+            else if (ex > target_base_x) ex -= (spd / 4);
+            g_enemies[i].x = ex;
         }
     }
 
-    // 4. Update Heavy Bolter Turrets (All deployed units)
+    // 5. Update Turrets & Logistics (Factorio conveyors & reloading)
     for (int t = 0; t < MAX_TURRETS; t++) {
         Turret *tur = &g_turrets[t];
         if (!tur->placed || !tur->active) continue;
@@ -591,48 +410,93 @@ void game_update_simulation(void) {
         if (tur->barrel_recoil_l > 0) tur->barrel_recoil_l--;
         if (tur->barrel_recoil_r > 0) tur->barrel_recoil_r--;
 
-        tur->current_angle += tur->sweep_dir * tur->sweep_speed;
-
-        int min_ang = tur->center_angle - tur->sweep_amplitude;
-        int max_ang = tur->center_angle + tur->sweep_amplitude;
-
-        if (tur->current_angle >= max_ang) {
-            tur->current_angle = max_ang;
-            tur->sweep_dir = -1;
-        } else if (tur->current_angle <= min_ang) {
-            tur->current_angle = min_ang;
-            tur->sweep_dir = 1;
+        // Conveyor passive reloading (Branch C)
+        if (g_game.upgrades.conveyor_lvl > 0 && tur->ammo < tur->max_ammo) {
+            int reload_rate = (g_game.upgrades.conveyor_lvl == 1) ? 60 : 20; // 1/s or 3/s
+            if (g_game.sim_ticks_elapsed % reload_rate == 0) {
+                tur->ammo++;
+            }
         }
 
-        if (tur->fire_cooldown > 0) {
-            tur->fire_cooldown--;
-        } else {
-            tur->fire_cooldown = tur->fire_interval;
-            tur->flash_timer = 2;
-            tur->last_barrel = 1 - tur->last_barrel;
-            // Explosive snap back: set timer to 4
-            if (tur->last_barrel == 0) {
-                tur->barrel_recoil_l = 4;
-            } else {
-                tur->barrel_recoil_r = 4;
+        // Target selection
+        int target_enemy = -1;
+
+        // Auto-targeting or manual target follow
+        if (g_game.upgrades.auto_target) {
+            // Find closest active enemy in range
+            int closest_dist_sq = tur->range * tur->range;
+            for (int e = 0; e < MAX_ENEMIES; e++) {
+                if (!g_enemies[e].active) continue;
+                int gy = FROM_FP(g_enemies[e].y);
+                if (gy < 192) continue; // Only shoot enemies on bottom screen
+                int local_y = gy - 192;
+                int gx = FROM_FP(g_enemies[e].x);
+
+                int dx = gx - tur->x;
+                int dy = local_y - tur->y;
+                int dsq = dx * dx + dy * dy;
+                if (dsq <= closest_dist_sq) {
+                    closest_dist_sq = dsq;
+                    target_enemy = e;
+                }
             }
+        } else {
+            // Manual locked enemy from stylus click
+            if (tur->locked_enemy_idx >= 0 && g_enemies[tur->locked_enemy_idx].active) {
+                int gy = FROM_FP(g_enemies[tur->locked_enemy_idx].y);
+                if (gy >= 192) {
+                    int local_y = gy - 192;
+                    int gx = FROM_FP(g_enemies[tur->locked_enemy_idx].x);
+                    int dx = gx - tur->x;
+                    int dy = local_y - tur->y;
+                    if (dx * dx + dy * dy <= tur->range * tur->range) {
+                        target_enemy = tur->locked_enemy_idx;
+                    }
+                }
+            }
+        }
 
-            int ang = ((tur->current_angle + 2) & ~3) & 0xFF;
-            int perp_x = -fixed_sin(ang);
-            int perp_y = fixed_cos(ang);
-            int s = (tur->last_barrel == 0) ? -3 : 3;
-            int bx = tur->x + ((perp_x * s) >> FP_SHIFT);
-            int by = tur->y + ((perp_y * s) >> FP_SHIFT);
+        // Aim towards target
+        if (target_enemy >= 0) {
+            int gx = FROM_FP(g_enemies[target_enemy].x);
+            int local_y = FROM_FP(g_enemies[target_enemy].y) - 192;
+            tur->target_angle = fixed_atan2(local_y - tur->y, gx - tur->x);
+            tur->current_angle = tur->target_angle;
 
-            spawn_bullet(bx, by, ang, t);
-            tur->shots_fired++;
+            // Firing
+            if (tur->ammo > 0) {
+                if (tur->fire_cooldown > 0) {
+                    tur->fire_cooldown--;
+                } else {
+                    int interval = tur->fire_interval - (g_game.upgrades.firerate_lvl * 3);
+                    if (interval < 4) interval = 4;
+                    tur->fire_cooldown = interval;
+                    tur->flash_timer = 3;
+                    tur->ammo--;
+
+                    // Alternating barrels recoil snap
+                    tur->last_barrel = 1 - tur->last_barrel;
+                    if (tur->last_barrel == 0) tur->barrel_recoil_l = 4;
+                    else tur->barrel_recoil_r = 4;
+
+                    int ang = tur->current_angle & 0xFF;
+                    int perp_x = -fixed_sin(ang);
+                    int perp_y = fixed_cos(ang);
+                    int s = (tur->last_barrel == 0) ? -3 : 3;
+                    int bx = tur->x + ((perp_x * s) >> FP_SHIFT);
+                    int by = tur->y + ((perp_y * s) >> FP_SHIFT);
+
+                    uint64_t dmg = 4 + (g_game.upgrades.caliber_lvl * 2);
+                    spawn_bullet(bx, by, ang, t, dmg);
+                    tur->shots_fired++;
+                }
+            }
         }
     }
 
-    // 5. Update Bullets & Collisions
+    // 6. Update Bullets & Collisions
     for (int b = 0; b < MAX_BULLETS; b++) {
         if (!g_bullets[b].active) continue;
-
         g_bullets[b].x += g_bullets[b].vx;
         g_bullets[b].y += g_bullets[b].vy;
         g_bullets[b].life--;
@@ -643,129 +507,108 @@ void game_update_simulation(void) {
         int hit = 0;
         for (int e = 0; e < MAX_ENEMIES; e++) {
             if (!g_enemies[e].active) continue;
-            int ex = FROM_FP(g_enemies[e].x);
-            int ey = FROM_FP(g_enemies[e].y);
+            int gy = FROM_FP(g_enemies[e].y);
+            if (gy < 192) continue; // Only collide in bottom screen
+            int local_y = gy - 192;
+            int gx = FROM_FP(g_enemies[e].x);
 
-            // Hit check scaled to enemy hitbox
-            static const int s_hit_radius[ENEMY_VARIANT_COUNT] = { 4, 5, 7, 9, 13, 16 };
-            int hit_r = s_hit_radius[g_enemies[e].variant];
-            if (abs(bx - ex) <= hit_r && abs(by - ey) <= hit_r) {
+            static const int s_hit_r[ENEMY_VARIANT_COUNT] = { 5, 6, 8, 11, 15, 18 };
+            int r = s_hit_r[g_enemies[e].variant];
+            if (abs(bx - gx) <= r && abs(by - local_y) <= r) {
                 hit = 1;
-                int base_dmg = (g_calibration.turret_damage > 0) ? g_calibration.turret_damage : 1;
-                int dmg = base_dmg + g_skill_tree.bonus_damage;
-                g_enemies[e].hp -= dmg;
-                int tid = g_bullets[b].turret_idx;
-                if (tid >= 0 && tid < MAX_TURRETS) {
-                    g_turrets[tid].damage_dealt += dmg;
-                    g_turrets[tid].hits_confirmed++;
-                }
-
-                if (g_enemies[e].hp <= 0) {
+                uint64_t dmg = g_bullets[b].damage;
+                if (g_enemies[e].hp > dmg) {
+                    g_enemies[e].hp -= dmg;
+                } else {
+                    g_enemies[e].hp = 0;
                     g_enemies[e].active = 0;
                     g_game.enemies_alive--;
                     g_game.enemies_killed++;
-                    if (tid >= 0 && tid < MAX_TURRETS) {
-                        g_turrets[tid].kills++;
-                    }
-                    int reward = g_enemy_types[g_enemies[e].variant].scrap_value + (g_skill_tree.bonus_ap > 0 ? 1 : 0);
+
+                    uint64_t reward = wdef->scrap_base * (1 + g_game.upgrades.bio_harvest_lvl);
                     g_game.scrap += reward;
 
-                    // Spectacular visceral death gore burst scaled by enemy tier
-                    game_spawn_death_gore(ex, ey, g_bullets[b].vx, g_bullets[b].vy, g_enemies[e].variant);
+                    game_spawn_death_gore(gx, gy, g_bullets[b].vx, g_bullets[b].vy, g_enemies[e].variant);
+                }
+
+                int tid = g_bullets[b].turret_idx;
+                if (tid >= 0 && tid < MAX_TURRETS) {
+                    g_turrets[tid].hits_confirmed++;
+                    g_turrets[tid].damage_dealt += dmg;
                 }
                 g_bullets[b].active = 0;
                 break;
             }
         }
 
-        if (!hit) {
-            if (g_bullets[b].life <= 0 || bx < 0 || bx >= SCREEN_W || by < 0 || by >= SCREEN_H) {
-                int tid = g_bullets[b].turret_idx;
-                if (tid >= 0 && tid < MAX_TURRETS) {
-                    g_turrets[tid].wasted_shots++;
-                }
-                g_bullets[b].active = 0;
-            }
+        if (!hit && (g_bullets[b].life <= 0 || bx < 0 || bx >= SCREEN_W || by < 0 || by >= SCREEN_H)) {
+            g_bullets[b].active = 0;
         }
     }
 
-    // 6. Wave Completion (Never finishes if enemy_count == 0 / infinite)
-    if (g_calibration.enemy_count > 0 && g_game.enemies_spawned >= g_calibration.enemy_count && g_game.enemies_alive == 0) {
-        g_game.scrap += 25;
+    // 7. Wave Completion
+    if (g_game.enemies_spawned >= g_game.enemies_to_spawn && g_game.enemies_alive == 0) {
         g_game.wave_number++;
-        // Clear bullets and transient particles for crisp transition
-        memset(g_bullets, 0, sizeof(g_bullets));
-        memset(g_death_particles, 0, sizeof(g_death_particles));
-        g_game.mode = MODE_PREPARATION;
+        if (g_game.wave_number > g_game.total_waves) {
+            // Victory loop
+            g_game.wave_number = g_game.total_waves;
+        }
+        game_reset_to_prep();
     }
 }
 
 void game_toggle_pause(void) {
     if (g_game.mode == MODE_PAUSED) {
-        g_game.mode = (g_game.previous_mode == MODE_PAUSED) ? MODE_PREPARATION : g_game.previous_mode;
-    } else if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PREPARATION) {
+        g_game.mode = (g_game.previous_mode == MODE_PAUSED) ? MODE_WAVE : g_game.previous_mode;
+    } else if (g_game.mode == MODE_WAVE) {
         g_game.previous_mode = g_game.mode;
         g_game.mode = MODE_PAUSED;
     }
 }
 
 void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
+    // Physical button shortcuts: A or START launches the wave!
+    if (keys_down & (KEY_START | KEY_A)) {
+        game_start_wave();
+        return;
+    }
+
+    // X or SELECT opens upgrades
+    if (keys_down & (KEY_X | KEY_SELECT)) {
+        g_game.previous_mode = g_game.mode;
+        g_game.mode = MODE_UPGRADES;
+        return;
+    }
+
     if (keys_down & KEY_R) {
         g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
     }
 
     if (keys_down & KEY_TOUCH) {
-        // [PURGA / START] Button: (224..254, 174..191) — new single bottom strip
-        if (touch.px >= 224 && touch.px <= 254 && touch.py >= 174) {
+        // [START] Button: drawn at (190, 150, 60, 36) -> generous hitbox (180..255, 144..191)
+        if (touch.px >= 180 && touch.px <= 255 && touch.py >= 144 && touch.py <= 191) {
             game_start_wave();
             return;
         }
 
-        // [PAUS] Button: (199..221, 174..191)
-        if (touch.px >= 199 && touch.px <= 221 && touch.py >= 174) {
-            game_toggle_pause();
-            return;
-        }
-
-        // [COG 2X] Button: (174..196, 174..191)
-        if (touch.px >= 174 && touch.px <= 196 && touch.py >= 174) {
-            g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
-            return;
-        }
-
-        // [FORJA] button: (134..170, 174..191)
-        if (touch.px >= 134 && touch.px <= 170 && touch.py >= 174) {
-            g_game.mode = MODE_WORKSHOP;
-            return;
-        }
-
-        // [CALIB] button: (95..130, 174..191)
-        if (touch.px >= 95 && touch.px <= 130 && touch.py >= 174) {
+        // [UPGRADES] Button: drawn at (60, 156, 50, 24) -> generous hitbox (50..120, 144..191)
+        if (touch.px >= 50 && touch.px <= 120 && touch.py >= 144 && touch.py <= 191) {
             g_game.previous_mode = g_game.mode;
-            g_game.mode = MODE_CALIBRATION;
+            g_game.mode = MODE_UPGRADES;
             return;
         }
 
-        // [RECALL] Button: (54..92, 174..191) — only when turret selected and placed
-        if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed) {
-            if (touch.px >= 54 && touch.px <= 92 && touch.py >= 174) {
-                g_turrets[g_game.selected_turret].placed = 0;
-                g_turrets[g_game.selected_turret].active = 0;
-                g_game.turret_dock_count++;
-                g_game.selected_turret = -1;
-                return;
+        // [AMMO DEPOT]: drawn at (6, 150, 44, 36) -> tap to fully reload all placed turrets
+        if (touch.px <= 50 && touch.py >= 144) {
+            for (int t = 0; t < MAX_TURRETS; t++) {
+                if (g_turrets[t].placed) {
+                    g_turrets[t].ammo = g_turrets[t].max_ammo;
+                }
             }
-        }
-
-        // [BOLTER dock] slot touch: drag Heavy Bolter (2..50, 174..191)
-        if (g_game.turret_dock_count > 0 && touch.px >= 2 && touch.px <= 50 && touch.py >= 174) {
-            g_game.is_dragging_new = 1;
-            g_game.drag_x = touch.px;
-            g_game.drag_y = touch.py;
             return;
         }
 
-        // Touch on placed turret: select it
+        // Turret selection in preparation
         for (int t = 0; t < MAX_TURRETS; t++) {
             if (g_turrets[t].placed) {
                 int d = abs(touch.px - g_turrets[t].x) + abs(touch.py - g_turrets[t].y);
@@ -775,62 +618,6 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
                 }
             }
         }
-
-        // If turret selected and touch is outside buttons/turrets: orient angle
-        if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed && touch.py < 174) {
-            Turret *st = &g_turrets[g_game.selected_turret];
-            int dy = touch.py - st->y;
-            int dx = touch.px - st->x;
-            st->center_angle = fixed_atan2(dy, dx);
-            st->current_angle = st->center_angle;
-            return;
-        }
-
-        g_game.selected_turret = -1;
-    }
-
-    if (keys_held & KEY_TOUCH) {
-        if (g_game.is_dragging_new) {
-            g_game.drag_x = touch.px;
-            g_game.drag_y = touch.py;
-        } else if (g_game.selected_turret >= 0 && g_turrets[g_game.selected_turret].placed) {
-            Turret *st = &g_turrets[g_game.selected_turret];
-            int dy = touch.py - st->y;
-            int dx = touch.px - st->x;
-            if (abs(dy) + abs(dx) > 10) {
-                st->center_angle = fixed_atan2(dy, dx);
-                st->current_angle = st->center_angle;
-            }
-        }
-    } else {
-        if (g_game.is_dragging_new) {
-            if (game_is_pos_valid(g_game.drag_x, g_game.drag_y)) {
-                int slot = -1;
-                for (int t = 0; t < MAX_TURRETS; t++) {
-                    if (!g_turrets[t].placed) { slot = t; break; }
-                }
-                if (slot >= 0) {
-                    g_turrets[slot].x = g_game.drag_x;
-                    g_turrets[slot].y = g_game.drag_y;
-                    g_turrets[slot].placed = 1;
-                    g_turrets[slot].active = 1;
-                    g_turrets[slot].center_angle = 192;
-                    g_turrets[slot].current_angle = 192;
-                    int half_angle_units = (g_calibration.cone_spread > 0) ? ((g_calibration.cone_spread * 64) / 90) : 16;
-                    if (half_angle_units < 4) half_angle_units = 4;
-                    g_turrets[slot].sweep_amplitude = half_angle_units;
-                    g_turrets[slot].sweep_speed = (g_calibration.sweep_speed > 0) ? g_calibration.sweep_speed : 1;
-                    g_turrets[slot].sweep_dir = 1;
-                    int interval = 8 - g_skill_tree.bonus_firerate;
-                    if (interval < 3) interval = 3;
-                    g_turrets[slot].fire_interval = interval;
-                    g_turrets[slot].range = (g_calibration.turret_range > 0) ? g_calibration.turret_range : 75;
-                    g_game.turret_dock_count--;
-                    g_game.selected_turret = slot;
-                }
-            }
-            g_game.is_dragging_new = 0;
-        }
     }
 }
 
@@ -839,314 +626,168 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
         g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
     }
 
+    // Touch down: Clicker attack on enemies, start ammo drag, or toggle pause
     if (keys_down & KEY_TOUCH) {
-        // [COG 2X] Button in bottom strip: (148..170, 174..191)
-        if (touch.px >= 148 && touch.px <= 170 && touch.py >= 174) {
-            g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
-            return;
-        }
-
-        // [PAUSE] Button in bottom strip: (174..196, 174..191)
-        if (touch.px >= 174 && touch.px <= 196 && touch.py >= 174) {
+        // [PAUSA] Button in wave HUD: (215..250, 0..14)
+        if (touch.px >= 215 && touch.px <= 250 && touch.py <= 14) {
             game_toggle_pause();
             return;
         }
 
-        // Touch on placed turret: select it to view cone and sync Auspex Cogitator!
-        for (int t = 0; t < MAX_TURRETS; t++) {
-            if (g_turrets[t].placed) {
-                int d = abs(touch.px - g_turrets[t].x) + abs(touch.py - g_turrets[t].y);
-                if (d <= 18) {
-                    g_game.selected_turret = t;
-                    return;
+        // Clicker Attack on enemies in bottom screen!
+        int clicked_enemy = -1;
+        for (int e = 0; e < MAX_ENEMIES; e++) {
+            if (!g_enemies[e].active) continue;
+            int gy = FROM_FP(g_enemies[e].y);
+            if (gy < 192) continue;
+            int local_y = gy - 192;
+            int gx = FROM_FP(g_enemies[e].x);
+
+            if (abs(touch.px - gx) <= 14 && abs(touch.py - local_y) <= 14) {
+                clicked_enemy = e;
+                break;
+            }
+        }
+
+        if (clicked_enemy >= 0) {
+            // Stylus clicker damage: 4 base damage (ignoring armor)
+            uint64_t click_dmg = 4 + (g_game.upgrades.caliber_lvl * 2);
+            if (g_enemies[clicked_enemy].hp > click_dmg) {
+                g_enemies[clicked_enemy].hp -= click_dmg;
+            } else {
+                g_enemies[clicked_enemy].hp = 0;
+                g_enemies[clicked_enemy].active = 0;
+                g_game.enemies_alive--;
+                g_game.enemies_killed++;
+                g_game.scrap += 2;
+                game_spawn_death_gore(FROM_FP(g_enemies[clicked_enemy].x),
+                                     FROM_FP(g_enemies[clicked_enemy].y), 0, 0,
+                                     g_enemies[clicked_enemy].variant);
+            }
+
+            // Designate as target for all turrets that reach it!
+            for (int t = 0; t < MAX_TURRETS; t++) {
+                if (g_turrets[t].placed) {
+                    g_turrets[t].locked_enemy_idx = clicked_enemy;
                 }
             }
+            return;
+        }
+
+        // Ammo Depot drag start (x: 116..140, y: 150..164)
+        if (touch.px >= 116 && touch.px <= 140 && touch.py >= 150 && touch.py <= 164) {
+            g_game.is_dragging_ammo = 1;
+            g_game.drag_x = touch.px;
+            g_game.drag_y = touch.py;
+            return;
+        }
+    }
+
+    if (keys_held & KEY_TOUCH) {
+        if (g_game.is_dragging_ammo) {
+            g_game.drag_x = touch.px;
+            g_game.drag_y = touch.py;
+        }
+    } else {
+        // Release touch: if dragging ammo over a turret, reload it!
+        if (g_game.is_dragging_ammo) {
+            for (int t = 0; t < MAX_TURRETS; t++) {
+                if (g_turrets[t].placed) {
+                    int d = abs(g_game.drag_x - g_turrets[t].x) + abs(g_game.drag_y - g_turrets[t].y);
+                    if (d <= 20) {
+                        g_turrets[t].ammo = g_turrets[t].max_ammo; // Reloaded!
+                        break;
+                    }
+                }
+            }
+            g_game.is_dragging_ammo = 0;
         }
     }
 }
 
 void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held) {
-    if (keys_down & (KEY_START | KEY_A | KEY_B)) {
+    if (keys_down & (KEY_START | KEY_A)) {
         game_toggle_pause();
         return;
     }
-
     if (keys_down & KEY_TOUCH) {
-        // Resume button in modal (x: 48..208, y: 104..126) or [PAUSE] button in bottom strip (174..196, 174..191)
-        if ((touch.px >= 48 && touch.px <= 208 && touch.py >= 104 && touch.py <= 126) ||
-            (touch.px >= 174 && touch.px <= 196 && touch.py >= 174)) {
+        // Resume button: x: 70..186, y: 96..116
+        if (touch.px >= 70 && touch.px <= 186 && touch.py >= 96 && touch.py <= 116) {
             game_toggle_pause();
             return;
-        }
-
-        // Allow tapping turrets even while paused to inspect them
-        for (int t = 0; t < MAX_TURRETS; t++) {
-            if (g_turrets[t].placed) {
-                int d = abs(touch.px - g_turrets[t].x) + abs(touch.py - g_turrets[t].y);
-                if (d <= 18) {
-                    g_game.selected_turret = t;
-                    return;
-                }
-            }
         }
     }
 }
 
 void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_held) {
-    if (keys_down & (KEY_A | KEY_START)) {
-        g_game.core_hp = g_game.core_max_hp;
-        game_reset_to_prep();
+    if (keys_down & (KEY_START | KEY_A)) {
+        game_init();
         return;
     }
-
     if (keys_down & KEY_TOUCH) {
-        // Retry button (mx + 20..mx + 196 -> x: 40..216, y: 116..140)
-        if (touch.px >= 40 && touch.px <= 216 && touch.py >= 116 && touch.py <= 140) {
-            g_game.core_hp = g_game.core_max_hp;
-            game_reset_to_prep();
+        if (touch.px >= 60 && touch.px <= 196 && touch.py >= 106 && touch.py <= 128) {
+            game_init();
             return;
         }
     }
 }
 
-void game_handle_input_workshop(touchPosition touch, int keys_down, int keys_held) {
+void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_held) {
     if (keys_down & (KEY_B | KEY_START)) {
-        game_reset_to_prep();
+        g_game.mode = g_game.previous_mode;
         return;
     }
 
     if (keys_down & KEY_TOUCH) {
-        if (skills_handle_touch(touch.px, touch.py)) {
-            if (g_game.core_hp <= 0) {
-                g_game.core_hp = g_game.core_max_hp;
+        // Back button: y: 166..186
+        if (touch.py >= 166 && touch.py <= 186) {
+            g_game.mode = g_game.previous_mode;
+            return;
+        }
+
+        // Row 1: Calibre (+2 Dmg) - Cost: 25$
+        if (touch.px >= 180 && touch.px <= 240 && touch.py >= 26 && touch.py <= 40) {
+            if (g_game.scrap >= 25) {
+                g_game.scrap -= 25;
+                g_game.upgrades.caliber_lvl++;
             }
-            game_reset_to_prep();
         }
-    }
-}
-
-void calibration_init(void) {
-    int cur_sel = g_calibration.selected_row;
-    int cur_map = g_calibration.selected_map;
-    if (cur_map < 0 || cur_map >= 3) cur_map = 0;
-    g_calibration.selected_map = cur_map;
-    g_calibration.enemy_count = 12;
-    g_calibration.enemy_hp = 15;
-    g_calibration.enemy_speed_int = 8;     // 0.8 px/frame
-    
-    // Per-variant spawn delays in frames (0 = OFF)
-    g_calibration.spawn_delay[0] = 20;     // T0 Larva (frequent)
-    g_calibration.spawn_delay[1] = 35;     // T1 Ripper
-    g_calibration.spawn_delay[2] = 50;     // T2 Hormagaunt
-    g_calibration.spawn_delay[3] = 75;     // T3 Ravener
-    g_calibration.spawn_delay[4] = 120;    // T4 Carnifex
-    g_calibration.spawn_delay[5] = 180;    // T5 Hierophant
-
-    g_calibration.explosion_force = 2;     // 2 (normal/satisfying)
-    g_calibration.turret_damage = 5;
-    g_calibration.turret_fire_rate = 8;    // 8 frames
-    g_calibration.cone_spread = 35;        // 35 deg
-    g_calibration.sweep_speed = 1;         // 1 deg/frame
-    g_calibration.turret_range = 65;       // 65 px
-    g_calibration.starting_scrap = 150;    // 150 $
-    g_calibration.core_lives = 10;         // 10 HP
-    g_calibration.selected_row = cur_sel;
-}
-
-static void modify_param(int row, int delta) {
-    switch (row) {
-        case 0:
-            g_calibration.selected_map = (g_calibration.selected_map + delta + 3) % 3;
-            map_select(g_calibration.selected_map);
-            break;
-        case 1:
-            // 0 = INF, 1..300
-            g_calibration.enemy_count += delta;
-            if (g_calibration.enemy_count < 0) g_calibration.enemy_count = 0;
-            if (g_calibration.enemy_count > 300) g_calibration.enemy_count = 300;
-            break;
-        case 2:
-            g_calibration.enemy_hp += delta * 2;
-            if (g_calibration.enemy_hp < 1) g_calibration.enemy_hp = 1;
-            if (g_calibration.enemy_hp > 100) g_calibration.enemy_hp = 100;
-            break;
-        case 3:
-            g_calibration.enemy_speed_int += delta;
-            if (g_calibration.enemy_speed_int < 3) g_calibration.enemy_speed_int = 3;
-            if (g_calibration.enemy_speed_int > 25) g_calibration.enemy_speed_int = 25;
-            break;
-
-        // Individual spawn delays per biocaste (0 = OFF, 5..300 frames)
-        case 4: // T0: Larva
-        case 5: // T1: Ripper
-        case 6: // T2: Hormagaunt
-        case 7: // T3: Ravener
-        case 8: // T4: Carnifex
-        case 9: // T5: Hierophant
-            {
-                int v = row - 4;
-                g_calibration.spawn_delay[v] += delta * 2;
-                if (g_calibration.spawn_delay[v] < 0) g_calibration.spawn_delay[v] = 0;
-                if (g_calibration.spawn_delay[v] > 300) g_calibration.spawn_delay[v] = 300;
+        // Row 2: Cadencia (+30%) - Cost: 35$
+        else if (touch.px >= 180 && touch.px <= 240 && touch.py >= 46 && touch.py <= 60) {
+            if (g_game.scrap >= 35) {
+                g_game.scrap -= 35;
+                g_game.upgrades.firerate_lvl++;
             }
-            break;
-
-        case 10:
-            g_calibration.explosion_force += delta;
-            if (g_calibration.explosion_force < 1) g_calibration.explosion_force = 1;
-            if (g_calibration.explosion_force > 5) g_calibration.explosion_force = 5;
-            break;
-        case 11:
-            g_calibration.turret_damage += delta;
-            if (g_calibration.turret_damage < 1) g_calibration.turret_damage = 1;
-            if (g_calibration.turret_damage > 50) g_calibration.turret_damage = 50;
-            break;
-        case 12:
-            g_calibration.turret_fire_rate += delta;
-            if (g_calibration.turret_fire_rate < 3) g_calibration.turret_fire_rate = 3;
-            if (g_calibration.turret_fire_rate > 30) g_calibration.turret_fire_rate = 30;
-            break;
-        case 13:
-            g_calibration.cone_spread += delta * 5;
-            if (g_calibration.cone_spread < 10) g_calibration.cone_spread = 10;
-            if (g_calibration.cone_spread > 120) g_calibration.cone_spread = 120;
-            break;
-        case 14:
-            g_calibration.sweep_speed += delta;
-            if (g_calibration.sweep_speed < 1) g_calibration.sweep_speed = 1;
-            if (g_calibration.sweep_speed > 6) g_calibration.sweep_speed = 6;
-            break;
-        case 15:
-            g_calibration.turret_range += delta * 5;
-            if (g_calibration.turret_range < 30) g_calibration.turret_range = 30;
-            if (g_calibration.turret_range > 120) g_calibration.turret_range = 120;
-            break;
-        case 16:
-            g_calibration.starting_scrap += delta * 25;
-            if (g_calibration.starting_scrap < 0) g_calibration.starting_scrap = 0;
-            if (g_calibration.starting_scrap > 999) g_calibration.starting_scrap = 999;
-            break;
-        case 17:
-            g_calibration.core_lives += delta;
-            if (g_calibration.core_lives < 1) g_calibration.core_lives = 1;
-            if (g_calibration.core_lives > 50) g_calibration.core_lives = 50;
-            break;
-    }
-}
-
-void calibration_apply_settings(void) {
-    // NOTE: core_hp/scrap are reset only when starting a new run via calibration_apply_and_start.
-    // Calling calibration_apply_settings mid-game (via SELECT) must NOT reset hull or scrap.
-    // Those are only reset in game_reset_to_prep / game_start_wave.
-
-    int base_interval = (g_calibration.turret_fire_rate > 0) ? g_calibration.turret_fire_rate : 8;
-    int interval = base_interval - g_skill_tree.bonus_firerate;
-    if (interval < 3) interval = 3;
-
-    int half_angle_units = (g_calibration.cone_spread > 0) ? ((g_calibration.cone_spread * 64) / 90) : 16;
-    if (half_angle_units < 4) half_angle_units = 4;
-
-    for (int t = 0; t < MAX_TURRETS; t++) {
-        // Apply fire rate, speed and range globally (these don't have per-turret customisation)
-        g_turrets[t].fire_interval = interval;
-        g_turrets[t].sweep_speed = (g_calibration.sweep_speed > 0) ? g_calibration.sweep_speed : 1;
-        g_turrets[t].range = (g_calibration.turret_range > 0) ? g_calibration.turret_range : 75;
-
-        // IMPORTANT: Only apply the global cone spread to turrets not yet placed (dock stock).
-        // For placed turrets, preserve the per-turret cone that the player tuned with X/Y.
-        if (!g_turrets[t].placed) {
-            g_turrets[t].sweep_amplitude = half_angle_units;
         }
-    }
-}
-
-void calibration_apply_and_start(void) {
-    // Full new-run reset: apply settings, reset hp and scrap, then start wave
-    calibration_apply_settings();
-    g_game.core_hp = g_calibration.core_lives;
-    g_game.core_max_hp = g_calibration.core_lives;
-    g_game.scrap = g_calibration.starting_scrap;
-    game_start_wave();
-}
-
-void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held) {
-    if (keys_down & KEY_UP) {
-        g_calibration.selected_row = (g_calibration.selected_row + CALIBRATION_ROWS - 1) % CALIBRATION_ROWS;
-    }
-    if (keys_down & KEY_DOWN) {
-        g_calibration.selected_row = (g_calibration.selected_row + 1) % CALIBRATION_ROWS;
-    }
-    // Cruceta izquierda / derecha: de 1 en 1
-    if (keys_down & KEY_LEFT) {
-        modify_param(g_calibration.selected_row, -1);
-    }
-    if (keys_down & KEY_RIGHT) {
-        modify_param(g_calibration.selected_row, 1);
-    }
-    // Botones L / R: de 5 en 5 para acelerar ajuste
-    if (keys_down & KEY_L) {
-        modify_param(g_calibration.selected_row, -5);
-    }
-    if (keys_down & KEY_R) {
-        modify_param(g_calibration.selected_row, 5);
-    }
-    if (keys_down & KEY_Y) {
-        calibration_init();
-    }
-    if (keys_down & KEY_A) {
-        calibration_apply_and_start();
-        return;
-    }
-    if (keys_down & KEY_B) {
-        calibration_apply_settings();
-        // Restore to previous mode (e.g. MODE_WAVE if paused mid-combat)
-        GameMode restore = g_game.previous_mode;
-        if (restore == MODE_CALIBRATION || restore == MODE_PAUSED) restore = MODE_PREPARATION;
-        g_game.mode = restore;
-        return;
-    }
-
-    if (keys_down & KEY_TOUCH) {
-        // Header [VOLVER]: (x: 202..252, y: 2..15)
-        if (touch.px >= 200 && touch.px <= 254 && touch.py >= 2 && touch.py <= 16) {
-            calibration_apply_settings();
-            GameMode restore = g_game.previous_mode;
-            if (restore == MODE_CALIBRATION || restore == MODE_PAUSED) restore = MODE_PREPARATION;
-            g_game.mode = restore;
-            return;
+        // Row 3: Bio-Cosecha (x2 $) - Cost: 40$
+        else if (touch.px >= 180 && touch.px <= 240 && touch.py >= 66 && touch.py <= 80) {
+            if (g_game.scrap >= 40) {
+                g_game.scrap -= 40;
+                g_game.upgrades.bio_harvest_lvl++;
+            }
         }
-
-        // Bottom [RESET (Y)]: (x: 6..82, y: 168..190)
-        if (touch.px >= 6 && touch.px <= 82 && touch.py >= 168 && touch.py <= 190) {
-            calibration_init();
-            return;
+        // Row 4: Auto-Targeting - Cost: 50$
+        else if (touch.px >= 180 && touch.px <= 240 && touch.py >= 86 && touch.py <= 100) {
+            if (!g_game.upgrades.auto_target && g_game.scrap >= 50) {
+                g_game.scrap -= 50;
+                g_game.upgrades.auto_target = 1;
+            }
         }
-
-        // Bottom [PROBAR PARTIDA (A)]: (x: 86..252, y: 168..190)
-        if (touch.px >= 86 && touch.px <= 252 && touch.py >= 168 && touch.py <= 190) {
-            calibration_apply_and_start();
-            return;
+        // Row 5: Cinta Transportadora (1B/s) - Cost: 100$
+        else if (touch.px >= 180 && touch.px <= 240 && touch.py >= 106 && touch.py <= 120) {
+            if (g_game.scrap >= 100) {
+                g_game.scrap -= 100;
+                g_game.upgrades.conveyor_lvl++;
+            }
         }
-
-        // Calibration rows: visible in scroll view (12 visible rows from scroll_top)
-        int scroll_top = g_calibration.selected_row - 6;
-        if (scroll_top < 0) scroll_top = 0;
-        if (scroll_top > CALIBRATION_ROWS - 12) scroll_top = CALIBRATION_ROWS - 12;
-
-        for (int v = 0; v < 12; v++) {
-            int row_idx = scroll_top + v;
-            int ry = 22 + v * 11;
-            if (touch.py >= ry - 1 && touch.py <= ry + 9) {
-                g_calibration.selected_row = row_idx;
-                // [-] button: x: 104..128
-                if (touch.px >= 104 && touch.px <= 128) {
-                    modify_param(row_idx, -1);
-                }
-                // [+] button: x: 184..210
-                else if (touch.px >= 184 && touch.px <= 210) {
-                    modify_param(row_idx, 1);
-                }
-                break;
+        // Row 6: Segunda Torreta - Cost: 150$
+        else if (touch.px >= 180 && touch.px <= 240 && touch.py >= 126 && touch.py <= 140) {
+            if (!g_turrets[1].placed && g_game.scrap >= 150) {
+                g_game.scrap -= 150;
+                g_turrets[1].x = 64;
+                g_turrets[1].y = 110;
+                g_turrets[1].placed = 1;
+                g_turrets[1].active = 1;
             }
         }
     }

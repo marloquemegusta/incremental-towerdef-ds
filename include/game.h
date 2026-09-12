@@ -5,20 +5,17 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "skills.h"
+#include <stdint.h>
 
 #define SCREEN_W 256
 #define SCREEN_H 192
+#define FIELD_H  384 // Vertical unified battlefield (256x384)
 
 #define MAX_ENEMIES 128
-#define TOTAL_WAVE_ENEMIES 100
 #define MAX_BULLETS 64
-#define MAX_WAYPOINTS 6
 #define MAX_SPLATTERS 256
 #define MAX_DEATH_PARTICLES 256
 #define MAX_TURRETS 4
-
-#include "telemetry_gfx.h"
 
 // Fixed point math: Q8 (256 = 1.0)
 #define FP_SHIFT 8
@@ -26,12 +23,10 @@
 #define TO_FP(x) ((x) << FP_SHIFT)
 #define FROM_FP(x) ((x) >> FP_SHIFT)
 
-// Warhammer 40k Grimdark Palette (15-bit RGB)
+// Colors (15-bit RGB)
 #define COLOR_BLACK          (RGB15(0, 0, 0) | BIT(15))
 #define COLOR_DECK_FLOOR     (RGB15(2, 2, 3) | BIT(15))
 #define COLOR_DECK_GRID      (RGB15(4, 4, 5) | BIT(15))
-#define COLOR_TRENCH_BASE    (RGB15(1, 2, 2) | BIT(15))
-#define COLOR_TRENCH_GRATE   (RGB15(3, 4, 5) | BIT(15))
 #define COLOR_HAZARD_YELLOW  (RGB15(31, 25, 0) | BIT(15))
 #define COLOR_HAZARD_BLACK   (RGB15(2, 2, 2) | BIT(15))
 
@@ -52,17 +47,14 @@
 #define COLOR_MUZZLE_FLASH   (RGB15(31, 29, 8) | BIT(15))
 #define COLOR_BOLTER_TRACER  (RGB15(31, 27, 4) | BIT(15))
 
-#define COLOR_CONE_LINE      (RGB15(18, 14, 2) | BIT(15))
-#define COLOR_CONE_DASH      (RGB15(28, 22, 0) | BIT(15))
+// Xenos Palette
+#define COLOR_XENOS_CHITIN   (RGB15(14, 4, 19) | BIT(15))
+#define COLOR_XENOS_FLESH    (RGB15(25, 10, 30) | BIT(15))
+#define COLOR_XENOS_EYE      (RGB15(31, 5, 4) | BIT(15))
+#define COLOR_XENOS_ICHOR    (RGB15(8, 31, 6) | BIT(15))
+#define COLOR_BLOOD_DARK     (RGB15(16, 2, 8) | BIT(15))
 
-// Xenos / Tyranid bio-mass (High-Contrast Radiant Violet Palette - Exclusively for Bioclasts)
-#define COLOR_XENOS_CHITIN   (RGB15(14, 4, 19) | BIT(15))  // RGB(115, 35, 155) Radiant Violet Chitin
-#define COLOR_XENOS_FLESH    (RGB15(25, 10, 30) | BIT(15)) // RGB(205, 85, 240) Luminous Bioluminescence
-#define COLOR_XENOS_EYE      (RGB15(31, 5, 4) | BIT(15))   // Pure Piercing Red
-#define COLOR_XENOS_ICHOR    (RGB15(8, 31, 6) | BIT(15))   // Toxic Green
-#define COLOR_BLOOD_DARK     (RGB15(16, 2, 8) | BIT(15))   // Deep Xenos Splatter
-
-// UI / Terminal
+// UI / Phosphor
 #define COLOR_PHOSPHOR_GREEN (RGB15(6, 31, 10) | BIT(15))
 #define COLOR_AMBER          (RGB15(31, 22, 0) | BIT(15))
 #define COLOR_LED_RED        (RGB15(31, 2, 2) | BIT(15))
@@ -72,73 +64,77 @@
 #define COLOR_DARK_GRAY      (RGB15(6, 6, 7) | BIT(15))
 
 typedef struct {
-    int x, y;
-} Waypoint;
-
-typedef struct {
-    int x, y;            // Q8 fixed point
-    int waypoint_idx;
-    int hp;
+    int x, y;            // Q8 fixed point in global space [0..255, 0..383]
+    uint64_t hp;
+    uint64_t max_hp;
     int active;
-    int lateral_offset;  // Q8 offset across trench width (-5 to +5 px)
-    int speed;           // Q8 speed (varying around 1.0)
-    int variant;         // 0..2 for slight size/color visual difference
-    int dir;             // 0 = East, 1 = South, 2 = West, 3 = North
-    int anim_frame;      // 0 or 1 for walk cycle
+    int speed;           // Q8 speed
+    int variant;         // 0..5 (Biocaste Tier)
+    int dir;             // 0=East, 1=South, 2=West, 3=North
+    int anim_frame;
+    int biting_target;   // -1=None/Marching, 0..3=Turret ID, 99=Bunker Sanctum
+    int bite_timer;
 } Enemy;
 
 typedef struct {
-    int type;            // 0 = Bolter, 1 = Lascannon
-    int x, y;            // Screen coordinates
-    int center_angle;    // 0..255
-    int current_angle;   // 0..255
-    int sweep_amplitude; // 16 (~45 deg total)
-    int sweep_speed;     // angle units per frame
-    int sweep_dir;       // +1 or -1
-    int fire_cooldown;
-    int fire_interval;
-    int range;
+    int id;
+    int type;            // 0=TURRET_TYPE_BOLTER, 1=TURRET_TYPE_LASCANNON
+    int x, y;            // Local screen coordinates in bottom screen [0..255, 0..191]
+    int current_angle;   // 0..255 angle
+    int target_angle;
+    int range;           // Circular omnidirectional radius in px
     int active;
     int placed;
-    int flash_timer;     // frames to show muzzle flash
+    
+    // Integrity
+    int hp;
+    int max_hp;
 
-    // Recoil & Alternating barrels
-    int barrel_recoil_l; // 0..3 px recoil left barrel
-    int barrel_recoil_r; // 0..3 px recoil right barrel
-    int last_barrel;     // 0 = left, 1 = right
+    // Ammo & Logistics
+    int ammo;
+    int max_ammo;
+    int fire_cooldown;
+    int fire_interval;
+    int flash_timer;
+
+    // Recoil animation & sparks
+    int barrel_recoil_l;
+    int barrel_recoil_r;
+    int last_barrel;
+
+    // Manual targeting / locked enemy
+    int locked_enemy_idx;
 
     // Metrics
-    int id;
-    int shots_fired;
-    int hits_confirmed;
-    int wasted_shots;
-    int damage_dealt;
-    int kills;
+    uint64_t shots_fired;
+    uint64_t hits_confirmed;
+    uint64_t damage_dealt;
+    uint64_t kills;
 } Turret;
 
 typedef struct {
-    int x, y;   // Q8 fixed point
+    int x, y;   // Q8 fixed point (local bottom screen)
     int vx, vy; // Q8 fixed point
     int life;
     int active;
     int turret_idx;
+    uint64_t damage;
 } Bullet;
 
 typedef struct {
-    int x, y;
+    int x, y;       // Global coordinates [0..255, 0..383]
     int life;
     int max_life;
-    int size;       // 0 = 1x1, 1 = 2x2, 2 = 3x3 cross
+    int size;
     uint16_t color;
 } Splatter;
 
 typedef struct {
-    int x, y;       // Q8 fixed point position
-    int z;          // Q8 height above ground
-    int vx, vy;     // Q8 fixed point horizontal velocity
-    int vz;         // Q8 fixed point vertical velocity
+    int x, y;       // Q8 global coordinates
+    int z;          // Q8 height
+    int vx, vy, vz; // Q8 velocities
     int life;
-    int size;       // 0 = 1x1 px, 1 = 2x2 px
+    int size;
     int active;
     uint16_t color;
 } DeathParticle;
@@ -148,61 +144,55 @@ typedef enum {
     MODE_WAVE,
     MODE_PAUSED,
     MODE_GAME_OVER,
-    MODE_WORKSHOP,
-    MODE_CALIBRATION
+    MODE_UPGRADES
 } GameMode;
 
-#define CALIBRATION_ROWS 18
-
+// Incremental Upgrades
 typedef struct {
-    int enemy_count;          // 0..300, 0 = INF, default: 12
-    int enemy_hp;             // 5..100, default: 15
-    int enemy_speed_int;      // speed in tenths of px/f: 3..25 (0.3..2.5), default: 8
-    int spawn_delay[6];       // delays in frames for T0 Larva, T1 Ripper, T2 Hormagaunt, T3 Ravener, T4 Carnifex, T5 Hierophant (0 = off)
-    int explosion_force;      // 1..5 multiplier, default: 2 (1=soft, 2=normal, 3=energetic, 4=extreme, 5=cataclysm)
-    int turret_damage;        // 1..50, default: 5
-    int turret_fire_rate;     // 3..30 frames, default: 8
-    int cone_spread;          // 10..120 deg, default: 35
-    int sweep_speed;          // 1..6 deg/f, default: 1
-    int turret_range;         // 30..120 px, default: 65
-    int starting_scrap;       // 0..999 $, default: 150
-    int core_lives;           // 1..50 HP, default: 10
-    int selected_map;         // 0..2 (0=Trinchera, 1=Doble S, 2=Rotonda)
-    int selected_row;         // 0..17
-} RunCalibration;
+    // Branch A: Battery Stats
+    int caliber_lvl;     // +Damage per bullet
+    int firerate_lvl;    // +Cadence
+    int range_lvl;       // +Range radius
+    int mag_size_lvl;    // +Max ammo capacity
 
-extern RunCalibration g_calibration;
+    // Branch B: Economy
+    int bio_harvest_lvl; // Extra scrap multiplier
+    int bunker_armor_lvl;// Bunker HP and DR
 
-typedef struct {
-    int firerate_lvl;
-    int sweep_lvl;
-    int scrap_lvl;
-} Metaprogression;
+    // Branch C: Automation (Factorio style)
+    int auto_target;     // 0=Manual click target, 1=Auto-target nearest
+    int conveyor_lvl;    // 0=Manual reload drag, 1=1 ammo/s, 2=3 ammo/s, 3=Continuous
+    int extra_turrets;   // Extra unlocked turrets (0..3)
+} UpgradeTree;
 
 typedef struct {
     GameMode mode;
     GameMode previous_mode;
     int wave_number;
-    int core_hp;
-    int core_max_hp;
-    int scrap;
+    int wave_timer;      // frames remaining in wave (30s = 1800f)
+    int total_waves;     // 20 waves
+
+    uint64_t bunker_hp;
+    uint64_t bunker_max_hp;
+    uint64_t scrap;      // Huge incremental numbers (up to millions/billions)
 
     int enemies_spawned;
+    int enemies_to_spawn;
     int enemies_alive;
-    int enemies_killed;
-    int enemies_breached;
-    int spawn_timers[6];
+    uint64_t enemies_killed;
+    int spawn_timer;
 
     int fast_forward;
     int sim_ticks_elapsed;
 
-    // Dock & selection
-    int turret_dock_count;
-    int is_dragging_new;
+    // Stylus drag & reload state
+    int is_dragging_ammo;
+    int is_dragging_turret;
+    int drag_turret_slot;
     int drag_x, drag_y;
     int selected_turret;
 
-    Metaprogression upgrades;
+    UpgradeTree upgrades;
 } GameContext;
 
 // Global declarations
@@ -213,10 +203,8 @@ extern Enemy g_enemies[MAX_ENEMIES];
 extern Bullet g_bullets[MAX_BULLETS];
 extern Splatter g_splatters[MAX_SPLATTERS];
 extern DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
-extern Waypoint g_waypoints[MAX_WAYPOINTS];
-extern int g_waypoint_count;
-extern const uint16_t *g_current_map_bg;
 extern uint16_t g_backbuffer[SCREEN_W * SCREEN_H];
+extern uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H];
 
 // Math
 void math_init(void);
@@ -232,20 +220,17 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_held);
-void game_handle_input_workshop(touchPosition touch, int keys_down, int keys_held);
-void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held);
+void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_held);
 void game_toggle_pause(void);
 void game_reset_to_prep(void);
-void map_select(int map_index);
-void calibration_init(void);
-void calibration_apply_settings(void);
-void calibration_apply_and_start(void);
-void game_add_splatter(int x, int y, uint16_t color);
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration);
 void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant);
 int game_is_pos_valid(int x, int y);
 
-// Renderer
+// Helpers
+void format_number_compact(char *buf, size_t buf_size, uint64_t val);
+
+// Renderer (Bottom and Top Screen Battlefield)
 void renderer_init(void);
 void renderer_clear(uint16_t color);
 void renderer_draw_pixel(int x, int y, uint16_t color);
@@ -255,21 +240,24 @@ void renderer_draw_line(int x0, int y0, int x1, int y1, uint16_t color);
 void renderer_draw_circle(int cx, int cy, int radius, uint16_t color, int filled);
 void renderer_draw_text(int x, int y, const char *str, uint16_t color);
 
-void renderer_draw_trench_path(void);
-void renderer_draw_turret(const Turret *t, int is_selected, int show_cone);
-void renderer_draw_enemies(void);
+void renderer_draw_battlefield_bottom(void);
+void renderer_draw_battlefield_top(void);
+void renderer_draw_turret(const Turret *t, int is_selected);
+void renderer_draw_enemies_bottom(void);
+void renderer_draw_enemies_top(void);
 void renderer_draw_bullets(void);
-void renderer_draw_splatters(void);
-void renderer_draw_death_particles(void);
+void renderer_draw_splatters_bottom(void);
+void renderer_draw_splatters_top(void);
+void renderer_draw_death_particles_bottom(void);
+void renderer_draw_death_particles_top(void);
 void renderer_draw_ui_prep(void);
+void renderer_draw_ui_wave(void);
 void renderer_draw_ui_pause(void);
 void renderer_draw_ui_game_over(void);
-void renderer_draw_ui_workshop(void);
-void renderer_draw_ui_calibration(void);
+void renderer_draw_ui_upgrades(void);
 void renderer_present(void);
 
-// Telemetry (Top Cogitator)
-void telemetry_init_palette(void);
-void telemetry_render_top(void);
+// Top screen presentation
+void top_screen_present(void);
 
 #endif // GAME_H

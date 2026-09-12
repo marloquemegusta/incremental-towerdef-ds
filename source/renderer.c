@@ -1,60 +1,100 @@
 #include "game.h"
 #include "tiles.h"
+#include "enemy_data.h"
+
+// Define VRAM backbuffers aligned for fast DMA
+uint16_t g_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
+uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
+
+static u16 *s_top_vram = NULL;
+static int s_top_bg = 0;
+
 #include "turret_data.h"
 
-uint16_t g_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
+void format_number_compact(char *buf, size_t buf_size, uint64_t val) {
+    if (val >= 1000000000ULL) {
+        snprintf(buf, buf_size, "%lluB", val / 1000000000ULL);
+    } else if (val >= 1000000ULL) {
+        snprintf(buf, buf_size, "%lluM", val / 1000000ULL);
+    } else if (val >= 1000ULL) {
+        snprintf(buf, buf_size, "%lluK", val / 1000ULL);
+    } else {
+        snprintf(buf, buf_size, "%llu", val);
+    }
+}
 
-static const uint8_t s_font_letters[26][5] = {
-    {0x2, 0x5, 0x7, 0x5, 0x5}, // A
-    {0x6, 0x5, 0x6, 0x5, 0x6}, // B
-    {0x7, 0x4, 0x4, 0x4, 0x7}, // C
-    {0x6, 0x5, 0x5, 0x5, 0x6}, // D
-    {0x7, 0x4, 0x6, 0x4, 0x7}, // E
-    {0x7, 0x4, 0x6, 0x4, 0x4}, // F
-    {0x7, 0x4, 0x5, 0x5, 0x7}, // G
-    {0x5, 0x5, 0x7, 0x5, 0x5}, // H
-    {0x7, 0x2, 0x2, 0x2, 0x7}, // I
-    {0x1, 0x1, 0x1, 0x5, 0x2}, // J
-    {0x5, 0x5, 0x6, 0x5, 0x5}, // K
-    {0x4, 0x4, 0x4, 0x4, 0x7}, // L
-    {0x5, 0x7, 0x5, 0x5, 0x5}, // M
-    {0x5, 0x7, 0x7, 0x5, 0x5}, // N
-    {0x7, 0x5, 0x5, 0x5, 0x7}, // O
-    {0x7, 0x5, 0x7, 0x4, 0x4}, // P
-    {0x7, 0x5, 0x5, 0x6, 0x3}, // Q
-    {0x7, 0x5, 0x7, 0x6, 0x5}, // R
-    {0x3, 0x4, 0x2, 0x1, 0x6}, // S
-    {0x7, 0x2, 0x2, 0x2, 0x2}, // T
-    {0x5, 0x5, 0x5, 0x5, 0x7}, // U
-    {0x5, 0x5, 0x5, 0x5, 0x2}, // V
-    {0x5, 0x5, 0x5, 0x7, 0x5}, // W
-    {0x5, 0x5, 0x2, 0x5, 0x5}, // X
-    {0x5, 0x5, 0x2, 0x2, 0x2}, // Y
-    {0x7, 0x1, 0x2, 0x4, 0x7}  // Z
-};
-
-static const uint8_t s_font_digits[10][5] = {
-    {0x7, 0x5, 0x5, 0x5, 0x7}, // 0
-    {0x2, 0x6, 0x2, 0x2, 0x7}, // 1
-    {0x7, 0x1, 0x7, 0x4, 0x7}, // 2
-    {0x7, 0x1, 0x7, 0x1, 0x7}, // 3
-    {0x5, 0x5, 0x7, 0x1, 0x1}, // 4
-    {0x7, 0x4, 0x7, 0x1, 0x7}, // 5
-    {0x7, 0x4, 0x7, 0x5, 0x7}, // 6
-    {0x7, 0x1, 0x2, 0x2, 0x2}, // 7
-    {0x7, 0x5, 0x7, 0x5, 0x7}, // 8
-    {0x7, 0x5, 0x7, 0x1, 0x7}  // 9
+// Font 4x6
+static const uint8_t font4x6[128][6] = {
+    [' '] = {0, 0, 0, 0, 0, 0},
+    ['0'] = {0x6, 0x9, 0x9, 0x9, 0x6, 0},
+    ['1'] = {0x2, 0x6, 0x2, 0x2, 0x7, 0},
+    ['2'] = {0x6, 0x9, 0x2, 0x4, 0xF, 0},
+    ['3'] = {0xE, 0x1, 0x6, 0x1, 0xE, 0},
+    ['4'] = {0x9, 0x9, 0xF, 0x1, 0x1, 0},
+    ['5'] = {0xF, 0x8, 0xE, 0x1, 0xE, 0},
+    ['6'] = {0x6, 0x8, 0xE, 0x9, 0x6, 0},
+    ['7'] = {0xF, 0x1, 0x2, 0x4, 0x4, 0},
+    ['8'] = {0x6, 0x9, 0x6, 0x9, 0x6, 0},
+    ['9'] = {0x6, 0x9, 0x7, 0x1, 0x6, 0},
+    ['A'] = {0x6, 0x9, 0xF, 0x9, 0x9, 0},
+    ['B'] = {0xE, 0x9, 0xE, 0x9, 0xE, 0},
+    ['C'] = {0x7, 0x8, 0x8, 0x8, 0x7, 0},
+    ['D'] = {0xE, 0x9, 0x9, 0x9, 0xE, 0},
+    ['E'] = {0xF, 0x8, 0xE, 0x8, 0xF, 0},
+    ['F'] = {0xF, 0x8, 0xE, 0x8, 0x8, 0},
+    ['G'] = {0x7, 0x8, 0xB, 0x9, 0x7, 0},
+    ['H'] = {0x9, 0x9, 0xF, 0x9, 0x9, 0},
+    ['I'] = {0x7, 0x2, 0x2, 0x2, 0x7, 0},
+    ['J'] = {0x1, 0x1, 0x1, 0x9, 0x6, 0},
+    ['K'] = {0x9, 0xA, 0xC, 0xA, 0x9, 0},
+    ['L'] = {0x8, 0x8, 0x8, 0x8, 0xF, 0},
+    ['M'] = {0x9, 0xF, 0xD, 0x9, 0x9, 0},
+    ['N'] = {0x9, 0xD, 0xB, 0x9, 0x9, 0},
+    ['O'] = {0x6, 0x9, 0x9, 0x9, 0x6, 0},
+    ['P'] = {0xE, 0x9, 0xE, 0x8, 0x8, 0},
+    ['Q'] = {0x6, 0x9, 0x9, 0xA, 0x5, 0},
+    ['R'] = {0xE, 0x9, 0xE, 0xA, 0x9, 0},
+    ['S'] = {0x7, 0x8, 0x6, 0x1, 0xE, 0},
+    ['T'] = {0x7, 0x2, 0x2, 0x2, 0x2, 0},
+    ['U'] = {0x9, 0x9, 0x9, 0x9, 0x6, 0},
+    ['V'] = {0x9, 0x9, 0x9, 0x5, 0x2, 0},
+    ['W'] = {0x9, 0x9, 0xD, 0xF, 0x9, 0},
+    ['X'] = {0x9, 0x5, 0x2, 0x5, 0x9, 0},
+    ['Y'] = {0x5, 0x5, 0x2, 0x2, 0x2, 0},
+    ['Z'] = {0xF, 0x1, 0x2, 0x4, 0xF, 0},
+    [':'] = {0x0, 0x2, 0x0, 0x2, 0x0, 0},
+    ['/'] = {0x1, 0x2, 0x4, 0x8, 0x0, 0},
+    ['%'] = {0x9, 0x2, 0x4, 0x9, 0x0, 0},
+    ['.'] = {0x0, 0x0, 0x0, 0x0, 0x2, 0},
+    ['+'] = {0x0, 0x2, 0x7, 0x2, 0x0, 0},
+    ['-'] = {0x0, 0x0, 0x7, 0x0, 0x0, 0},
+    ['('] = {0x2, 0x4, 0x4, 0x4, 0x2, 0},
+    [')'] = {0x4, 0x2, 0x2, 0x2, 0x4, 0},
+    ['x'] = {0x0, 0x5, 0x2, 0x5, 0x0, 0},
+    ['$'] = {0x7, 0xA, 0x7, 0x2, 0x7, 0},
+    ['!'] = {0x2, 0x2, 0x2, 0x0, 0x2, 0},
 };
 
 void renderer_init(void) {
+    // 1. Bottom Screen: Main engine in Direct FB0 mode on bottom LCD
     lcdMainOnBottom();
     videoSetMode(MODE_FB0);
     vramSetBankA(VRAM_A_LCD);
 
+    // 2. Top Screen: Sub engine 16-bit Bitmap Mode 5
+    videoSetModeSub(MODE_5_2D);
+    vramSetBankC(VRAM_C_SUB_BG);
+    s_top_bg = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
+    s_top_vram = bgGetGfxPtr(s_top_bg);
+
+    // 3. Asset generator
     tiles_init();
 
+    // 4. Initial clear
     renderer_clear(COLOR_DECK_FLOOR);
-    renderer_present();
+    for (int i = 0; i < SCREEN_W * SCREEN_H; i++) {
+        g_top_backbuffer[i] = COLOR_DECK_FLOOR;
+    }
 }
 
 void renderer_clear(uint16_t color) {
@@ -72,6 +112,12 @@ void renderer_draw_pixel(int x, int y, uint16_t color) {
     }
 }
 
+void top_draw_pixel(int x, int y, uint16_t color) {
+    if (x >= 0 && x < SCREEN_W && y >= 0 && y < SCREEN_H) {
+        g_top_backbuffer[y * SCREEN_W + x] = color;
+    }
+}
+
 void renderer_draw_rect(int x, int y, int w, int h, uint16_t color) {
     for (int i = x; i < x + w; i++) {
         renderer_draw_pixel(i, y, color);
@@ -84,75 +130,57 @@ void renderer_draw_rect(int x, int y, int w, int h, uint16_t color) {
 }
 
 void renderer_fill_rect(int x, int y, int w, int h, uint16_t color) {
-    if (x < 0) { w += x; x = 0; }
-    if (y < 0) { h += y; y = 0; }
-    if (x + w > SCREEN_W) w = SCREEN_W - x;
-    if (y + h > SCREEN_H) h = SCREEN_H - y;
-    if (w <= 0 || h <= 0) return;
+    int x0 = (x < 0) ? 0 : x;
+    int y0 = (y < 0) ? 0 : y;
+    int x1 = (x + w > SCREEN_W) ? SCREEN_W : (x + w);
+    int y1 = (y + h > SCREEN_H) ? SCREEN_H : (y + h);
+    for (int j = y0; j < y1; j++) {
+        uint16_t *line = &g_backbuffer[j * SCREEN_W];
+        for (int i = x0; i < x1; i++) {
+            line[i] = color;
+        }
+    }
+}
 
-    for (int j = y; j < y + h; j++) {
-        uint16_t *row = &g_backbuffer[j * SCREEN_W + x];
-        for (int i = 0; i < w; i++) {
-            row[i] = color;
+void top_fill_rect(int x, int y, int w, int h, uint16_t color) {
+    int x0 = (x < 0) ? 0 : x;
+    int y0 = (y < 0) ? 0 : y;
+    int x1 = (x + w > SCREEN_W) ? SCREEN_W : (x + w);
+    int y1 = (y + h > SCREEN_H) ? SCREEN_H : (y + h);
+    for (int j = y0; j < y1; j++) {
+        uint16_t *line = &g_top_backbuffer[j * SCREEN_W];
+        for (int i = x0; i < x1; i++) {
+            line[i] = color;
         }
     }
 }
 
 void renderer_draw_line(int x0, int y0, int x1, int y1, uint16_t color) {
-    int dx = abs(x1 - x0);
-    int dy = abs(y1 - y0);
-    int sx = (x0 < x1) ? 1 : -1;
-    int sy = (y0 < y1) ? 1 : -1;
-    int err = dx - dy;
-
+    int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy, e2;
     while (1) {
         renderer_draw_pixel(x0, y0, color);
         if (x0 == x1 && y0 == y1) break;
-        int e2 = 2 * err;
-        if (e2 > -dy) {
-            err -= dy;
-            x0 += sx;
-        }
-        if (e2 < dx) {
-            err += dx;
-            y0 += sy;
-        }
+        e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
     }
 }
 
 void renderer_draw_circle(int cx, int cy, int radius, uint16_t color, int filled) {
-    int x = radius;
-    int y = 0;
-    int err = 0;
-
-    while (x >= y) {
-        if (filled) {
-            for (int i = cx - x; i <= cx + x; i++) {
-                renderer_draw_pixel(i, cy + y, color);
-                renderer_draw_pixel(i, cy - y, color);
+    for (int y = -radius; y <= radius; y++) {
+        for (int x = -radius; x <= radius; x++) {
+            int d2 = x * x + y * y;
+            if (filled) {
+                if (d2 <= radius * radius) {
+                    renderer_draw_pixel(cx + x, cy + y, color);
+                }
+            } else {
+                if (d2 <= radius * radius && d2 >= (radius - 1) * (radius - 1)) {
+                    renderer_draw_pixel(cx + x, cy + y, color);
+                }
             }
-            for (int i = cx - y; i <= cx + y; i++) {
-                renderer_draw_pixel(i, cy + x, color);
-                renderer_draw_pixel(i, cy - x, color);
-            }
-        } else {
-            renderer_draw_pixel(cx + x, cy + y, color);
-            renderer_draw_pixel(cx + y, cy + x, color);
-            renderer_draw_pixel(cx - y, cy + x, color);
-            renderer_draw_pixel(cx - x, cy + y, color);
-            renderer_draw_pixel(cx - x, cy - y, color);
-            renderer_draw_pixel(cx - y, cy - x, color);
-            renderer_draw_pixel(cx + y, cy - x, color);
-            renderer_draw_pixel(cx + x, cy - y, color);
-        }
-
-        if (err <= 0) {
-            y += 1;
-            err += 2 * y + 1;
-        }
-        if (err > 0) {
-            x -= 1;
-            err -= 2 * x + 1;
         }
     }
 }
@@ -160,100 +188,138 @@ void renderer_draw_circle(int cx, int cy, int radius, uint16_t color, int filled
 void renderer_draw_text(int x, int y, const char *str, uint16_t color) {
     while (*str) {
         char c = *str++;
-        const uint8_t *glyph = NULL;
-        uint8_t custom[5] = {0};
-
-        if (c >= 'a' && c <= 'z') c -= 32;
-
-        if (c >= 'A' && c <= 'Z') {
-            glyph = s_font_letters[c - 'A'];
-        } else if (c >= '0' && c <= '9') {
-            glyph = s_font_digits[c - '0'];
-        } else if (c == '[') {
-            custom[0] = 0x6; custom[1] = 0x4; custom[2] = 0x4; custom[3] = 0x4; custom[4] = 0x6;
-            glyph = custom;
-        } else if (c == ']') {
-            custom[0] = 0x3; custom[1] = 0x1; custom[2] = 0x1; custom[3] = 0x1; custom[4] = 0x3;
-            glyph = custom;
-        } else if (c == '+') {
-            custom[0] = 0x0; custom[1] = 0x2; custom[2] = 0x7; custom[3] = 0x2; custom[4] = 0x0;
-            glyph = custom;
-        } else if (c == '-') {
-            custom[0] = 0x0; custom[1] = 0x0; custom[2] = 0x7; custom[3] = 0x0; custom[4] = 0x0;
-            glyph = custom;
-        } else if (c == '>') {
-            custom[0] = 0x4; custom[1] = 0x2; custom[2] = 0x1; custom[3] = 0x2; custom[4] = 0x4;
-            glyph = custom;
-        } else if (c == '<') {
-            custom[0] = 0x1; custom[1] = 0x2; custom[2] = 0x4; custom[3] = 0x2; custom[4] = 0x1;
-            glyph = custom;
-        } else if (c == ':') {
-            custom[0] = 0x0; custom[1] = 0x2; custom[2] = 0x0; custom[3] = 0x2; custom[4] = 0x0;
-            glyph = custom;
-        } else if (c == '.') {
-            custom[0] = 0x0; custom[1] = 0x0; custom[2] = 0x0; custom[3] = 0x0; custom[4] = 0x2;
-            glyph = custom;
-        } else if (c == '/') {
-            custom[0] = 0x1; custom[1] = 0x2; custom[2] = 0x2; custom[3] = 0x4; custom[4] = 0x4;
-            glyph = custom;
-        } else if (c == '$') {
-            custom[0] = 0x2; custom[1] = 0x7; custom[2] = 0x6; custom[3] = 0x7; custom[4] = 0x2;
-            glyph = custom;
-        } else if (c == '%') {
-            custom[0] = 0x5; custom[1] = 0x1; custom[2] = 0x2; custom[3] = 0x4; custom[4] = 0x5;
-            glyph = custom;
-        }
-
-        if (glyph) {
-            for (int r = 0; r < 5; r++) {
-                uint8_t row = glyph[r];
-                if (row & 0x4) renderer_draw_pixel(x, y + r, color);
-                if (row & 0x2) renderer_draw_pixel(x + 1, y + r, color);
-                if (row & 0x1) renderer_draw_pixel(x + 2, y + r, color);
+        if (c >= 'a' && c <= 'z') c = c - 'a' + 'A';
+        if ((unsigned char)c < 128) {
+            for (int row = 0; row < 6; row++) {
+                uint8_t bits = font4x6[(unsigned char)c][row];
+                for (int col = 0; col < 4; col++) {
+                    if (bits & (1 << (3 - col))) {
+                        renderer_draw_pixel(x + col, y + row, color);
+                    }
+                }
             }
         }
-        x += 4;
+        x += 5;
     }
 }
 
-void renderer_draw_trench_path(void) {
-    tiles_render_sector1_map();
+void top_draw_text(int x, int y, const char *str, uint16_t color) {
+    while (*str) {
+        char c = *str++;
+        if (c >= 'a' && c <= 'z') c = c - 'a' + 'A';
+        if ((unsigned char)c < 128) {
+            for (int row = 0; row < 6; row++) {
+                uint8_t bits = font4x6[(unsigned char)c][row];
+                for (int col = 0; col < 4; col++) {
+                    if (bits & (1 << (3 - col))) {
+                        top_draw_pixel(x + col, y + row, color);
+                    }
+                }
+            }
+        }
+        x += 5;
+    }
 }
 
-void renderer_draw_turret(const Turret *t, int is_selected, int show_cone) {
+void renderer_draw_battlefield_top(void) {
+    tiles_render_urban_ground(g_top_backbuffer, 0);
+}
+
+void renderer_draw_battlefield_bottom(void) {
+    tiles_render_urban_ground(g_backbuffer, 192);
+    // Sanctum bunker placed at bottom center (128, 172)
+    tiles_draw_central_bunker(g_backbuffer, 128, 172, g_game.bunker_hp, g_game.bunker_max_hp);
+}
+
+void renderer_draw_turret(const Turret *t, int is_selected) {
     if (!t->placed) return;
+    
+    // Selected or target highlight
+    if (is_selected) {
+        renderer_draw_circle(t->x, t->y, 16, COLOR_AMBER, 0);
+        renderer_draw_circle(t->x, t->y, t->range, COLOR_AMBER, 0);
+    }
 
-    // 1. Dotted Warning Arc (Sweep Cone)
-    if (show_cone) {
-        int r = t->range;
-        int left_ang = (t->center_angle - t->sweep_amplitude) & 0xFF;
-        int right_ang = (t->center_angle + t->sweep_amplitude) & 0xFF;
+    // Draw canonical 32-angle discrete RotSprite turret
+    turret_draw_angle(t->x, t->y, t->type, t->current_angle, is_selected);
 
-        int lx = t->x + ((fixed_cos(left_ang) * r) >> FP_SHIFT);
-        int ly = t->y + ((fixed_sin(left_ang) * r) >> FP_SHIFT);
-        int rx = t->x + ((fixed_cos(right_ang) * r) >> FP_SHIFT);
-        int ry = t->y + ((fixed_sin(right_ang) * r) >> FP_SHIFT);
+    // Muzzle flash when firing
+    if (t->flash_timer > 0) {
+        int tip_dist = 14;
+        int fx = t->x + ((fixed_cos(t->current_angle) * tip_dist) >> FP_SHIFT);
+        int fy = t->y + ((fixed_sin(t->current_angle) * tip_dist) >> FP_SHIFT);
+        renderer_draw_circle(fx, fy, 2, COLOR_MUZZLE_FLASH, 1);
+        renderer_draw_pixel(fx, fy, COLOR_WHITE);
+    }
 
-        renderer_draw_line(t->x, t->y, lx, ly, COLOR_CONE_LINE);
-        renderer_draw_line(t->x, t->y, rx, ry, COLOR_CONE_LINE);
+    // Ammo bar above turret
+    int bar_w = 20;
+    int bar_x = t->x - bar_w / 2;
+    int bar_y = t->y - 18;
+    renderer_fill_rect(bar_x - 1, bar_y - 1, bar_w + 2, 4, COLOR_BLACK);
+    int ammo_fill = (t->max_ammo > 0) ? (t->ammo * bar_w / t->max_ammo) : 0;
+    uint16_t ammo_col = (t->ammo > t->max_ammo / 4) ? COLOR_AMBER : COLOR_LED_RED;
+    if (ammo_fill > 0) {
+        renderer_fill_rect(bar_x, bar_y, ammo_fill, 2, ammo_col);
+    }
 
-        for (int a = t->center_angle - t->sweep_amplitude; a <= t->center_angle + t->sweep_amplitude; a += 4) {
-            int ax = t->x + ((fixed_cos(a & 0xFF) * r) >> FP_SHIFT);
-            int ay = t->y + ((fixed_sin(a & 0xFF) * r) >> FP_SHIFT);
-            renderer_draw_pixel(ax, ay, COLOR_CONE_DASH);
+    // Health bar if damaged
+    if (t->hp < t->max_hp) {
+        int hp_y = t->y + 16;
+        renderer_fill_rect(bar_x - 1, hp_y - 1, bar_w + 2, 4, COLOR_BLACK);
+        int hp_fill = (t->max_hp > 0) ? (t->hp * bar_w / t->max_hp) : 0;
+        if (hp_fill > 0) {
+            renderer_fill_rect(bar_x, hp_y, hp_fill, 2, COLOR_LED_GREEN);
         }
     }
-
-    // 2. Pixel-art canonical 32-angle discrete sprite (RotSprite)
-    turret_draw_angle(t->x, t->y, t->type, t->current_angle, is_selected);
 }
 
-void renderer_draw_enemies(void) {
+void renderer_draw_enemies_top(void) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
-        int ex = FROM_FP(g_enemies[i].x);
-        int ey = FROM_FP(g_enemies[i].y);
-        tiles_draw_xenos(ex, ey, g_enemies[i].dir, g_enemies[i].anim_frame, g_enemies[i].variant);
+        int gx = FROM_FP(g_enemies[i].x);
+        int gy = FROM_FP(g_enemies[i].y);
+        // Top screen: Y in [0..191]
+        if (gy >= -16 && gy < 192) {
+            enemy_draw_sprite_to_buffer(g_top_backbuffer, gx, gy, g_enemies[i].variant,
+                                       g_enemies[i].anim_frame, g_enemies[i].dir);
+            // Health bar if damaged
+            if (g_enemies[i].hp < g_enemies[i].max_hp) {
+                int bw = 14;
+                int bx = gx - bw / 2;
+                int by = gy - 10;
+                top_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
+                int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
+                if (fill > 0) {
+                    top_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
+                }
+            }
+        }
+    }
+}
+
+void renderer_draw_enemies_bottom(void) {
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (!g_enemies[i].active) continue;
+        int gx = FROM_FP(g_enemies[i].x);
+        int gy = FROM_FP(g_enemies[i].y);
+        // Bottom screen: Y in [192..383] -> local Y = gy - 192
+        int ly = gy - 192;
+        if (ly >= -16 && ly < SCREEN_H) {
+            enemy_draw_sprite_to_buffer(g_backbuffer, gx, ly, g_enemies[i].variant,
+                                       g_enemies[i].anim_frame, g_enemies[i].dir);
+            // Health bar if damaged
+            if (g_enemies[i].hp < g_enemies[i].max_hp) {
+                int bw = 14;
+                int bx = gx - bw / 2;
+                int by = ly - 10;
+                renderer_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
+                int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
+                if (fill > 0) {
+                    renderer_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
+                }
+            }
+        }
     }
 }
 
@@ -262,426 +328,215 @@ void renderer_draw_bullets(void) {
         if (!g_bullets[i].active) continue;
         int bx = FROM_FP(g_bullets[i].x);
         int by = FROM_FP(g_bullets[i].y);
-        int bpx = FROM_FP(g_bullets[i].x - g_bullets[i].vx);
-        int bpy = FROM_FP(g_bullets[i].y - g_bullets[i].vy);
-
-        // Heavy Bolter tracer (Golden amber projectile)
-        renderer_draw_line(bpx, bpy, bx, by, COLOR_BOLTER_TRACER);
-        renderer_draw_pixel(bx, by, COLOR_WHITE);
+        renderer_draw_pixel(bx, by, COLOR_BOLTER_TRACER);
+        renderer_draw_pixel(bx + 1, by, COLOR_WHITE);
+        renderer_draw_pixel(bx, by + 1, COLOR_WHITE);
     }
 }
 
-void renderer_draw_splatters(void) {
+void renderer_draw_splatters_top(void) {
     for (int i = 0; i < MAX_SPLATTERS; i++) {
         if (g_splatters[i].life <= 0) continue;
-        int sx = g_splatters[i].x;
-        int sy = g_splatters[i].y;
-        uint16_t col = g_splatters[i].color;
-        int sz = g_splatters[i].size;
-        int life = g_splatters[i].life;
-
-        // Visual degradation / shrinking as puddle dries and seeps into iron deck
-        if (life < 30) {
-            // Fading single dot
-            renderer_draw_pixel(sx, sy, COLOR_BLOOD_DARK);
-            continue;
-        }
-
-        if (sz == 0) {
-            // Small droplet (1-2 pixels)
-            renderer_draw_pixel(sx, sy, col);
-            if (life > 60) {
-                renderer_draw_pixel(sx + 1, sy, COLOR_BLOOD_DARK);
-            }
-        } else if (sz == 1) {
-            // Medium splatter (2x2 cluster + shadow rim)
-            renderer_draw_pixel(sx, sy, col);
-            renderer_draw_pixel(sx + 1, sy, col);
-            renderer_draw_pixel(sx, sy + 1, COLOR_BLOOD_DARK);
-            renderer_draw_pixel(sx + 1, sy + 1, COLOR_BLOOD_DARK);
-            if (life > 90) {
-                renderer_draw_pixel(sx - 1, sy, col);
-                renderer_draw_pixel(sx, sy - 1, col);
-            }
-        } else {
-            // Large bio-pool / gore chunk (3x3 organic blob)
-            renderer_draw_pixel(sx, sy, col);
-            renderer_draw_pixel(sx + 1, sy, col);
-            renderer_draw_pixel(sx - 1, sy, col);
-            renderer_draw_pixel(sx, sy - 1, col);
-            renderer_draw_pixel(sx, sy + 1, COLOR_BLOOD_DARK);
-            renderer_draw_pixel(sx + 1, sy + 1, COLOR_BLOOD_DARK);
-            renderer_draw_pixel(sx - 1, sy + 1, COLOR_BLOOD_DARK);
-            if (life > 80) {
-                renderer_draw_pixel(sx + 2, sy, col);
-                renderer_draw_pixel(sx, sy + 2, COLOR_BLOOD_DARK);
+        int gx = g_splatters[i].x;
+        int gy = g_splatters[i].y;
+        if (gy >= 0 && gy < SCREEN_H) {
+            top_draw_pixel(gx, gy, g_splatters[i].color);
+            if (g_splatters[i].size > 1) {
+                top_draw_pixel(gx + 1, gy, g_splatters[i].color);
+                top_draw_pixel(gx, gy + 1, g_splatters[i].color);
             }
         }
     }
 }
 
-void renderer_draw_death_particles(void) {
+void renderer_draw_splatters_bottom(void) {
+    for (int i = 0; i < MAX_SPLATTERS; i++) {
+        if (g_splatters[i].life <= 0) continue;
+        int gx = g_splatters[i].x;
+        int gy = g_splatters[i].y - 192;
+        if (gy >= 0 && gy < SCREEN_H) {
+            renderer_draw_pixel(gx, gy, g_splatters[i].color);
+            if (g_splatters[i].size > 1) {
+                renderer_draw_pixel(gx + 1, gy, g_splatters[i].color);
+                renderer_draw_pixel(gx, gy + 1, g_splatters[i].color);
+            }
+        }
+    }
+}
+
+void renderer_draw_death_particles_top(void) {
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
         if (!g_death_particles[i].active) continue;
-
-        int ground_x = FROM_FP(g_death_particles[i].x);
-        int ground_y = FROM_FP(g_death_particles[i].y);
-        int height_z = FROM_FP(g_death_particles[i].z);
-
-        if (ground_x < 0 || ground_x >= SCREEN_W || ground_y < 0 || ground_y >= SCREEN_H) continue;
-
-        // 1. Draw pseudo-3D ground shadow underneath airborne particle
-        if (height_z > 2 && ground_y + 1 < SCREEN_H) {
-            renderer_draw_pixel(ground_x, ground_y, COLOR_HAZARD_BLACK);
+        int gx = FROM_FP(g_death_particles[i].x);
+        int gy = FROM_FP(g_death_particles[i].y);
+        if (gy >= 0 && gy < SCREEN_H) {
+            top_draw_pixel(gx, gy, g_death_particles[i].color);
         }
+    }
+}
 
-        // 2. Projected airborne position
-        int air_y = ground_y - height_z;
-        if (air_y >= 0 && air_y < SCREEN_H) {
-            uint16_t col = g_death_particles[i].color;
-            if (g_death_particles[i].size == 0) {
-                // 1x1 fast projectile drop
-                renderer_draw_pixel(ground_x, air_y, col);
-            } else {
-                // 2x2 heavy organ/carapace chunk
-                renderer_draw_pixel(ground_x, air_y, col);
-                if (ground_x + 1 < SCREEN_W) {
-                    renderer_draw_pixel(ground_x + 1, air_y, col);
-                    renderer_draw_pixel(ground_x + 1, air_y + 1, COLOR_BLOOD_DARK);
-                }
-                if (air_y + 1 < SCREEN_H) {
-                    renderer_draw_pixel(ground_x, air_y + 1, COLOR_BLOOD_DARK);
-                }
-            }
+void renderer_draw_death_particles_bottom(void) {
+    for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
+        if (!g_death_particles[i].active) continue;
+        int gx = FROM_FP(g_death_particles[i].x);
+        int gy = FROM_FP(g_death_particles[i].y) - 192;
+        if (gy >= 0 && gy < SCREEN_H) {
+            renderer_draw_pixel(gx, gy, g_death_particles[i].color);
         }
     }
 }
 
 void renderer_draw_ui_prep(void) {
-    // =========================================================
-    // SINGLE BOTTOM COMMAND DOCK (y: 174..191, 18px tall)
-    // All control buttons are compacted here. The map is fully
-    // visible from y=0..173 with no top strip obstruction.
-    // =========================================================
-    renderer_fill_rect(0, 174, SCREEN_W, 18, COLOR_IRON_PANEL);
-    renderer_draw_line(0, 174, SCREEN_W - 1, 174, COLOR_IRON_BORDER);
+    // Top HUD banner
+    top_fill_rect(0, 0, SCREEN_W, 14, COLOR_BLACK);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "WAVE %d/20", g_game.wave_number);
+    top_draw_text(6, 4, buf, COLOR_AMBER);
+    
+    char scrap_buf[32];
+    format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
+    snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
+    top_draw_text(160, 4, buf, COLOR_PHOSPHOR_GREEN);
 
-    // Hazard accent line at the top of the dock
-    for (int x = 0; x < SCREEN_W; x += 4) {
-        renderer_draw_pixel(x, 174, COLOR_HAZARD_YELLOW);
-        renderer_draw_pixel(x + 1, 174, COLOR_HAZARD_YELLOW);
-    }
+    // Bottom UI: Ammo depot & control buttons
+    // Bunker Scrap / Depot dock on left
+    renderer_fill_rect(6, 150, 44, 36, COLOR_IRON_PANEL);
+    renderer_draw_rect(6, 150, 44, 36, COLOR_IRON_BORDER);
+    renderer_draw_text(12, 156, "AMMO", COLOR_AMBER);
+    renderer_draw_text(10, 168, "DEPOT", COLOR_WHITE);
 
-    if (g_game.mode == MODE_PREPARATION) {
-        // ── BOLTER DOCK [BOLTER xN] (x: 2..50) ──
-        renderer_fill_rect(2, 176, 48, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(2, 176, 48, 14, (g_game.turret_dock_count > 0) ? COLOR_BRASS : COLOR_DARK_GRAY);
-        // Mini twin-barrel icon (8px)
-        renderer_draw_circle(11, 183, 3, COLOR_TURRET_RING, 1);
-        renderer_draw_line(11, 182, 15, 182, COLOR_BARREL_STEEL);
-        renderer_draw_line(11, 184, 15, 184, COLOR_BARREL_STEEL);
-        char dock_lbl[8];
-        sprintf(dock_lbl, "x%d", g_game.turret_dock_count);
-        renderer_draw_text(18, 180, dock_lbl, (g_game.turret_dock_count > 0) ? COLOR_HAZARD_YELLOW : COLOR_IRON_LIGHT);
+    // Start wave button
+    renderer_fill_rect(190, 150, 60, 36, COLOR_LED_GREEN);
+    renderer_draw_rect(190, 150, 60, 36, COLOR_WHITE);
+    renderer_draw_text(198, 164, "START", COLOR_BLACK);
 
-        // ── RECALL (x: 54..92) — only when a placed turret is selected ──
-        if (g_game.selected_turret >= 0 && g_game.selected_turret < MAX_TURRETS && g_turrets[g_game.selected_turret].placed) {
-            renderer_fill_rect(54, 176, 38, 14, COLOR_HAZARD_BLACK);
-            renderer_draw_rect(54, 176, 38, 14, COLOR_RED);
-            renderer_fill_rect(57, 179, 3, 8, COLOR_LED_RED);
-            renderer_draw_text(63, 180, "RECL", COLOR_WHITE);
-        } else {
-            renderer_fill_rect(54, 176, 38, 14, COLOR_HAZARD_BLACK);
-            renderer_draw_rect(54, 176, 38, 14, COLOR_DARK_GRAY);
-            renderer_draw_text(60, 180, "RECL", COLOR_DARK_GRAY);
-        }
+    // Upgrade button
+    renderer_fill_rect(60, 156, 50, 24, COLOR_IRON_PANEL);
+    renderer_draw_rect(60, 156, 50, 24, COLOR_AMBER);
+    renderer_draw_text(65, 164, "UPGRADES", COLOR_AMBER);
 
-        // ── CALIB (x: 95..130) ──
-        renderer_fill_rect(95, 176, 36, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(95, 176, 36, 14, COLOR_AMBER);
-        renderer_fill_rect(98, 179, 3, 8, COLOR_HAZARD_YELLOW);
-        renderer_draw_text(104, 180, "CALIB", COLOR_AMBER);
+    // Instruction banner
+    renderer_draw_text(50, 138, "DRAG AMMO TO RELOAD / TAP ENEMY", COLOR_WHITE);
+}
 
-        // ── FORJA (x: 134..170) ──
-        renderer_fill_rect(134, 176, 36, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(134, 176, 36, 14, COLOR_BRASS);
-        renderer_fill_rect(137, 179, 3, 8, COLOR_AMBER);
-        renderer_draw_text(143, 180, "FORJA", COLOR_BRASS);
+void renderer_draw_ui_wave(void) {
+    // Top HUD banner
+    top_fill_rect(0, 0, SCREEN_W, 14, COLOR_BLACK);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "WAVE %d/20", g_game.wave_number);
+    top_draw_text(6, 4, buf, COLOR_AMBER);
 
-        // ── COG 2X (x: 174..196) ──
-        uint16_t ff_led = (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_DARK_GRAY;
-        renderer_fill_rect(174, 176, 22, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(174, 176, 22, 14, COLOR_IRON_LIGHT);
-        renderer_fill_rect(177, 179, 3, 8, ff_led);
-        renderer_draw_text(183, 180, "2X", (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_IRON_LIGHT);
+    int sec_left = g_game.wave_timer / 60;
+    snprintf(buf, sizeof(buf), "TIME: %ds", sec_left);
+    top_draw_text(80, 4, buf, COLOR_WHITE);
 
-        // ── PAUS (x: 199..221) ──
-        renderer_fill_rect(199, 176, 22, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(199, 176, 22, 14, COLOR_IRON_LIGHT);
-        renderer_fill_rect(202, 179, 3, 8, (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_DARK_GRAY);
-        renderer_draw_text(208, 180, "PAU", (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_WHITE);
+    char scrap_buf[32];
+    format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
+    snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
+    top_draw_text(170, 4, buf, COLOR_PHOSPHOR_GREEN);
 
-        // ── PURGA (x: 224..254) — Start wave ──
-        renderer_fill_rect(224, 176, 30, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(224, 176, 30, 14, COLOR_HAZARD_YELLOW);
-        renderer_fill_rect(227, 179, 3, 8, COLOR_LED_GREEN);
-        renderer_draw_text(233, 180, "PURGA", COLOR_HAZARD_YELLOW);
+    // Bottom UI: Ammo crate dock for quick tactile reload
+    renderer_fill_rect(6, 156, 40, 30, COLOR_IRON_PANEL);
+    renderer_draw_rect(6, 156, 40, 30, COLOR_IRON_BORDER);
+    renderer_draw_text(10, 162, "AMMO", COLOR_AMBER);
+    renderer_draw_text(10, 172, "DRAG", COLOR_WHITE);
 
-        // Ghost drag preview
-        if (g_game.is_dragging_new) {
-            int gx = g_game.drag_x;
-            int gy = g_game.drag_y;
-            int valid = game_is_pos_valid(gx, gy);
-            uint16_t ghost_col = valid ? COLOR_HAZARD_YELLOW : COLOR_LED_RED;
-            renderer_draw_circle(gx, gy, 7, ghost_col, 0);
-            renderer_draw_circle(gx, gy, 45, ghost_col, 0);
-        }
-
-    } else if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PAUSED) {
-        // ── WAVE MODE / PAUSED: COG 2X, PAUS, ACTIVA + turret info ──
-
-        // Left side: selected turret info (or hint)
-        if (g_game.selected_turret >= 0 && g_game.selected_turret < MAX_TURRETS && g_turrets[g_game.selected_turret].placed) {
-            Turret *st = &g_turrets[g_game.selected_turret];
-            int deg = (st->center_angle * 360) / 256;
-            int cdeg = (st->sweep_amplitude * 360) / 256;
-            char tinfo[40];
-            snprintf(tinfo, sizeof(tinfo), "#%d EJE:%03d CONO:+-%02d", g_game.selected_turret + 1, deg, cdeg);
-            renderer_draw_text(4, 180, tinfo, COLOR_HAZARD_YELLOW);
-        } else {
-            renderer_draw_text(4, 180, "TOCA TORRETA", COLOR_IRON_LIGHT);
-        }
-
-        // COG 2X (x: 148..170)
-        uint16_t ff_led = (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_DARK_GRAY;
-        renderer_fill_rect(148, 176, 22, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(148, 176, 22, 14, COLOR_IRON_LIGHT);
-        renderer_fill_rect(151, 179, 3, 8, ff_led);
-        renderer_draw_text(157, 180, "2X", (g_game.fast_forward == 2) ? COLOR_AMBER : COLOR_IRON_LIGHT);
-
-        // PAUS (x: 174..196)
-        renderer_fill_rect(174, 176, 22, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(174, 176, 22, 14, COLOR_IRON_LIGHT);
-        renderer_fill_rect(177, 179, 3, 8, (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_DARK_GRAY);
-        renderer_draw_text(183, 180, "PAU", (g_game.mode == MODE_PAUSED) ? COLOR_AMBER : COLOR_WHITE);
-
-        // ACTIVA indicator (x: 199..254)
-        renderer_fill_rect(199, 176, 55, 14, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(199, 176, 55, 14, COLOR_LED_RED);
-        renderer_fill_rect(202, 179, 3, 8, COLOR_LED_RED);
-        renderer_draw_text(208, 180, "COMBATE", COLOR_WHITE);
+    // If currently dragging ammo
+    if (g_game.is_dragging_ammo) {
+        renderer_draw_circle(g_game.drag_x, g_game.drag_y, 8, COLOR_AMBER, 1);
+        renderer_draw_text(g_game.drag_x - 6, g_game.drag_y - 3, "BOX", COLOR_BLACK);
     }
 }
 
-
 void renderer_draw_ui_pause(void) {
-    // Semi-transparent / dithered or solid modal frame in center
-    int mx = 24, my = 50, mw = 208, mh = 90;
-    renderer_fill_rect(mx, my, mw, mh, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(mx, my, mw, mh, COLOR_BRASS);
-    renderer_draw_rect(mx + 2, my + 2, mw - 4, mh - 4, COLOR_IRON_BORDER);
-
-    // Hazard header in pause box
-    renderer_fill_rect(mx + 3, my + 3, mw - 6, 14, COLOR_IRON_PANEL);
-    renderer_draw_text(mx + 26, my + 6, "++ LITURGIA EN SUSPENSION ++", COLOR_AMBER);
-
-    renderer_draw_text(mx + 20, my + 26, "SIMULACION BALISTICA PAUSADA", COLOR_WHITE);
-    renderer_draw_text(mx + 16, my + 38, "AUSPEX COGITATOR EN ESPERA", COLOR_IRON_LIGHT);
-
-    // Resume button
-    renderer_fill_rect(mx + 24, my + 54, 160, 22, COLOR_IRON_PANEL);
-    renderer_draw_rect(mx + 24, my + 54, 160, 22, COLOR_HAZARD_YELLOW);
-    renderer_fill_rect(mx + 28, my + 59, 4, 12, COLOR_LED_GREEN);
-    renderer_draw_text(mx + 40, my + 61, "PULSA [START] O TOCA AQUI", COLOR_HAZARD_YELLOW);
+    renderer_fill_rect(48, 60, 160, 72, COLOR_BLACK);
+    renderer_draw_rect(48, 60, 160, 72, COLOR_AMBER);
+    renderer_draw_text(100, 75, "PAUSED", COLOR_AMBER);
+    renderer_draw_text(70, 95, "PRESS START TO RESUME", COLOR_WHITE);
 }
 
 void renderer_draw_ui_game_over(void) {
-    // Game over modal overlay
-    int mx = 20, my = 40, mw = 216, mh = 112;
-    renderer_fill_rect(mx, my, mw, mh, COLOR_BLACK);
-    renderer_draw_rect(mx, my, mw, mh, COLOR_RED);
-    renderer_draw_rect(mx + 2, my + 2, mw - 4, mh - 4, COLOR_HAZARD_BLACK);
+    renderer_fill_rect(40, 50, 176, 92, COLOR_BLACK);
+    renderer_draw_rect(40, 50, 176, 92, COLOR_LED_RED);
+    renderer_draw_text(85, 65, "SANCTUM FALLEN", COLOR_LED_RED);
+    
+    char buf[64];
+    snprintf(buf, sizeof(buf), "WAVES SURVIVED: %d", g_game.wave_number - 1);
+    renderer_draw_text(65, 85, buf, COLOR_WHITE);
 
-    renderer_fill_rect(mx + 3, my + 3, mw - 6, 16, COLOR_RED);
-    renderer_draw_text(mx + 24, my + 7, "++ BRECHA FATAL EN EL SANCTUM ++", COLOR_WHITE);
+    char scrap_buf[32];
+    format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
+    snprintf(buf, sizeof(buf), "TOTAL SCRAP: %s", scrap_buf);
+    renderer_draw_text(65, 100, buf, COLOR_AMBER);
 
-    char buf[48];
-    snprintf(buf, sizeof(buf), "XENOS PURGADOS : %d BAJAS", g_game.enemies_killed);
-    renderer_draw_text(mx + 16, my + 30, buf, COLOR_WHITE);
-
-    snprintf(buf, sizeof(buf), "ENEMIGOS INFILTRADOS: %d", g_game.enemies_breached);
-    renderer_draw_text(mx + 16, my + 44, buf, COLOR_LED_RED);
-
-    snprintf(buf, sizeof(buf), "DIEZMO RECOLECTADO : %d SC", g_game.scrap);
-    renderer_draw_text(mx + 16, my + 58, buf, COLOR_HAZARD_YELLOW);
-
-    // Retry / Rebuild button
-    renderer_fill_rect(mx + 20, my + 76, 176, 24, COLOR_IRON_PANEL);
-    renderer_draw_rect(mx + 20, my + 76, 176, 24, COLOR_BRASS);
-    renderer_fill_rect(mx + 24, my + 82, 4, 12, COLOR_LED_GREEN);
-    renderer_draw_text(mx + 36, my + 84, "RESTAURAR SANCTUM [TOCAR/A]", COLOR_WHITE);
+    renderer_draw_text(65, 120, "TAP ANYWHERE TO RETRY", COLOR_PHOSPHOR_GREEN);
 }
 
-void renderer_draw_ui_workshop(void) {
-    skills_draw_tree();
-}
+void renderer_draw_ui_upgrades(void) {
+    renderer_fill_rect(0, 0, SCREEN_W, SCREEN_H, COLOR_BLACK);
+    renderer_draw_rect(2, 2, SCREEN_W - 4, SCREEN_H - 4, COLOR_IRON_BORDER);
+    renderer_draw_text(75, 8, "SANCTUM UPGRADES", COLOR_AMBER);
 
-void renderer_draw_ui_calibration(void) {
-    renderer_clear(COLOR_DECK_FLOOR);
+    char scrap_buf[32];
+    format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
+    renderer_draw_text(160, 8, buf, COLOR_PHOSPHOR_GREEN);
 
-    // Header (y: 0..17)
-    renderer_fill_rect(0, 0, SCREEN_W, 18, COLOR_IRON_PANEL);
-    renderer_draw_line(0, 18, SCREEN_W - 1, 18, COLOR_IRON_BORDER);
-    for (int x = 0; x < SCREEN_W; x += 4) {
-        renderer_draw_pixel(x, 17, COLOR_HAZARD_YELLOW);
-        renderer_draw_pixel(x + 1, 17, COLOR_HAZARD_YELLOW);
-    }
-    renderer_draw_text(6, 6, "TUNING DECK - CALIBRACION M1", COLOR_HAZARD_YELLOW);
+    // Tab 1: Caliber
+    renderer_fill_rect(10, 24, 110, 32, COLOR_IRON_PANEL);
+    renderer_draw_rect(10, 24, 110, 32, COLOR_IRON_BORDER);
+    snprintf(buf, sizeof(buf), "CALIBER LV%d", g_game.upgrades.caliber_lvl);
+    renderer_draw_text(14, 28, buf, COLOR_WHITE);
+    renderer_draw_text(14, 40, "+DMG 100$", COLOR_AMBER);
 
-    // [VOLVER] button (x: 202..252, y: 2..15)
-    renderer_fill_rect(202, 2, 50, 14, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(202, 2, 50, 14, COLOR_IRON_LIGHT);
-    renderer_draw_text(208, 6, "VOLVER", COLOR_WHITE);
+    // Tab 2: Cadence
+    renderer_fill_rect(130, 24, 110, 32, COLOR_IRON_PANEL);
+    renderer_draw_rect(130, 24, 110, 32, COLOR_IRON_BORDER);
+    snprintf(buf, sizeof(buf), "FIRE RATE LV%d", g_game.upgrades.firerate_lvl);
+    renderer_draw_text(134, 28, buf, COLOR_WHITE);
+    renderer_draw_text(134, 40, "+ROF 150$", COLOR_AMBER);
 
-    static const char *labels[CALIBRATION_ROWS] = {
-        "ACTIVE MAP",
-        "ENEMY COUNT",
-        "ENEMY HP",
-        "ENEMY SPEED",
-        "T0 LARVA DELAY",
-        "T1 RIPPER DELAY",
-        "T2 GAUNT DELAY",
-        "T3 RAVENER DELAY",
-        "T4 CARNIFEX DLY",
-        "T5 TITAN DELAY",
-        "EXPLOSION FORCE",
-        "TURRET DAMAGE",
-        "TURRET CADENCE",
-        "CONE SPREAD",
-        "SWEEP SPEED",
-        "TURRET RANGE",
-        "STARTING SCRAP",
-        "BASE LIVES"
-    };
+    // Tab 3: Ammo Cap
+    renderer_fill_rect(10, 62, 110, 32, COLOR_IRON_PANEL);
+    renderer_draw_rect(10, 62, 110, 32, COLOR_IRON_BORDER);
+    snprintf(buf, sizeof(buf), "MAG SIZE LV%d", g_game.upgrades.mag_size_lvl);
+    renderer_draw_text(14, 66, buf, COLOR_WHITE);
+    renderer_draw_text(14, 78, "+50 AMMO 80$", COLOR_AMBER);
 
-    static const char *units[CALIBRATION_ROWS] = {
-        "M1",
-        "XENOS",
-        "HP",
-        "PX/F",
-        "FRAMES",
-        "FRAMES",
-        "FRAMES",
-        "FRAMES",
-        "FRAMES",
-        "FRAMES",
-        "X",
-        "DMG",
-        "FRAMES",
-        "DEG",
-        "DEG/F",
-        "PX",
-        "$",
-        "HP"
-    };
+    // Tab 4: Bio Harvest
+    renderer_fill_rect(130, 62, 110, 32, COLOR_IRON_PANEL);
+    renderer_draw_rect(130, 62, 110, 32, COLOR_IRON_BORDER);
+    snprintf(buf, sizeof(buf), "BIO HARVEST LV%d", g_game.upgrades.bio_harvest_lvl);
+    renderer_draw_text(134, 66, buf, COLOR_WHITE);
+    renderer_draw_text(134, 78, "+SCRAP 200$", COLOR_AMBER);
 
-    // Calculate scroll offset to keep selected_row in view
-    // 12 visible rows on screen (y = 22 to 154)
-    int scroll_top = g_calibration.selected_row - 6;
-    if (scroll_top < 0) scroll_top = 0;
-    if (scroll_top > CALIBRATION_ROWS - 12) scroll_top = CALIBRATION_ROWS - 12;
+    // Tab 5: Conveyor Loader (Automation)
+    renderer_fill_rect(10, 100, 110, 32, COLOR_IRON_PANEL);
+    renderer_draw_rect(10, 100, 110, 32, COLOR_IRON_BORDER);
+    snprintf(buf, sizeof(buf), "CONVEYOR LV%d", g_game.upgrades.conveyor_lvl);
+    renderer_draw_text(14, 104, buf, COLOR_WHITE);
+    renderer_draw_text(14, 116, "AUTO-LOAD 500$", COLOR_AMBER);
 
-    char val_buf[16];
-    for (int v = 0; v < 12; v++) {
-        int i = scroll_top + v;
-        int y = 22 + v * 11;
-        int is_sel = (g_calibration.selected_row == i);
+    // Tab 6: Auto Targeting
+    renderer_fill_rect(130, 100, 110, 32, COLOR_IRON_PANEL);
+    renderer_draw_rect(130, 100, 110, 32, COLOR_IRON_BORDER);
+    snprintf(buf, sizeof(buf), "AUTO-TARGET: %s", g_game.upgrades.auto_target ? "ON" : "OFF");
+    renderer_draw_text(134, 104, buf, COLOR_WHITE);
+    renderer_draw_text(134, 116, "COGITATOR 750$", COLOR_AMBER);
 
-        if (is_sel) {
-            renderer_fill_rect(4, y - 1, 240, 10, COLOR_IRON_BORDER);
-            renderer_draw_text(6, y + 1, ">", COLOR_HAZARD_YELLOW);
-        }
-
-        uint16_t txt_col = is_sel ? COLOR_WHITE : COLOR_IRON_LIGHT;
-        renderer_draw_text(14, y + 1, labels[i], txt_col);
-
-        switch (i) {
-            case 0:
-                if (g_calibration.selected_map == 0) sprintf(val_buf, "TRINCHERA");
-                else if (g_calibration.selected_map == 1) sprintf(val_buf, "DOBLE S");
-                else sprintf(val_buf, "ROTONDA");
-                break;
-            case 1:
-                if (g_calibration.enemy_count == 0) sprintf(val_buf, "INF");
-                else sprintf(val_buf, "%d", g_calibration.enemy_count);
-                break;
-            case 2: sprintf(val_buf, "%d", g_calibration.enemy_hp); break;
-            case 3: sprintf(val_buf, "%d.%d", g_calibration.enemy_speed_int / 10, g_calibration.enemy_speed_int % 10); break;
-
-            // Per-variant spawn delays (0 = OFF)
-            case 4: case 5: case 6: case 7: case 8: case 9:
-                {
-                    int var_idx = i - 4;
-                    int dly = g_calibration.spawn_delay[var_idx];
-                    if (dly == 0) sprintf(val_buf, "OFF");
-                    else sprintf(val_buf, "%d", dly);
-                }
-                break;
-
-            case 10: sprintf(val_buf, "%d", g_calibration.explosion_force); break;
-            case 11: sprintf(val_buf, "%d", g_calibration.turret_damage); break;
-            case 12: sprintf(val_buf, "%d", g_calibration.turret_fire_rate); break;
-            case 13: sprintf(val_buf, "%d", g_calibration.cone_spread); break;
-            case 14: sprintf(val_buf, "%d", g_calibration.sweep_speed); break;
-            case 15: sprintf(val_buf, "%d", g_calibration.turret_range); break;
-            case 16: sprintf(val_buf, "%d", g_calibration.starting_scrap); break;
-            case 17: sprintf(val_buf, "%d", g_calibration.core_lives); break;
-            default: sprintf(val_buf, "0"); break;
-        }
-
-        // [-] touch button
-        renderer_fill_rect(108, y, 10, 8, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(108, y, 10, 8, is_sel ? COLOR_AMBER : COLOR_DARK_GRAY);
-        renderer_draw_text(111, y + 1, "-", COLOR_WHITE);
-
-        // Value text
-        renderer_draw_text(122, y + 1, val_buf, is_sel ? COLOR_HAZARD_YELLOW : COLOR_WHITE);
-
-        // [+] touch button
-        renderer_fill_rect(190, y, 10, 8, COLOR_HAZARD_BLACK);
-        renderer_draw_rect(190, y, 10, 8, is_sel ? COLOR_AMBER : COLOR_DARK_GRAY);
-        renderer_draw_text(193, y + 1, "+", COLOR_WHITE);
-
-        // Unit
-        renderer_draw_text(204, y + 1, units[i], COLOR_DARK_GRAY);
-    }
-
-    // Vertical Scroll Bar Indicator (x: 248, y: 22..154)
-    renderer_fill_rect(248, 22, 3, 132, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(248, 22, 3, 132, COLOR_IRON_BORDER);
-    int thumb_h = (12 * 132) / CALIBRATION_ROWS;
-    int thumb_y = 22 + (scroll_top * (132 - thumb_h)) / (CALIBRATION_ROWS - 12);
-    renderer_fill_rect(248, thumb_y, 3, thumb_h, COLOR_HAZARD_YELLOW);
-
-    // Bottom Controls Bar (y: 158..191)
-    renderer_fill_rect(0, 158, SCREEN_W, 34, COLOR_IRON_PANEL);
-    renderer_draw_line(0, 158, SCREEN_W - 1, 158, COLOR_IRON_BORDER);
-
-    renderer_draw_text(6, 160, "CRUCETA: +/-1  L/R: +/-5  Y: RESET", COLOR_IRON_LIGHT);
-
-    // [DEFAULT (Y)] Button
-    renderer_fill_rect(6, 170, 76, 19, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(6, 170, 76, 19, COLOR_IRON_LIGHT);
-    renderer_draw_text(10, 176, "RESET [Y]", COLOR_WHITE);
-
-    // [PROBAR PARTIDA (A)] Button
-    renderer_fill_rect(86, 170, 164, 19, COLOR_HAZARD_BLACK);
-    renderer_draw_rect(86, 170, 164, 19, COLOR_HAZARD_YELLOW);
-    renderer_fill_rect(90, 174, 6, 11, COLOR_LED_GREEN);
-    renderer_draw_text(102, 176, "PROBAR PARTIDA [A]", COLOR_HAZARD_YELLOW);
+    // Return button
+    renderer_fill_rect(90, 150, 76, 28, COLOR_LED_GREEN);
+    renderer_draw_rect(90, 150, 76, 28, COLOR_WHITE);
+    renderer_draw_text(108, 160, "BACK", COLOR_BLACK);
 }
 
 void renderer_present(void) {
-    swiWaitForVBlank();
     dmaCopyWords(3, g_backbuffer, VRAM_A, sizeof(g_backbuffer));
+}
+
+void top_screen_present(void) {
+    if (s_top_vram) {
+        dmaCopyWords(1, g_top_backbuffer, s_top_vram, sizeof(g_top_backbuffer));
+    }
 }
