@@ -350,7 +350,8 @@ void game_update_simulation(void) {
             if (g_game.wave_spawn_timer_tier[t] >= interval) {
                 g_game.wave_spawn_timer_tier[t] = 0;
                 g_game.wave_spawned_tier[t]++;
-                int hp = wdef->tiers[t].hp;
+                /* Base enemy HP is constant; waves tune composition and timing. */
+                int hp = (int)g_balance.enemy_hp[t];
                 if (hp < 1) hp = 1;
             spawn_enemy(t, hp, wdef->tiers[t].speed);
             }
