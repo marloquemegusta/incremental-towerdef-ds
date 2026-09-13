@@ -59,6 +59,9 @@ static const GameBalanceConfig s_default_balance = {
     .turret_magazine = { 20, 35, 50, 70, 100, 150 },
     .bunker_start_hp = 100, .wave_duration_frames = 1800,
     .wave_bonus_base = 10, .wave_bonus_per_wave = 5,
+    .enemy_bite_damage = { 1, 3, 5, 7, 9, 11 },
+    .enemy_bite_interval = { 45, 45, 45, 45, 45, 45 },
+    .conveyor_reload_interval = { 9999, 60, 20, 10 },
     .magic = 0x544F5744 // "TOWD"
 };
 
@@ -499,8 +502,7 @@ void game_update_simulation(void) {
 
         // Conveyor passive reloading (Branch C): 1/s, 3/s, 6/s
         if (g_game.upgrades.conveyor_lvl > 0 && tur->ammo < tur->max_ammo) {
-            static const int s_rates[4] = { 9999, 60, 20, 10 };
-            int rate = (g_game.upgrades.conveyor_lvl <= 3) ? s_rates[g_game.upgrades.conveyor_lvl] : 10;
+            int rate = (g_game.upgrades.conveyor_lvl <= 3) ? g_balance.conveyor_reload_interval[g_game.upgrades.conveyor_lvl] : g_balance.conveyor_reload_interval[3];
             if (g_game.sim_ticks_elapsed % rate == 0) {
                 tur->ammo++;
             }

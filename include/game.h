@@ -176,6 +176,9 @@ typedef struct {
     int wave_duration_frames;
     int wave_bonus_base;
     int wave_bonus_per_wave;
+    int enemy_bite_damage[6];
+    int enemy_bite_interval[6];
+    int conveyor_reload_interval[4];
     uint32_t magic;           // 0x544F5744 ("TOWD")
 } GameBalanceConfig;
 
