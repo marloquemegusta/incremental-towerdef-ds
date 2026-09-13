@@ -52,7 +52,7 @@ static const GameBalanceConfig s_default_balance = {
     },
     .enemy_hp = { 1, 8, 40, 160, 2500, 40000 },
     .enemy_scrap = { 1, 3, 10, 60, 750, 20000 },
-    .upgrade_costs = { {15,25,40,65,100}, {20,30,45,70,110}, {15,25,35,55,85}, {25,40,65,105,170}, {50,90,160,0,0}, {80,0,0,0,0} },
+    .upgrade_costs = { {15,25,40,65,100}, {20,30,45,70,110}, {15,25,35,55,85}, {25,40,65,105,170}, {50,90,160,0,0}, {80,0,0,0,0}, {200,400,800,1600,0} },
     .turret_damage = { 2, 3, 4, 6, 8 },
     .turret_fire_interval = { 18, 14, 10, 7, 5 },
     .turret_range = { 65, 80, 100, 125, 150 },
@@ -858,10 +858,11 @@ void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_he
 
 uint64_t upgrade_get_cost(int idx) {
     /* Costs are part of the persisted balance so calibration can tune them. */
-    if (idx >= 0 && idx < 6) {
-        int levels[6] = { g_game.upgrades.caliber_lvl, g_game.upgrades.firerate_lvl,
+    if (idx >= 0 && idx < 7) {
+        int levels[7] = { g_game.upgrades.caliber_lvl, g_game.upgrades.firerate_lvl,
             g_game.upgrades.mag_size_lvl, g_game.upgrades.bio_harvest_lvl,
-            g_game.upgrades.conveyor_lvl, g_game.upgrades.auto_target };
+            g_game.upgrades.conveyor_lvl, g_game.upgrades.auto_target,
+            g_game.upgrades.extra_turrets };
         int level = levels[idx];
         if (level >= 0 && level < 5 && g_balance.upgrade_costs[idx][level] > 0)
             return g_balance.upgrade_costs[idx][level];
@@ -929,6 +930,24 @@ void upgrade_purchase(int idx) {
         case 3: g_game.upgrades.bio_harvest_lvl++; break;
         case 4: g_game.upgrades.conveyor_lvl++; break;
         case 5: g_game.upgrades.auto_target = 1; break;
+        case 6:
+            g_game.upgrades.extra_turrets++;
+            if (g_game.upgrades.extra_turrets > MAX_TURRETS - 1) g_game.upgrades.extra_turrets = MAX_TURRETS - 1;
+            for (int t = 1; t <= g_game.upgrades.extra_turrets && t < MAX_TURRETS; t++) {
+                if (!g_turrets[t].placed) {
+                    static const int sx[3] = { 82, 174, 128 };
+                    static const int sy[3] = { 110, 110, 86 };
+                    g_turrets[t].id = t; g_turrets[t].type = TURRET_TYPE_BOLTER;
+                    g_turrets[t].x = sx[t - 1]; g_turrets[t].y = sy[t - 1];
+                    g_turrets[t].current_angle = 192; g_turrets[t].target_angle = 192;
+                    g_turrets[t].range = g_balance.turret_range[g_game.upgrades.range_lvl < 5 ? g_game.upgrades.range_lvl : 4];
+                    g_turrets[t].placed = 1; g_turrets[t].active = 1; g_turrets[t].hp = 50; g_turrets[t].max_hp = 50;
+                    g_turrets[t].ammo = g_balance.turret_magazine[g_game.upgrades.mag_size_lvl < 6 ? g_game.upgrades.mag_size_lvl : 5];
+                    g_turrets[t].max_ammo = g_turrets[t].ammo; g_turrets[t].fire_interval = g_balance.turret_fire_interval[0];
+                    g_turrets[t].locked_enemy_idx = -1;
+                }
+            }
+            break;
     }
 }
 
@@ -940,7 +959,7 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
 
     if (keys_down & KEY_TOUCH) {
         // Return button: (90, 150, 76, 28)
-        if (touch.px >= 85 && touch.px <= 170 && touch.py >= 145 && touch.py <= 180) {
+        if (touch.px >= 125 && touch.px <= 210 && touch.py >= 170 && touch.py <= 191) {
             g_game.mode = g_game.previous_mode;
             return;
         }
@@ -968,6 +987,10 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
         // Tab 6: Auto Target (130, 100, 110, 32)
         else if (touch.px >= 130 && touch.px <= 240 && touch.py >= 100 && touch.py <= 132) {
             upgrade_purchase(5);
+        }
+        // Tab 7: Extra turrets (10, 138, 110, 32)
+        else if (touch.px >= 10 && touch.px <= 120 && touch.py >= 136 && touch.py <= 172) {
+            upgrade_purchase(6);
         }
     }
 }
@@ -1119,7 +1142,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row on the current page.
-    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 48 : 30);
+    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 48 : 35);
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
     }

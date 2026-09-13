@@ -167,7 +167,7 @@ typedef struct {
     WaveDef waves[20];
     uint32_t enemy_hp[6];
     uint32_t enemy_scrap[6];
-    uint64_t upgrade_costs[6][5];
+    uint64_t upgrade_costs[7][5];
     int turret_damage[5];
     int turret_fire_interval[5];
     int turret_range[5];

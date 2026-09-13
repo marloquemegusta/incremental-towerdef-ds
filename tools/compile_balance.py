@@ -35,12 +35,12 @@ def compile_balance(root, output):
 
     with (cfg / "upgrades.csv").open(newline="", encoding="utf-8-sig") as f:
         upgrades = list(csv.DictReader(f))
-    if len(upgrades) != 6 or [int(r["upgrade_id"]) for r in upgrades] != list(range(6)):
-        raise ValueError("upgrades.csv debe contener las mejoras 0..5")
+    if len(upgrades) != 7 or [int(r["upgrade_id"]) for r in upgrades] != list(range(7)):
+        raise ValueError("upgrades.csv debe contener las mejoras 0..6")
     costs = []
     for row in upgrades:
         costs.extend(int(row[f"cost_{i}"] or 0) for i in range(5))
-    blob += struct.pack("<30Q", *costs)
+    blob += struct.pack("<35Q", *costs)
     blob += struct.pack("<5i", 2, 3, 4, 6, 8)
     blob += struct.pack("<5i", 18, 14, 10, 7, 5)
     blob += struct.pack("<5i", 65, 80, 100, 125, 150)
