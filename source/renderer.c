@@ -567,7 +567,7 @@ void renderer_draw_ui_calibration(void) {
 
     // Title banner
     renderer_draw_text(6, 4, "CALIBRATION", COLOR_AMBER);
-    renderer_draw_text(164, 4, "X/Y NEXT", COLOR_WHITE);
+    renderer_draw_text(150, 4, "X PREV Y NEXT", COLOR_WHITE);
     if (g_game.calib_saved_timer > 0) {
         g_game.calib_saved_timer--;
         renderer_draw_text(180, 4, "SAVED (SD)", COLOR_PHOSPHOR_GREEN);
@@ -575,8 +575,10 @@ void renderer_draw_ui_calibration(void) {
 
     if (g_game.calib_page != 0) {
         char buf[64];
-        const char *title = (g_game.calib_page == 1) ? "GLOBAL / TURRET (Y=NEXT)" : "UPGRADE COSTS (Y=NEXT)";
+        const char *title = (g_game.calib_page == 1) ? "GLOBAL / TURRET" : "UPGRADE COSTS";
         renderer_draw_text(6, 18, title, COLOR_WHITE);
+        snprintf(buf, sizeof(buf), "PAGE %d/3", g_game.calib_page + 1);
+        renderer_draw_text(190, 18, buf, COLOR_AMBER);
         int first = (g_game.calib_page == 1) ? (g_game.calib_row / 10) * 10 : (g_game.calib_row / 10) * 10;
         int last = (g_game.calib_page == 1) ? 48 : 30;
         static const char *global_labels[48] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4", "RANGE LV0", "RANGE LV1", "RANGE LV2", "RANGE LV3", "RANGE LV4", "LARVA HP", "RIPPER HP", "HORMAGAUNT HP", "RAVENER HP", "CARNIFEX HP", "HIEROPHANT HP", "LARVA SCRAP", "RIPPER SCRAP", "HORMAGAUNT SCRAP", "RAVENER SCRAP", "CARNIFEX SCRAP", "HIEROPHANT SCRAP", "LARVA BITE DMG", "RIPPER BITE DMG", "HORMAGAUNT BITE DMG", "RAVENER BITE DMG", "CARNIFEX BITE DMG", "HIEROPHANT BITE DMG", "CONVEYOR LV0", "CONVEYOR LV1", "CONVEYOR LV2", "CONVEYOR LV3", "LARVA BITE FRAMES", "RIPPER BITE FRAMES", "HORMAGAUNT BITE FRAMES", "RAVENER BITE FRAMES", "CARNIFEX BITE FRAMES", "HIEROPHANT BITE FRAMES", "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4", "MAGAZINE LV5" };
@@ -602,7 +604,7 @@ void renderer_draw_ui_calibration(void) {
             else { snprintf(buf, sizeof(buf), "UPG %d LEVEL %d", r / 5, r % 5); renderer_draw_text(10, y + 2, buf, COLOR_WHITE); }
             snprintf(buf, sizeof(buf), "%d  [-] [+]", val); renderer_draw_text(150, y + 2, buf, COLOR_PHOSPHOR_GREEN);
         }
-        renderer_draw_text(8, 166, "Y NEXT PAGE   B BACK   UP/DN SELECT", COLOR_AMBER);
+        renderer_draw_text(8, 166, "X PREV  Y NEXT  B BACK", COLOR_AMBER);
         renderer_draw_text(8, 178, "LEFT/RIGHT EDIT - AUTO SAVE", COLOR_PHOSPHOR_GREEN);
         return;
     }
