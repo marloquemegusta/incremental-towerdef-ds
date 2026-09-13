@@ -566,7 +566,8 @@ void renderer_draw_ui_calibration(void) {
     renderer_draw_rect(2, 2, SCREEN_W - 4, SCREEN_H - 4, COLOR_IRON_BORDER);
 
     // Title banner
-    renderer_draw_text(6, 4, "WAVE CALIBRATION", COLOR_AMBER);
+    renderer_draw_text(6, 4, "CALIBRATION", COLOR_AMBER);
+    renderer_draw_text(164, 4, "X/Y NEXT", COLOR_WHITE);
     if (g_game.calib_saved_timer > 0) {
         g_game.calib_saved_timer--;
         renderer_draw_text(180, 4, "SAVED (SD)", COLOR_PHOSPHOR_GREEN);

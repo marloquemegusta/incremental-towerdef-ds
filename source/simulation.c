@@ -1088,7 +1088,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         return;
     }
 
-    if (keys_down & KEY_Y) {
+    if (keys_down & (KEY_Y | KEY_X)) {
         g_game.calib_page = (g_game.calib_page + 1) % 3;
         g_game.calib_row = 0;
     }
@@ -1137,6 +1137,12 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
 
     // Touch controls
     if (keys_down & KEY_TOUCH) {
+        // Visible page navigation fallback: touch the header.
+        if (touch.py >= 0 && touch.py <= 27 && touch.px >= 150 && touch.px <= 255) {
+            g_game.calib_page = (g_game.calib_page + 1) % 3;
+            g_game.calib_row = 0;
+            return;
+        }
         // Navigation buttons [<] (10..40, 18..34) and [>] (215..245, 18..34) for Wave
         if (touch.py >= 16 && touch.py <= 34) {
             if (touch.px >= 8 && touch.px <= 42) { // [<]
