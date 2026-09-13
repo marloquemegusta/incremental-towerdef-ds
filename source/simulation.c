@@ -993,13 +993,15 @@ static void calib_modify_val(int delta) {
         else if (g_game.calib_row >= 14 && g_game.calib_row < 20) {
             int i = g_game.calib_row - 14;
             int n = (int)g_balance.enemy_hp[i] + delta;
-            if (n < 1) n = 1; if (n > 999999) n = 999999;
+            if (n < 1) n = 1;
+            if (n > 999999) n = 999999;
             g_balance.enemy_hp[i] = (uint32_t)n;
         }
         else if (g_game.calib_row >= 20 && g_game.calib_row < 26) {
             int i = g_game.calib_row - 20;
             int n = (int)g_balance.enemy_scrap[i] + delta;
-            if (n < 0) n = 0; if (n > 999999) n = 999999;
+            if (n < 0) n = 0;
+            if (n > 999999) n = 999999;
             g_balance.enemy_scrap[i] = (uint32_t)n;
         }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
