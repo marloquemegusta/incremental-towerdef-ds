@@ -249,6 +249,17 @@ void game_init(void) {
     g_game.upgrades.conveyor_lvl = 0; // Starts requiring manual ammo drag!
     g_game.upgrades.extra_turrets = 0;
 
+    // Debug Sandbox test defaults
+    g_game.sandbox.enemy_tier = 1;
+    g_game.sandbox.enemy_hp = 10;
+    g_game.sandbox.enemy_speed = 30;
+    g_game.sandbox.turret_firerate = 10;
+    g_game.sandbox.turret_range = 80;
+    g_game.sandbox.turret_damage = 5;
+    g_game.sandbox.turret_infinite_ammo = 1;
+    g_game.sandbox.run_sim = 1;
+    g_game.sandbox.edit_row = 0;
+
     // Initial Turret #0: Deployed right in front of the Sanctum
     g_turrets[0].id = 0;
     g_turrets[0].type = TURRET_TYPE_BOLTER;
@@ -326,7 +337,7 @@ void game_reset_to_prep(void) {
 }
 
 void game_update_simulation(void) {
-    if (g_game.mode != MODE_WAVE) return;
+    if (g_game.mode != MODE_WAVE && g_game.mode != MODE_DEBUG_SANDBOX) return;
 
     g_game.sim_ticks_elapsed++;
     if (g_game.wave_timer > 0) g_game.wave_timer--;
@@ -424,9 +435,12 @@ void game_update_simulation(void) {
             continue; // Stop advancing while biting
         }
 
-        // Compute base movement speed
-        int spd = (g_enemies[i].speed * FP_ONE) / 60;
-        if (spd < 1) spd = 1;
+        // Compute base movement speed (0 = stationary frozen dummy in sandbox)
+        int spd = 0;
+        if (g_enemies[i].speed > 0) {
+            spd = (g_enemies[i].speed * FP_ONE) / 60;
+            if (spd < 1) spd = 1;
+        }
 
         // Check if reaching Bunker Sanctum baseline (py >= 344):
         // Never teleport! If outside the bunker front width (104..152), walk purely horizontally.
@@ -455,12 +469,14 @@ void game_update_simulation(void) {
             if (g_enemies[i].bite_timer >= 40) {
                 g_enemies[i].bite_timer = 0;
                 uint64_t bite_dmg = 1 + g_enemies[i].variant * 2;
-                if (g_game.bunker_hp > bite_dmg) {
-                    g_game.bunker_hp -= bite_dmg;
-                } else {
-                    g_game.bunker_hp = 0;
-                    g_game.mode = MODE_GAME_OVER;
-                    return;
+                if (g_game.mode != MODE_DEBUG_SANDBOX) {
+                    if (g_game.bunker_hp > bite_dmg) {
+                        g_game.bunker_hp -= bite_dmg;
+                    } else {
+                        g_game.bunker_hp = 0;
+                        g_game.mode = MODE_GAME_OVER;
+                        return;
+                    }
                 }
             }
             continue;
@@ -472,7 +488,7 @@ void game_update_simulation(void) {
         g_enemies[i].vx = 0;
 
         // Funnel X towards Sanctum bunker front ONLY in lower bottom screen (py > 255)
-        if (py > 255) {
+        if (spd > 0 && py > 255) {
             // Distribute across bunker front width (x: 110..146) based on initial lane
             int target_x = TO_FP(110 + ((ex >> FP_SHIFT) * 36) / 256);
             int h_spd = spd / 3;
@@ -523,10 +539,17 @@ void game_update_simulation(void) {
             }
         }
 
-        // Dynamic range based on upgrade
-        static const int s_ranges[5] = { 65, 80, 100, 125, 150 };
-        int r_lvl = g_game.upgrades.range_lvl;
-        tur->range = (r_lvl < 5) ? s_ranges[r_lvl] : 150;
+        // Dynamic range based on upgrade (or sandbox override)
+        if (g_game.mode == MODE_DEBUG_SANDBOX) {
+            tur->range = g_game.sandbox.turret_range;
+            if (g_game.sandbox.turret_infinite_ammo) {
+                tur->ammo = tur->max_ammo;
+            }
+        } else {
+            static const int s_ranges[5] = { 65, 80, 100, 125, 150 };
+            int r_lvl = g_game.upgrades.range_lvl;
+            tur->range = (r_lvl < 5) ? s_ranges[r_lvl] : 150;
+        }
 
         // Target selection
         int target_enemy = -1;
@@ -561,6 +584,25 @@ void game_update_simulation(void) {
                     if (dx * dx + dy * dy <= tur->range * tur->range) {
                         target_enemy = tur->locked_enemy_idx;
                     }
+                }
+            }
+        }
+
+        // In debug sandbox: auto-acquire closest enemy within range if none locked
+        if (target_enemy < 0 && g_game.mode == MODE_DEBUG_SANDBOX) {
+            int closest_dist_sq = tur->range * tur->range;
+            for (int e = 0; e < MAX_ENEMIES; e++) {
+                if (!g_enemies[e].active) continue;
+                int gy = FROM_FP(g_enemies[e].y);
+                if (gy < 192) continue;
+                int local_y = gy - 192;
+                int gx = FROM_FP(g_enemies[e].x);
+                int dx = gx - tur->x;
+                int dy = local_y - tur->y;
+                int dsq = dx * dx + dy * dy;
+                if (dsq <= closest_dist_sq) {
+                    closest_dist_sq = dsq;
+                    target_enemy = e;
                 }
             }
         }
@@ -602,7 +644,8 @@ void game_update_simulation(void) {
                 } else {
                     static const int s_intervals[5] = { 18, 14, 10, 7, 5 };
                     int f_lvl = g_game.upgrades.firerate_lvl;
-                    int interval = (f_lvl < 5) ? s_intervals[f_lvl] : 5;
+                    int interval = (g_game.mode == MODE_DEBUG_SANDBOX) ? g_game.sandbox.turret_firerate :
+                                   ((f_lvl < 5) ? s_intervals[f_lvl] : 5);
                     tur->fire_cooldown = interval;
                     tur->flash_timer = 3;
                     tur->ammo--;
@@ -630,7 +673,8 @@ void game_update_simulation(void) {
                     // Multiplicative damage: Base 2 -> 3 -> 4 -> 6 -> 8
                     static const uint64_t s_dmg[5] = { 2, 3, 4, 6, 8 };
                     int c_lvl = g_game.upgrades.caliber_lvl;
-                    uint64_t dmg = (c_lvl < 5) ? s_dmg[c_lvl] : 8;
+                    uint64_t dmg = (g_game.mode == MODE_DEBUG_SANDBOX) ? (uint64_t)g_game.sandbox.turret_damage :
+                                   ((c_lvl < 5) ? s_dmg[c_lvl] : 8);
 
                     spawn_bullet(bx, by, fire_angle, t, dmg);
                     tur->shots_fired++;
@@ -738,8 +782,8 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
         return;
     }
 
-    // X or SELECT opens upgrades
-    if (keys_down & (KEY_X | KEY_SELECT)) {
+    // X opens upgrades (SELECT handled in main loop)
+    if (keys_down & KEY_X) {
         g_game.previous_mode = g_game.mode;
         g_game.mode = MODE_UPGRADES;
         return;
@@ -755,23 +799,37 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
     s_prep_touching = is_touch;
 
     if (touch_press) {
-        // [START] Button: drawn at (190, 150, 60, 36) -> generous hitbox (180..255, 144..191)
-        if (touch.px >= 180 && touch.px <= 255 && touch.py >= 144 && touch.py <= 191) {
+        // [START] Button: drawn at (190, 150, 60, 36) -> hitbox (190..255, 144..191)
+        if (touch.px >= 190 && touch.px <= 255 && touch.py >= 144 && touch.py <= 191) {
             game_start_wave();
             return;
         }
 
-        // [UPGRADES] Button: drawn at (55, 156, 50, 24) -> hitbox (50..105, 144..191)
-        if (touch.px >= 50 && touch.px <= 105 && touch.py >= 144 && touch.py <= 191) {
+        // [UPGRADES] Button: drawn at (54, 156, 48, 24) -> hitbox (52..104, 144..191)
+        if (touch.px >= 52 && touch.px <= 104 && touch.py >= 144 && touch.py <= 191) {
             g_game.previous_mode = g_game.mode;
             g_game.mode = MODE_UPGRADES;
             return;
         }
 
-        // [CALIB] Button: drawn at (112, 156, 44, 24) -> hitbox (108..160, 144..191)
-        if (touch.px >= 108 && touch.px <= 160 && touch.py >= 144 && touch.py <= 191) {
+        // [CALIB] Button: drawn at (108, 156, 36, 24) -> hitbox (106..145, 144..191)
+        if (touch.px >= 106 && touch.px <= 145 && touch.py >= 144 && touch.py <= 191) {
             g_game.previous_mode = g_game.mode;
             g_game.mode = MODE_CALIBRATION;
+            return;
+        }
+
+        // [SANDBOX] Button: drawn at (148, 156, 36, 24) -> hitbox (146..188, 144..191)
+        if (touch.px >= 146 && touch.px <= 188 && touch.py >= 144 && touch.py <= 191) {
+            g_game.previous_mode = g_game.mode;
+            g_game.mode = MODE_DEBUG_SANDBOX;
+            if (!g_turrets[0].placed) {
+                g_turrets[0].placed = 1;
+                g_turrets[0].x = 128;
+                g_turrets[0].y = 104;
+                g_turrets[0].ammo = 50;
+                g_turrets[0].max_ammo = 50;
+            }
             return;
         }
 
@@ -1158,6 +1216,179 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         // [BACK / RESUME] (175..248, 160..186)
         if (touch.px >= 175 && touch.px <= 248 && touch.py >= 158 && touch.py <= 186) {
             g_game.mode = g_game.previous_mode;
+            return;
+        }
+    }
+}
+
+
+void game_sandbox_spawn_enemy(int x, int y) {
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (!g_enemies[i].active) {
+            g_enemies[i].active = 1;
+            g_enemies[i].variant = g_game.sandbox.enemy_tier;
+            g_enemies[i].hp = g_game.sandbox.enemy_hp;
+            g_enemies[i].max_hp = g_game.sandbox.enemy_hp;
+            g_enemies[i].x = TO_FP(x);
+            g_enemies[i].y = TO_FP(y);
+            g_enemies[i].speed = g_game.sandbox.enemy_speed;
+            g_enemies[i].dir = 1; // South
+            g_enemies[i].anim_frame = 0;
+            g_enemies[i].biting_target = -1;
+            g_enemies[i].bite_timer = 0;
+            g_enemies[i].vx = 0;
+            g_enemies[i].vy = (g_enemies[i].speed * FP_ONE) / 60;
+            g_game.enemies_alive++;
+            g_game.sandbox.spawn_count++;
+            break;
+        }
+    }
+}
+
+void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held) {
+    // START toggles live simulation running / paused
+    if (keys_down & KEY_START) {
+        g_game.sandbox.run_sim = !g_game.sandbox.run_sim;
+        return;
+    }
+
+    // Y advances exactly 1 frame (single step execution)
+    if (keys_down & KEY_Y) {
+        game_update_simulation();
+        return;
+    }
+
+    // X clears all battlefield entities
+    if (keys_down & KEY_X) {
+        memset(g_enemies, 0, sizeof(g_enemies));
+        memset(g_bullets, 0, sizeof(g_bullets));
+        g_game.enemies_alive = 0;
+        return;
+    }
+
+    // D-Pad UP / DOWN selects parameter row (0..5)
+    if (keys_down & KEY_UP) {
+        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 5) % 6;
+    } else if (keys_down & KEY_DOWN) {
+        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 1) % 6;
+    }
+
+    // D-Pad LEFT / RIGHT adjusts selected parameter
+    int delta = 0;
+    if (keys_down & KEY_LEFT) delta = -1;
+    else if (keys_down & KEY_RIGHT) delta = 1;
+
+    if (delta != 0) {
+        switch (g_game.sandbox.edit_row) {
+            case 0: { // Enemy Tier (0..5)
+                int t = g_game.sandbox.enemy_tier + delta;
+                if (t < 0) t = 0;
+                if (t >= ENEMY_VARIANT_COUNT) t = ENEMY_VARIANT_COUNT - 1;
+                g_game.sandbox.enemy_tier = t;
+                break;
+            }
+            case 1: { // Enemy HP
+                static const int s_hp_steps[] = { 1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000 };
+                int idx = 2;
+                for (int j = 0; j < 10; j++) {
+                    if (s_hp_steps[j] == g_game.sandbox.enemy_hp) { idx = j; break; }
+                }
+                idx += delta;
+                if (idx < 0) idx = 0;
+                if (idx > 9) idx = 9;
+                g_game.sandbox.enemy_hp = s_hp_steps[idx];
+                break;
+            }
+            case 2: { // Enemy Speed
+                static const int s_spd_steps[] = { 0, 15, 30, 45, 60, 90, 120, 180 };
+                int idx = 2;
+                for (int j = 0; j < 8; j++) {
+                    if (s_spd_steps[j] == g_game.sandbox.enemy_speed) { idx = j; break; }
+                }
+                idx += delta;
+                if (idx < 0) idx = 0;
+                if (idx > 7) idx = 7;
+                g_game.sandbox.enemy_speed = s_spd_steps[idx];
+                break;
+            }
+            case 3: { // Turret Range
+                static const int s_rng_steps[] = { 40, 65, 80, 100, 125, 150, 200 };
+                int idx = 2;
+                for (int j = 0; j < 7; j++) {
+                    if (s_rng_steps[j] == g_game.sandbox.turret_range) { idx = j; break; }
+                }
+                idx += delta;
+                if (idx < 0) idx = 0;
+                if (idx > 6) idx = 6;
+                g_game.sandbox.turret_range = s_rng_steps[idx];
+                break;
+            }
+            case 4: { // Turret Fire Interval (cadence)
+                static const int s_int_steps[] = { 1, 3, 5, 8, 12, 18, 25, 35 };
+                int idx = 4;
+                for (int j = 0; j < 8; j++) {
+                    if (s_int_steps[j] == g_game.sandbox.turret_firerate) { idx = j; break; }
+                }
+                idx += delta;
+                if (idx < 0) idx = 0;
+                if (idx > 7) idx = 7;
+                g_game.sandbox.turret_firerate = s_int_steps[idx];
+                break;
+            }
+            case 5: { // Turret Damage
+                static const int s_dmg_steps[] = { 1, 2, 3, 5, 10, 20, 50, 100 };
+                int idx = 3;
+                for (int j = 0; j < 8; j++) {
+                    if (s_dmg_steps[j] == g_game.sandbox.turret_damage) { idx = j; break; }
+                }
+                idx += delta;
+                if (idx < 0) idx = 0;
+                if (idx > 7) idx = 7;
+                g_game.sandbox.turret_damage = s_dmg_steps[idx];
+                break;
+            }
+        }
+    }
+
+    // Touch handling
+    static int s_sb_touching = 0;
+    int is_touch = (keys_held & KEY_TOUCH) || (touch.px > 0 && touch.py > 0);
+    int touch_press = ((keys_down & KEY_TOUCH) || (is_touch && !s_sb_touching));
+    s_sb_touching = is_touch;
+
+    if (touch_press) {
+        // Bottom control bar buttons:
+        if (touch.py >= 148) {
+            // [CLEAR] (6..50)
+            if (touch.px >= 6 && touch.px <= 50) {
+                memset(g_enemies, 0, sizeof(g_enemies));
+                memset(g_bullets, 0, sizeof(g_bullets));
+                g_game.enemies_alive = 0;
+                return;
+            }
+            // [RUN/PAUSE] (54..110)
+            if (touch.px >= 54 && touch.px <= 110) {
+                g_game.sandbox.run_sim = !g_game.sandbox.run_sim;
+                return;
+            }
+            // [STEP 1F] (114..160)
+            if (touch.px >= 114 && touch.px <= 160) {
+                game_update_simulation();
+                return;
+            }
+            // [INF AMMO] (164..205)
+            if (touch.px >= 164 && touch.px <= 205) {
+                g_game.sandbox.turret_infinite_ammo = !g_game.sandbox.turret_infinite_ammo;
+                return;
+            }
+            // [EXIT] (210..252)
+            if (touch.px >= 210 && touch.px <= 252) {
+                g_game.mode = g_game.previous_mode;
+                return;
+            }
+        } else {
+            // Touch in battlefield: spawn chosen enemy right at touch coordinates!
+            game_sandbox_spawn_enemy(touch.px, touch.py);
             return;
         }
     }
