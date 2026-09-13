@@ -1016,6 +1016,11 @@ static void calib_modify_val(int delta) {
             g_balance.conveyor_reload_interval[i] += delta * 5;
             if (g_balance.conveyor_reload_interval[i] < 1) g_balance.conveyor_reload_interval[i] = 1;
         }
+        else if (g_game.calib_row >= 36 && g_game.calib_row < 42) {
+            int i = g_game.calib_row - 36;
+            g_balance.enemy_bite_interval[i] += delta;
+            if (g_balance.enemy_bite_interval[i] < 1) g_balance.enemy_bite_interval[i] = 1;
+        }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
     }
     if (g_game.calib_page == 2) {
@@ -1097,7 +1102,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row on the current page.
-    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 36 : 30);
+    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 42 : 30);
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
     }
