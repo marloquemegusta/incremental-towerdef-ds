@@ -577,8 +577,8 @@ void renderer_draw_ui_calibration(void) {
         const char *title = (g_game.calib_page == 1) ? "GLOBAL / TURRET (Y=NEXT)" : "UPGRADE COSTS (Y=NEXT)";
         renderer_draw_text(6, 18, title, COLOR_WHITE);
         int first = (g_game.calib_page == 1) ? (g_game.calib_row / 10) * 10 : (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 1) ? 36 : 30;
-        static const char *global_labels[36] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DMG L0", "DMG L1", "DMG L2", "DMG L3", "DMG L4", "RANGE L0", "RANGE L1", "RANGE L2", "RANGE L3", "RANGE L4", "ENEMY0 HP", "ENEMY1 HP", "ENEMY2 HP", "ENEMY3 HP", "ENEMY4 HP", "ENEMY5 HP", "ENEMY0 SCRAP", "ENEMY1 SCRAP", "ENEMY2 SCRAP", "ENEMY3 SCRAP", "ENEMY4 SCRAP", "ENEMY5 SCRAP", "ENEMY0 BITE", "ENEMY1 BITE", "ENEMY2 BITE", "ENEMY3 BITE", "ENEMY4 BITE", "ENEMY5 BITE", "CONVEYOR 0", "CONVEYOR 1", "CONVEYOR 2", "CONVEYOR 3" };
+        int last = (g_game.calib_page == 1) ? 42 : 30;
+        static const char *global_labels[42] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DMG L0", "DMG L1", "DMG L2", "DMG L3", "DMG L4", "RANGE L0", "RANGE L1", "RANGE L2", "RANGE L3", "RANGE L4", "ENEMY0 HP", "ENEMY1 HP", "ENEMY2 HP", "ENEMY3 HP", "ENEMY4 HP", "ENEMY5 HP", "ENEMY0 SCRAP", "ENEMY1 SCRAP", "ENEMY2 SCRAP", "ENEMY3 SCRAP", "ENEMY4 SCRAP", "ENEMY5 SCRAP", "ENEMY0 BITE", "ENEMY1 BITE", "ENEMY2 BITE", "ENEMY3 BITE", "ENEMY4 BITE", "ENEMY5 BITE", "CONVEYOR 0", "CONVEYOR 1", "CONVEYOR 2", "CONVEYOR 3", "ENEMY0 BITE T", "ENEMY1 BITE T", "ENEMY2 BITE T", "ENEMY3 BITE T", "ENEMY4 BITE T", "ENEMY5 BITE T" };
         for (int n = 0; n < 10 && first + n < last; n++) {
             int r = first + n, val = 0;
             if (g_game.calib_page == 1) {
@@ -589,6 +589,7 @@ void renderer_draw_ui_calibration(void) {
                 else if (r < 26) val = g_balance.enemy_scrap[r - 20];
                 else if (r < 32) val = g_balance.enemy_bite_damage[r - 26];
                 else if (r < 36) val = g_balance.conveyor_reload_interval[r - 32];
+                else if (r < 42) val = g_balance.enemy_bite_interval[r - 36];
             } else {
                 int u = r / 5, l = r % 5; val = (int)g_balance.upgrade_costs[u][l];
             }
