@@ -165,6 +165,17 @@ typedef struct {
 
 typedef struct {
     WaveDef waves[20];
+    uint32_t enemy_hp[6];
+    uint32_t enemy_scrap[6];
+    uint64_t upgrade_costs[6][5];
+    int turret_damage[5];
+    int turret_fire_interval[5];
+    int turret_range[5];
+    int turret_magazine[6];
+    int bunker_start_hp;
+    int wave_duration_frames;
+    int wave_bonus_base;
+    int wave_bonus_per_wave;
     uint32_t magic;           // 0x544F5744 ("TOWD")
 } GameBalanceConfig;
 

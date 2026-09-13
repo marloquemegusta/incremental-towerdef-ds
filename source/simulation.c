@@ -50,6 +50,15 @@ static const GameBalanceConfig s_default_balance = {
         { .tiers = { { 220,  8, 48, 30 }, { 110, 15, 55, 80 }, { 80, 30, 65, 160 } }, .scrap_base = 40 },
         { .tiers = { { 250,  6, 50, 35 }, { 130, 12, 56, 90 }, { 100, 25, 66, 180 } }, .scrap_base = 50 }
     },
+    .enemy_hp = { 1, 8, 40, 160, 2500, 40000 },
+    .enemy_scrap = { 1, 3, 10, 60, 750, 20000 },
+    .upgrade_costs = { {15,25,40,65,100}, {20,30,45,70,110}, {15,25,35,55,85}, {25,40,65,105,170}, {50,90,160,0,0}, {80,0,0,0,0} },
+    .turret_damage = { 2, 3, 4, 6, 8 },
+    .turret_fire_interval = { 18, 14, 10, 7, 5 },
+    .turret_range = { 65, 80, 100, 125, 150 },
+    .turret_magazine = { 20, 35, 50, 70, 100, 150 },
+    .bunker_start_hp = 100, .wave_duration_frames = 1800,
+    .wave_bonus_base = 10, .wave_bonus_per_wave = 5,
     .magic = 0x544F5744 // "TOWD"
 };
 
@@ -231,8 +240,8 @@ void game_init(void) {
     g_game.mode = MODE_PREPARATION;
     g_game.wave_number = 1;
     g_game.total_waves = 20;
-    g_game.bunker_hp = 100;
-    g_game.bunker_max_hp = 100;
+    g_game.bunker_hp = g_balance.bunker_start_hp;
+    g_game.bunker_max_hp = g_balance.bunker_start_hp;
     g_game.scrap = 10;
     g_game.fast_forward = 1;
 
@@ -281,7 +290,7 @@ void game_init(void) {
 
 void game_start_wave(void) {
     g_game.mode = MODE_WAVE;
-    g_game.wave_timer = 1800; // 30 seconds at 60 FPS
+    g_game.wave_timer = g_balance.wave_duration_frames;
     g_game.enemies_spawned = 0;
     g_game.enemies_alive = 0;
     g_game.spawn_timer = 0;
