@@ -419,9 +419,9 @@ void game_update_simulation(void) {
             // Bite Turret!
             g_enemies[i].biting_target = hitting_turret;
             g_enemies[i].bite_timer++;
-            if (g_enemies[i].bite_timer >= 45) { // Bite every 0.75s
+            if (g_enemies[i].bite_timer >= g_balance.enemy_bite_interval[g_enemies[i].variant]) {
                 g_enemies[i].bite_timer = 0;
-                int bite_dmg = 1 + g_enemies[i].variant * 2;
+                int bite_dmg = g_balance.enemy_bite_damage[g_enemies[i].variant];
                 if (g_turrets[hitting_turret].hp > bite_dmg) {
                     g_turrets[hitting_turret].hp -= bite_dmg;
                 } else {
@@ -448,7 +448,7 @@ void game_update_simulation(void) {
             g_enemies[i].bite_timer++;
             if (g_enemies[i].bite_timer >= 40) {
                 g_enemies[i].bite_timer = 0;
-                uint64_t bite_dmg = 1 + g_enemies[i].variant * 2;
+                uint64_t bite_dmg = g_balance.enemy_bite_damage[g_enemies[i].variant];
                 if (g_game.bunker_hp > bite_dmg) {
                     g_game.bunker_hp -= bite_dmg;
                 } else {
@@ -1006,6 +1006,16 @@ static void calib_modify_val(int delta) {
             if (n > 999999) n = 999999;
             g_balance.enemy_scrap[i] = (uint32_t)n;
         }
+        else if (g_game.calib_row >= 26 && g_game.calib_row < 32) {
+            int i = g_game.calib_row - 26;
+            g_balance.enemy_bite_damage[i] += delta;
+            if (g_balance.enemy_bite_damage[i] < 1) g_balance.enemy_bite_damage[i] = 1;
+        }
+        else if (g_game.calib_row >= 32 && g_game.calib_row < 36) {
+            int i = g_game.calib_row - 32;
+            g_balance.conveyor_reload_interval[i] += delta * 5;
+            if (g_balance.conveyor_reload_interval[i] < 1) g_balance.conveyor_reload_interval[i] = 1;
+        }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
     }
     if (g_game.calib_page == 2) {
@@ -1087,7 +1097,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row on the current page.
-    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 26 : 30);
+    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 36 : 30);
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
     }
