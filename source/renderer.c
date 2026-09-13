@@ -588,22 +588,24 @@ void renderer_draw_ui_calibration(void) {
     int w = g_game.calib_wave_idx;
     const WaveDef *wd = &g_balance.waves[w];
 
-    // 9 Rows grouped across the 3 Tiers (Tier 0: Larva, Tier 1: Ripper, Tier 2: Hormagaunt)
-    static const char *row_labels[9] = {
-        "T1 LARVA COUNT", "T1 LARVA DELAY", "T1 LARVA SPEED",
-        "T2 RIPPER COUNT", "T2 RIPPER DELAY", "T2 RIPPER SPEED",
-        "T3 HORMAG COUNT", "T3 HORMAG DELAY", "T3 HORMAG SPEED"
+    // 12 rows: every per-wave tier variable plus wave reward
+    static const char *row_labels[12] = {
+        "T1 LARVA COUNT", "T1 LARVA DELAY", "T1 LARVA SPEED", "T1 LARVA HP",
+        "T2 RIPPER COUNT", "T2 RIPPER DELAY", "T2 RIPPER SPEED", "T2 RIPPER HP",
+        "T3 HORMAG COUNT", "T3 HORMAG DELAY", "T3 HORMAG SPEED", "WAVE SCRAP"
     };
 
-    for (int r = 0; r < 9; r++) {
-        int tier = r / 3;
-        int param = r % 3;
+    for (int r = 0; r < 12; r++) {
+        int tier = r / 4;
+        int param = r % 4;
         int val = 0;
-        if (param == 0) val = wd->tiers[tier].count;
+        if (r == 11) val = wd->scrap_base;
+        else if (param == 0) val = wd->tiers[tier].count;
         else if (param == 1) val = wd->tiers[tier].delay;
         else if (param == 2) val = wd->tiers[tier].speed;
+        else if (param == 3) val = wd->tiers[tier].hp;
 
-        int y = 36 + r * 13;
+        int y = 31 + r * 10;
         int is_sel = (g_game.calib_row == r);
         uint16_t row_bg = is_sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL;
         uint16_t row_border = is_sel ? COLOR_AMBER : COLOR_IRON_BORDER;
@@ -612,13 +614,13 @@ void renderer_draw_ui_calibration(void) {
         // Highlight header tier group with slightly warmer text
         if (param == 0 && !is_sel) txt_col = COLOR_AMBER;
 
-        renderer_fill_rect(6, y, 244, 12, row_bg);
-        renderer_draw_rect(6, y, 244, 12, row_border);
+        renderer_fill_rect(6, y, 244, 10, row_bg);
+        renderer_draw_rect(6, y, 244, 10, row_border);
 
-        renderer_draw_text(10, y + 2, row_labels[r], txt_col);
+        renderer_draw_text(10, y + 1, row_labels[r], txt_col);
 
         snprintf(buf, sizeof(buf), "%d", val);
-        renderer_draw_text(142, y + 2, buf, COLOR_PHOSPHOR_GREEN);
+        renderer_draw_text(142, y + 1, buf, COLOR_PHOSPHOR_GREEN);
 
         // [-] button
         renderer_fill_rect(178, y + 1, 24, 10, COLOR_BLACK);

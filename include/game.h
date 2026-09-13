@@ -226,7 +226,7 @@ typedef struct {
     int wave_spawn_timer_tier[3];// Timers for each tier spawn in current wave
 
     // Calibration UI navigation
-    int calib_row;               // 0..8 (3 rows per tier: Count, Delay, Speed)
+    int calib_row;               // 0..11 (per tier: Count, Delay, Speed, HP; wave scrap)
     int calib_wave_idx;          // 0..19 (Wave 1..20)
     int calib_hold_timer;        // For autorepeat continuous adjustment
     int calib_saved_timer;       // Feedback notification ("SAVED")

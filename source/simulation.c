@@ -961,10 +961,19 @@ static void calib_modify_val(int delta) {
 
     int row = g_game.calib_row;
     if (row < 0) row = 0;
-    if (row > 8) row = 8;
+    if (row > 11) row = 11;
 
-    int tier = row / 3;
-    int param = row % 3;
+    if (row == 11) {
+        wd->scrap_base += delta;
+        if (wd->scrap_base < 0) wd->scrap_base = 0;
+        if (wd->scrap_base > 999999) wd->scrap_base = 999999;
+        g_game.calib_saved_timer = 20;
+        balance_config_save();
+        return;
+    }
+
+    int tier = row / 4;
+    int param = row % 4;
     WaveTierConfig *tc = &wd->tiers[tier];
 
     switch (param) {
@@ -982,6 +991,11 @@ static void calib_modify_val(int delta) {
             tc->speed += delta;
             if (tc->speed < 10) tc->speed = 10;
             if (tc->speed > 150) tc->speed = 150;
+            break;
+        case 3: // HP (1..999999)
+            tc->hp += delta;
+            if (tc->hp < 1) tc->hp = 1;
+            if (tc->hp > 999999) tc->hp = 999999;
             break;
     }
 
@@ -1003,8 +1017,8 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         g_game.calib_wave_idx = (g_game.calib_wave_idx + 1) % 20;
     }
 
-    // Up / Down: select parameter row (0..8)
-    int max_rows = 9;
+    // Up / Down: select parameter row (0..11)
+    int max_rows = 12;
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
     }
@@ -1014,10 +1028,12 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
 
     // Left / Right with continuous autorepeat
     int step = 1;
-    int param = g_game.calib_row % 3;
+    int param = g_game.calib_row % 4;
     if (param == 0) step = 1; // count
     else if (param == 1) step = 5; // delay
     else if (param == 2) step = 2; // speed
+    else if (param == 3) step = 1; // hp
+    if (g_game.calib_row == 11) step = 1; // scrap
 
     if (keys_down & KEY_LEFT) {
         calib_modify_val(-step);
@@ -1048,13 +1064,13 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
             }
         }
 
-        // Parameter rows touch hitboxes (9 rows: y starts at 36, each row height 13)
-        for (int r = 0; r < 9; r++) {
-            int ry = 36 + r * 13;
-            if (touch.py >= ry && touch.py <= ry + 12) {
+        // Parameter rows touch hitboxes (12 rows)
+        for (int r = 0; r < 12; r++) {
+            int ry = 31 + r * 10;
+            if (touch.py >= ry && touch.py <= ry + 9) {
                 g_game.calib_row = r;
-                int rparam = r % 3;
-                int rstep = (rparam == 0) ? 1 : ((rparam == 1) ? 5 : 2);
+                int rparam = r % 4;
+                int rstep = (r == 11 || rparam == 0 || rparam == 3) ? 1 : ((rparam == 1) ? 5 : 2);
                 // Tap on [-] box (175..205) or [+] box (212..242)
                 if (touch.px >= 175 && touch.px <= 205) {
                     calib_modify_val(-rstep);
