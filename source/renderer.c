@@ -577,8 +577,8 @@ void renderer_draw_ui_calibration(void) {
         const char *title = (g_game.calib_page == 1) ? "GLOBAL / TURRET (Y=NEXT)" : "UPGRADE COSTS (Y=NEXT)";
         renderer_draw_text(6, 18, title, COLOR_WHITE);
         int first = (g_game.calib_page == 1) ? (g_game.calib_row / 10) * 10 : (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 1) ? 15 : 30;
-        static const char *global_labels[15] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DMG L0", "DMG L1", "DMG L2", "DMG L3", "DMG L4", "RANGE L0", "RANGE L1", "RANGE L2", "RANGE L3", "RANGE L4", "MAX ENEMIES" };
+        int last = (g_game.calib_page == 1) ? 14 : 30;
+        static const char *global_labels[14] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DMG L0", "DMG L1", "DMG L2", "DMG L3", "DMG L4", "RANGE L0", "RANGE L1", "RANGE L2", "RANGE L3", "RANGE L4" };
         for (int n = 0; n < 10 && first + n < last; n++) {
             int r = first + n, val = 0;
             if (g_game.calib_page == 1) {

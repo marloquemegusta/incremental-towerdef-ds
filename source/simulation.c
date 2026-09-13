@@ -999,7 +999,8 @@ static void calib_modify_val(int delta) {
         int up = g_game.calib_row / 5, level = g_game.calib_row % 5;
         if (up >= 0 && up < 6) {
             int64_t n = (int64_t)g_balance.upgrade_costs[up][level] + delta;
-            if (n < 0) n = 0; if (n > 999999) n = 999999;
+            if (n < 0) n = 0;
+            if (n > 999999) n = 999999;
             g_balance.upgrade_costs[up][level] = (uint64_t)n;
         }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
@@ -1073,7 +1074,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row on the current page.
-    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 15 : 30);
+    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 14 : 30);
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
     }
