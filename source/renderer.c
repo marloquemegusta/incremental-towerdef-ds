@@ -407,12 +407,15 @@ void renderer_draw_ui_prep(void) {
     // Upgrade button
     renderer_fill_rect(54, 156, 48, 24, COLOR_IRON_PANEL);
     renderer_draw_rect(54, 156, 48, 24, COLOR_AMBER);
-    renderer_draw_text(58, 164, "UPGRADE", COLOR_AMBER);
-
     // Calibration button
-    renderer_fill_rect(108, 156, 40, 24, COLOR_IRON_PANEL);
-    renderer_draw_rect(108, 156, 40, 24, COLOR_PHOSPHOR_GREEN);
-    renderer_draw_text(114, 164, "CALIB", COLOR_PHOSPHOR_GREEN);
+    renderer_fill_rect(108, 156, 36, 24, COLOR_IRON_PANEL);
+    renderer_draw_rect(108, 156, 36, 24, COLOR_PHOSPHOR_GREEN);
+    renderer_draw_text(112, 164, "CALIB", COLOR_PHOSPHOR_GREEN);
+
+    // Sandbox test button
+    renderer_fill_rect(148, 156, 36, 24, COLOR_IRON_PANEL);
+    renderer_draw_rect(148, 156, 36, 24, COLOR_AMBER);
+    renderer_draw_text(152, 164, "SANDB", COLOR_AMBER);
 
     // Instruction banner
     renderer_draw_text(50, 138, "DRAG AMMO TO RELOAD / TAP ENEMY", COLOR_WHITE);
@@ -643,6 +646,120 @@ void renderer_draw_ui_calibration(void) {
     renderer_fill_rect(168, 158, 78, 26, COLOR_LED_GREEN);
     renderer_draw_rect(168, 158, 78, 26, COLOR_WHITE);
     renderer_draw_text(182, 166, "RESUME", COLOR_BLACK);
+}
+
+void renderer_draw_ui_sandbox(void) {
+    // --- TOP SCREEN: Telemetry & Config HUD ---
+    for (int i = 0; i < SCREEN_W * SCREEN_H; i++) {
+        g_top_backbuffer[i] = COLOR_BLACK;
+    }
+    top_fill_rect(0, 0, SCREEN_W, 20, COLOR_IRON_PANEL);
+    for (int x = 0; x < SCREEN_W; x++) {
+        top_draw_pixel(x, 20, COLOR_PHOSPHOR_GREEN);
+    }
+    top_draw_text(6, 6, "--- DEBUG SANDBOX LAB ---", COLOR_AMBER);
+    top_draw_text(180, 6, g_game.sandbox.run_sim ? "[RUN]" : "[STEP]", 
+                  g_game.sandbox.run_sim ? COLOR_LED_GREEN : COLOR_AMBER);
+
+    // D-Pad adjustable parameters (Rows 0..5)
+    static const char *s_tier_names[6] = { "T0 LARVA", "T1 RIPPER", "T2 HORMAG", "T3 WARRIOR", "T4 GENEST", "T5 CARNIFEX" };
+    char buf[48];
+
+    const char *labels[6] = { "ENEMY TIER", "ENEMY HP", "ENEMY SPEED", "TURRET RANGE", "FIRE CADENCE", "BULLET DMG" };
+    for (int r = 0; r < 6; r++) {
+        int y = 26 + r * 14;
+        int is_sel = (g_game.sandbox.edit_row == r);
+        uint16_t row_col = is_sel ? COLOR_WHITE : COLOR_IRON_LIGHT;
+        uint16_t val_col = is_sel ? COLOR_AMBER : COLOR_PHOSPHOR_GREEN;
+
+        if (is_sel) {
+            top_fill_rect(2, y - 1, SCREEN_W - 4, 13, COLOR_IRON_PANEL);
+            top_draw_text(4, y + 2, ">", COLOR_AMBER);
+        }
+
+        top_draw_text(12, y + 2, labels[r], row_col);
+
+        switch (r) {
+            case 0:
+                snprintf(buf, sizeof(buf), "%s", s_tier_names[g_game.sandbox.enemy_tier]);
+                break;
+            case 1:
+                snprintf(buf, sizeof(buf), "%d HP", g_game.sandbox.enemy_hp);
+                break;
+            case 2:
+                if (g_game.sandbox.enemy_speed == 0) {
+                    snprintf(buf, sizeof(buf), "0 px/s (FROZEN)");
+                } else {
+                    snprintf(buf, sizeof(buf), "%d px/s", g_game.sandbox.enemy_speed);
+                }
+                break;
+            case 3:
+                snprintf(buf, sizeof(buf), "%d px", g_game.sandbox.turret_range);
+                break;
+            case 4:
+                snprintf(buf, sizeof(buf), "%d f (%d/s)", g_game.sandbox.turret_firerate, 60 / g_game.sandbox.turret_firerate);
+                break;
+            case 5:
+                snprintf(buf, sizeof(buf), "%d DMG", g_game.sandbox.turret_damage);
+                break;
+        }
+        top_draw_text(120, y + 2, buf, val_col);
+    }
+
+    // Bottom telemetry stats on top screen
+    for (int x = 0; x < SCREEN_W; x++) {
+        top_draw_pixel(x, 114, COLOR_IRON_BORDER);
+    }
+    top_draw_text(8, 120, "CONTROLS:", COLOR_AMBER);
+    top_draw_text(12, 132, "TOUCH: Drop Enemy at pos", COLOR_IRON_LIGHT);
+    top_draw_text(12, 144, "D-PAD: Select & Tune params", COLOR_IRON_LIGHT);
+    top_draw_text(12, 156, "START: Run/Pause  Y: Step 1F", COLOR_IRON_LIGHT);
+    top_draw_text(12, 168, "X: Clear Entities L+SEL: Exit", COLOR_IRON_LIGHT);
+
+    snprintf(buf, sizeof(buf), "ALIVE: %d | TOTAL: %d", g_game.enemies_alive, g_game.sandbox.spawn_count);
+    top_draw_text(12, 180, buf, COLOR_PHOSPHOR_GREEN);
+
+    // --- BOTTOM SCREEN: Battlefield Overlay & Touch Control Bar ---
+    // Turret range circle preview
+    if (g_turrets[0].placed) {
+        int tx = g_turrets[0].x;
+        int ty = g_turrets[0].y;
+        renderer_draw_circle(tx, ty, g_game.sandbox.turret_range, COLOR_AMBER, 0);
+    }
+
+    // Bottom control bar (y >= 148, h = 44)
+    renderer_fill_rect(0, 148, SCREEN_W, 44, COLOR_BLACK);
+    renderer_draw_line(0, 148, SCREEN_W, 148, COLOR_IRON_BORDER);
+
+    // [CLEAR] button (6..50)
+    renderer_fill_rect(6, 152, 44, 18, COLOR_LED_RED);
+    renderer_draw_rect(6, 152, 44, 18, COLOR_WHITE);
+    renderer_draw_text(12, 157, "CLEAR", COLOR_WHITE);
+
+    // [RUN / PAUSE] button (54..110)
+    uint16_t run_btn_bg = g_game.sandbox.run_sim ? COLOR_LED_GREEN : COLOR_AMBER;
+    renderer_fill_rect(54, 152, 56, 18, run_btn_bg);
+    renderer_draw_rect(54, 152, 56, 18, COLOR_WHITE);
+    renderer_draw_text(60, 157, g_game.sandbox.run_sim ? "RUNNING" : "PAUSED", COLOR_BLACK);
+
+    // [STEP 1F] button (114..160)
+    renderer_fill_rect(114, 152, 46, 18, COLOR_IRON_PANEL);
+    renderer_draw_rect(114, 152, 46, 18, COLOR_WHITE);
+    renderer_draw_text(120, 157, "STEP 1F", COLOR_AMBER);
+
+    // [INF AMMO] button (164..205)
+    uint16_t inf_bg = g_game.sandbox.turret_infinite_ammo ? COLOR_PHOSPHOR_GREEN : COLOR_IRON_PANEL;
+    renderer_fill_rect(164, 152, 42, 18, inf_bg);
+    renderer_draw_rect(164, 152, 42, 18, COLOR_WHITE);
+    renderer_draw_text(168, 157, "INF AMMO", COLOR_BLACK);
+
+    // [EXIT] button (210..250)
+    renderer_fill_rect(210, 152, 40, 18, COLOR_IRON_BORDER);
+    renderer_draw_rect(210, 152, 40, 18, COLOR_WHITE);
+    renderer_draw_text(218, 157, "EXIT", COLOR_WHITE);
+
+    // Hint in bottom bar
+    renderer_draw_text(8, 175, "TOUCH FIELD TO DROP ENEMY", COLOR_AMBER);
 }
 
 void renderer_present(void) {

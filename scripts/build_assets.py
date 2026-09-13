@@ -156,6 +156,7 @@ typedef struct {{
 extern const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT];
 
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir);
+void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir);
 
 #endif // ENEMY_DATA_H
 ''')
@@ -203,7 +204,8 @@ void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir);
         fc.write("};\n\n")
 
         # Drawing routine
-        fc.write('''void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
+        fc.write('''void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir) {
+    if (!buffer) return;
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
     frame = frame & 3;
 
@@ -231,10 +233,14 @@ void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir);
 
             uint16_t col = src[y * w + x];
             if (col & 0x8000) {
-                g_backbuffer[dst_y * SCREEN_W + draw_x] = col;
+                buffer[dst_y * SCREEN_W + draw_x] = col;
             }
         }
     }
+}
+
+void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
+    enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir);
 }
 ''')
 
