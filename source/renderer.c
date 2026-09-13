@@ -572,6 +572,34 @@ void renderer_draw_ui_calibration(void) {
         renderer_draw_text(180, 4, "SAVED (SD)", COLOR_PHOSPHOR_GREEN);
     }
 
+    if (g_game.calib_page != 0) {
+        char buf[64];
+        const char *title = (g_game.calib_page == 1) ? "GLOBAL / TURRET (Y=NEXT)" : "UPGRADE COSTS (Y=NEXT)";
+        renderer_draw_text(6, 18, title, COLOR_WHITE);
+        int first = (g_game.calib_page == 1) ? (g_game.calib_row / 10) * 10 : (g_game.calib_row / 10) * 10;
+        int last = (g_game.calib_page == 1) ? 15 : 30;
+        static const char *global_labels[15] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DMG L0", "DMG L1", "DMG L2", "DMG L3", "DMG L4", "RANGE L0", "RANGE L1", "RANGE L2", "RANGE L3", "RANGE L4", "MAX ENEMIES" };
+        for (int n = 0; n < 10 && first + n < last; n++) {
+            int r = first + n, val = 0;
+            if (g_game.calib_page == 1) {
+                if (r < 4) { int *p[4] = { &g_balance.bunker_start_hp, &g_balance.wave_duration_frames, &g_balance.wave_bonus_base, &g_balance.wave_bonus_per_wave }; val = *p[r]; }
+                else if (r < 9) val = g_balance.turret_damage[r - 4];
+                else if (r < 14) val = g_balance.turret_range[r - 9];
+            } else {
+                int u = r / 5, l = r % 5; val = (int)g_balance.upgrade_costs[u][l];
+            }
+            int y = 32 + n * 13; int sel = (r == g_game.calib_row);
+            renderer_fill_rect(6, y, 244, 12, sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL);
+            renderer_draw_rect(6, y, 244, 12, sel ? COLOR_AMBER : COLOR_IRON_BORDER);
+            if (g_game.calib_page == 1) renderer_draw_text(10, y + 2, global_labels[r], COLOR_WHITE);
+            else { snprintf(buf, sizeof(buf), "UPG %d LEVEL %d", r / 5, r % 5); renderer_draw_text(10, y + 2, buf, COLOR_WHITE); }
+            snprintf(buf, sizeof(buf), "%d  [-] [+]", val); renderer_draw_text(150, y + 2, buf, COLOR_PHOSPHOR_GREEN);
+        }
+        renderer_draw_text(8, 166, "Y NEXT PAGE   B BACK   UP/DN SELECT", COLOR_AMBER);
+        renderer_draw_text(8, 178, "LEFT/RIGHT EDIT - AUTO SAVE", COLOR_PHOSPHOR_GREEN);
+        return;
+    }
+
     // Wave Selector Bar: [<] WAVE X/20 [>]
     renderer_fill_rect(8, 16, 26, 16, COLOR_IRON_PANEL);
     renderer_draw_rect(8, 16, 26, 16, COLOR_AMBER);

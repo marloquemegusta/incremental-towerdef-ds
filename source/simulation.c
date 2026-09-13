@@ -974,6 +974,36 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
 }
 
 static void calib_modify_val(int delta) {
+    if (g_game.calib_page == 1) {
+        int *v = 0;
+        switch (g_game.calib_row) {
+            case 0: v = &g_balance.bunker_start_hp; break;
+            case 1: v = &g_balance.wave_duration_frames; break;
+            case 2: v = &g_balance.wave_bonus_base; break;
+            case 3: v = &g_balance.wave_bonus_per_wave; break;
+        }
+        if (v) { *v += delta; if (*v < 0) *v = 0; if (*v > 999999) *v = 999999; }
+        else if (g_game.calib_row >= 4 && g_game.calib_row < 9) {
+            int i = g_game.calib_row - 4;
+            g_balance.turret_damage[i] += delta;
+            if (g_balance.turret_damage[i] < 1) g_balance.turret_damage[i] = 1;
+        }
+        else if (g_game.calib_row >= 9 && g_game.calib_row < 15) {
+            int i = g_game.calib_row - 9;
+            g_balance.turret_range[i] += delta * 2;
+            if (g_balance.turret_range[i] < 1) g_balance.turret_range[i] = 1;
+        }
+        g_game.calib_saved_timer = 20; balance_config_save(); return;
+    }
+    if (g_game.calib_page == 2) {
+        int up = g_game.calib_row / 5, level = g_game.calib_row % 5;
+        if (up >= 0 && up < 6) {
+            int64_t n = (int64_t)g_balance.upgrade_costs[up][level] + delta;
+            if (n < 0) n = 0; if (n > 999999) n = 999999;
+            g_balance.upgrade_costs[up][level] = (uint64_t)n;
+        }
+        g_game.calib_saved_timer = 20; balance_config_save(); return;
+    }
     int w = g_game.calib_wave_idx;
     if (w < 0) w = 0;
     if (w >= 20) w = 19;
@@ -1029,6 +1059,11 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         return;
     }
 
+    if (keys_down & KEY_Y) {
+        g_game.calib_page = (g_game.calib_page + 1) % 3;
+        g_game.calib_row = 0;
+    }
+
     // L / R: cycle waves (1..20)
     if (keys_down & KEY_L) {
         g_game.calib_wave_idx = (g_game.calib_wave_idx + 19) % 20;
@@ -1037,8 +1072,8 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         g_game.calib_wave_idx = (g_game.calib_wave_idx + 1) % 20;
     }
 
-    // Up / Down: select parameter row (0..11)
-    int max_rows = 12;
+    // Up / Down: select parameter row on the current page.
+    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 15 : 30);
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
     }
@@ -1048,12 +1083,12 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
 
     // Left / Right with continuous autorepeat
     int step = 1;
-    int param = g_game.calib_row % 4;
+    int param = (g_game.calib_page == 0) ? (g_game.calib_row % 4) : 0;
     if (param == 0) step = 1; // count
     else if (param == 1) step = 5; // delay
     else if (param == 2) step = 2; // speed
     else if (param == 3) step = 1; // hp
-    if (g_game.calib_row == 11) step = 1; // scrap
+    if (g_game.calib_page != 0 || g_game.calib_row == 11) step = 1;
 
     if (keys_down & KEY_LEFT) {
         calib_modify_val(-step);
