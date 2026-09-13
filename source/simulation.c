@@ -352,7 +352,7 @@ void game_update_simulation(void) {
                 g_game.wave_spawned_tier[t]++;
                 int hp = wdef->tiers[t].hp;
                 if (hp < 1) hp = 1;
-                spawn_enemy(t, hp, wdef->tiers[t].speed);
+            spawn_enemy(t, hp, wdef->tiers[t].speed);
             }
         }
     }
@@ -857,6 +857,17 @@ void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_he
 }
 
 uint64_t upgrade_get_cost(int idx) {
+    /* Costs are part of the persisted balance so calibration can tune them. */
+    if (idx >= 0 && idx < 6) {
+        int levels[6] = { g_game.upgrades.caliber_lvl, g_game.upgrades.firerate_lvl,
+            g_game.upgrades.mag_size_lvl, g_game.upgrades.bio_harvest_lvl,
+            g_game.upgrades.conveyor_lvl, g_game.upgrades.auto_target };
+        int level = levels[idx];
+        if (level >= 0 && level < 5 && g_balance.upgrade_costs[idx][level] > 0)
+            return g_balance.upgrade_costs[idx][level];
+        return 999999;
+    }
+    /* Legacy switch retained only as a defensive fallback for invalid callers. */
     switch (idx) {
         case 0: { // Caliber: 15, 25, 40, 65, 100
             static const uint64_t c[6] = { 15, 25, 40, 65, 100, 999999 };
