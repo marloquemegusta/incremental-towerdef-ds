@@ -179,6 +179,7 @@ typedef struct {
     int enemy_bite_damage[6];
     int enemy_bite_interval[6];
     int conveyor_reload_interval[4];
+    WaveTierConfig advanced_waves[20][3];
     uint32_t magic;           // 0x544F5744 ("TOWD")
 } GameBalanceConfig;
 
@@ -236,8 +237,8 @@ typedef struct {
     int upgrade_flash_timer;
     int upgrade_flash_idx;
 
-    int wave_spawned_tier[3];    // Number of enemies spawned so far for Tier 0..2 in current wave
-    int wave_spawn_timer_tier[3];// Timers for each tier spawn in current wave
+    int wave_spawned_tier[6];
+    int wave_spawn_timer_tier[6];
 
     // Calibration UI navigation
     int calib_row;               // 0..11 (per tier: Count, Delay, Speed, HP; wave scrap)
