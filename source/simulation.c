@@ -506,9 +506,8 @@ void game_update_simulation(void) {
         }
 
         // Dynamic range based on upgrade
-        static const int s_ranges[5] = { 65, 80, 100, 125, 150 };
         int r_lvl = g_game.upgrades.range_lvl;
-        tur->range = (r_lvl < 5) ? s_ranges[r_lvl] : 150;
+        tur->range = (r_lvl < 5) ? g_balance.turret_range[r_lvl] : g_balance.turret_range[4];
 
         // Target selection
         int target_enemy = -1;
@@ -559,9 +558,8 @@ void game_update_simulation(void) {
                 if (tur->fire_cooldown > 0) {
                     tur->fire_cooldown--;
                 } else {
-                    static const int s_intervals[5] = { 18, 14, 10, 7, 5 };
                     int f_lvl = g_game.upgrades.firerate_lvl;
-                    int interval = (f_lvl < 5) ? s_intervals[f_lvl] : 5;
+                    int interval = (f_lvl < 5) ? g_balance.turret_fire_interval[f_lvl] : g_balance.turret_fire_interval[4];
                     tur->fire_cooldown = interval;
                     tur->flash_timer = 3;
                     tur->ammo--;
@@ -584,9 +582,8 @@ void game_update_simulation(void) {
                     int by = tur->y + ((perp_y * s) >> FP_SHIFT);
 
                     // Multiplicative damage: Base 2 -> 3 -> 4 -> 6 -> 8
-                    static const uint64_t s_dmg[5] = { 2, 3, 4, 6, 8 };
                     int c_lvl = g_game.upgrades.caliber_lvl;
-                    uint64_t dmg = (c_lvl < 5) ? s_dmg[c_lvl] : 8;
+                    uint64_t dmg = (c_lvl < 5) ? g_balance.turret_damage[c_lvl] : g_balance.turret_damage[4];
 
                     spawn_bullet(bx, by, ang, t, dmg);
                     tur->shots_fired++;
@@ -631,7 +628,7 @@ void game_update_simulation(void) {
                     g_game.enemies_alive--;
                     g_game.enemies_killed++;
 
-                    uint64_t base_scrap = 1 + g_enemies[e].variant * 2;
+                    uint64_t base_scrap = g_balance.enemy_scrap[g_enemies[e].variant];
                     uint64_t reward = base_scrap * (1 + g_game.upgrades.bio_harvest_lvl);
                     g_game.scrap += reward;
 
@@ -921,8 +918,7 @@ void upgrade_purchase(int idx) {
             g_game.upgrades.mag_size_lvl++;
             // Update all turrets max ammo
             for (int t = 0; t < MAX_TURRETS; t++) {
-                static const int s_mag[6] = { 20, 35, 50, 70, 100, 150 };
-                int m = (g_game.upgrades.mag_size_lvl < 6) ? s_mag[g_game.upgrades.mag_size_lvl] : 150;
+                int m = (g_game.upgrades.mag_size_lvl < 6) ? g_balance.turret_magazine[g_game.upgrades.mag_size_lvl] : g_balance.turret_magazine[5];
                 g_turrets[t].max_ammo = m;
             }
             break;
