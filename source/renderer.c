@@ -577,14 +577,16 @@ void renderer_draw_ui_calibration(void) {
         const char *title = (g_game.calib_page == 1) ? "GLOBAL / TURRET (Y=NEXT)" : "UPGRADE COSTS (Y=NEXT)";
         renderer_draw_text(6, 18, title, COLOR_WHITE);
         int first = (g_game.calib_page == 1) ? (g_game.calib_row / 10) * 10 : (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 1) ? 14 : 30;
-        static const char *global_labels[14] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DMG L0", "DMG L1", "DMG L2", "DMG L3", "DMG L4", "RANGE L0", "RANGE L1", "RANGE L2", "RANGE L3", "RANGE L4" };
+        int last = (g_game.calib_page == 1) ? 26 : 30;
+        static const char *global_labels[26] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DMG L0", "DMG L1", "DMG L2", "DMG L3", "DMG L4", "RANGE L0", "RANGE L1", "RANGE L2", "RANGE L3", "RANGE L4", "ENEMY0 HP", "ENEMY1 HP", "ENEMY2 HP", "ENEMY3 HP", "ENEMY4 HP", "ENEMY5 HP", "ENEMY0 SCRAP", "ENEMY1 SCRAP", "ENEMY2 SCRAP", "ENEMY3 SCRAP", "ENEMY4 SCRAP", "ENEMY5 SCRAP" };
         for (int n = 0; n < 10 && first + n < last; n++) {
             int r = first + n, val = 0;
             if (g_game.calib_page == 1) {
                 if (r < 4) { int *p[4] = { &g_balance.bunker_start_hp, &g_balance.wave_duration_frames, &g_balance.wave_bonus_base, &g_balance.wave_bonus_per_wave }; val = *p[r]; }
                 else if (r < 9) val = g_balance.turret_damage[r - 4];
                 else if (r < 14) val = g_balance.turret_range[r - 9];
+                else if (r < 20) val = g_balance.enemy_hp[r - 14];
+                else if (r < 26) val = g_balance.enemy_scrap[r - 20];
             } else {
                 int u = r / 5, l = r % 5; val = (int)g_balance.upgrade_costs[u][l];
             }

@@ -984,10 +984,22 @@ static void calib_modify_val(int delta) {
             g_balance.turret_damage[i] += delta;
             if (g_balance.turret_damage[i] < 1) g_balance.turret_damage[i] = 1;
         }
-        else if (g_game.calib_row >= 9 && g_game.calib_row < 15) {
+        else if (g_game.calib_row >= 9 && g_game.calib_row < 14) {
             int i = g_game.calib_row - 9;
             g_balance.turret_range[i] += delta * 2;
             if (g_balance.turret_range[i] < 1) g_balance.turret_range[i] = 1;
+        }
+        else if (g_game.calib_row >= 14 && g_game.calib_row < 20) {
+            int i = g_game.calib_row - 14;
+            int n = (int)g_balance.enemy_hp[i] + delta;
+            if (n < 1) n = 1; if (n > 999999) n = 999999;
+            g_balance.enemy_hp[i] = (uint32_t)n;
+        }
+        else if (g_game.calib_row >= 20 && g_game.calib_row < 26) {
+            int i = g_game.calib_row - 20;
+            int n = (int)g_balance.enemy_scrap[i] + delta;
+            if (n < 0) n = 0; if (n > 999999) n = 999999;
+            g_balance.enemy_scrap[i] = (uint32_t)n;
         }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
     }
@@ -1070,7 +1082,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row on the current page.
-    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 14 : 30);
+    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 26 : 30);
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
     }
