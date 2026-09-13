@@ -239,6 +239,7 @@ typedef struct {
     // Calibration UI navigation
     int calib_row;               // 0..11 (per tier: Count, Delay, Speed, HP; wave scrap)
     int calib_wave_idx;          // 0..19 (Wave 1..20)
+    int calib_page;              // 0 waves, 1 global/turret, 2 upgrade costs
     int calib_hold_timer;        // For autorepeat continuous adjustment
     int calib_saved_timer;       // Feedback notification ("SAVED")
 
