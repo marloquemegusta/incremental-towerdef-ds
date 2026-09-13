@@ -1104,7 +1104,8 @@ static void calib_modify_val(int delta) {
         WaveTierConfig *tc = &g_balance.advanced_waves[w][tier - 3];
         if (param == 3) {
             int hp = (int)g_balance.enemy_hp[tier] + delta;
-            if (hp < 1) hp = 1; if (hp > 999999) hp = 999999;
+            if (hp < 1) hp = 1;
+            if (hp > 999999) hp = 999999;
             g_balance.enemy_hp[tier] = (uint32_t)hp;
         } else {
             int *v = (param == 0) ? &tc->count : (param == 1) ? &tc->delay : &tc->speed;
