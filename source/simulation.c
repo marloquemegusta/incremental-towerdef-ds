@@ -656,7 +656,7 @@ void game_update_simulation(void) {
     // 7. Wave Completion
     if (g_game.enemies_spawned >= g_game.enemies_to_spawn && g_game.enemies_alive == 0) {
         // Wave clear bonus scrap (+10 in W1, +15 in W2, etc.)
-        uint64_t wave_bonus = 10 + (g_game.wave_number * 5);
+        uint64_t wave_bonus = g_balance.wave_bonus_base + (g_game.wave_number * g_balance.wave_bonus_per_wave);
         g_game.scrap += wave_bonus;
 
         g_game.wave_number++;
