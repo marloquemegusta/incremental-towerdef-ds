@@ -1102,10 +1102,16 @@ static void calib_modify_val(int delta) {
     if (row >= 12 && row < 24) {
         int tier = 3 + ((row - 12) / 4), param = (row - 12) % 4;
         WaveTierConfig *tc = &g_balance.advanced_waves[w][tier - 3];
-        int *v = (param == 0) ? &tc->count : (param == 1) ? &tc->delay : (param == 2) ? &tc->speed : &g_balance.enemy_hp[tier];
-        *v += delta;
-        if (*v < 0) *v = (param == 0) ? 0 : 1;
-        if (*v > 999999) *v = 999999;
+        if (param == 3) {
+            int hp = (int)g_balance.enemy_hp[tier] + delta;
+            if (hp < 1) hp = 1; if (hp > 999999) hp = 999999;
+            g_balance.enemy_hp[tier] = (uint32_t)hp;
+        } else {
+            int *v = (param == 0) ? &tc->count : (param == 1) ? &tc->delay : &tc->speed;
+            *v += delta;
+            if (*v < 0) *v = (param == 0) ? 0 : 1;
+            if (*v > 999999) *v = 999999;
+        }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
     }
     if ((row % 4) == 3) {
