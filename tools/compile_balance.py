@@ -26,6 +26,26 @@ def compile_balance(root, output):
         if any(v < 0 for v in values) or any(values[j] == 0 and j % 4 in (1, 2, 3) for j in range(12)):
             raise ValueError(f"wave {i}: valores negativos o configuración inválida")
         blob += struct.pack("<12iQ", *values[:12], values[12])
+    with (cfg / "enemies.csv").open(newline="", encoding="utf-8-sig") as f:
+        enemies = list(csv.DictReader(f))
+    if len(enemies) != 6 or [int(r["enemy_id"]) for r in enemies] != list(range(6)):
+        raise ValueError("enemies.csv debe contener los enemigos 0..5")
+    blob += struct.pack("<6I", *(int(r["default_hp"]) for r in enemies))
+    blob += struct.pack("<6I", *(int(r["scrap_value"]) for r in enemies))
+
+    with (cfg / "upgrades.csv").open(newline="", encoding="utf-8-sig") as f:
+        upgrades = list(csv.DictReader(f))
+    if len(upgrades) != 6 or [int(r["upgrade_id"]) for r in upgrades] != list(range(6)):
+        raise ValueError("upgrades.csv debe contener las mejoras 0..5")
+    costs = []
+    for row in upgrades:
+        costs.extend(int(row[f"cost_{i}"] or 0) for i in range(5))
+    blob += struct.pack("<30Q", *costs)
+    blob += struct.pack("<5i", 2, 3, 4, 6, 8)
+    blob += struct.pack("<5i", 18, 14, 10, 7, 5)
+    blob += struct.pack("<5i", 65, 80, 100, 125, 150)
+    blob += struct.pack("<6i", 20, 35, 50, 70, 100, 150)
+    blob += struct.pack("<4i", 100, 1800, 10, 5)
     blob += struct.pack("<I", MAGIC)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(blob)
