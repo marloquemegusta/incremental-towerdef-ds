@@ -12,4 +12,15 @@ Validación y generación del archivo que ya entiende la DS:
 python tools/compile_balance.py --output towerds_balance.bin
 ```
 
+Servidor local para el futuro cliente Wi-Fi de desarrollo:
+
+```powershell
+python tools/serve_balance.py --directory artifacts --port 5000
+```
+
+La descarga por Wi-Fi requiere soporte `libnds/dswifi` enlazado al proyecto. El
+toolchain actual de esta rama no expone esa biblioteca en sus headers, por lo
+que no se debe simular ni declarar completada esa parte hasta añadirla al
+toolchain de BlocksDS.
+
 El binario generado se copia a la raíz de la tarjeta SD como `towerds_balance.bin`. Si falta o no supera la validación de magia, el juego conserva sus valores por defecto.
