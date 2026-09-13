@@ -322,9 +322,10 @@ void game_start_wave(void) {
     if (w_idx >= 20) w_idx = 19;
     const WaveDef *wdef = &g_balance.waves[w_idx];
 
-    // Total enemies to spawn across Tier 0, 1, 2
-    g_game.enemies_to_spawn = wdef->tiers[0].count + wdef->tiers[1].count + wdef->tiers[2].count;
-    for (int t = 0; t < 3; t++) {
+    g_game.enemies_to_spawn = 0;
+    for (int t = 0; t < 6; t++) {
+        const WaveTierConfig *tier_cfg = (t < 3) ? &wdef->tiers[t] : &g_balance.advanced_waves[w_idx][t - 3];
+        g_game.enemies_to_spawn += tier_cfg->count;
         g_game.wave_spawned_tier[t] = 0;
         g_game.wave_spawn_timer_tier[t] = 0;
     }
@@ -363,11 +364,12 @@ void game_update_simulation(void) {
     if (w_idx >= 20) w_idx = 19;
     const WaveDef *wdef = &g_balance.waves[w_idx];
 
-    // 1. Spawning per tier (Tier 0, Tier 1, Tier 2)
-    for (int t = 0; t < 3; t++) {
-        if (g_game.wave_spawned_tier[t] < wdef->tiers[t].count) {
+    // 1. Spawning per tier (all six enemy variants)
+    for (int t = 0; t < 6; t++) {
+        const WaveTierConfig *tier_cfg = (t < 3) ? &wdef->tiers[t] : &g_balance.advanced_waves[w_idx][t - 3];
+        if (g_game.wave_spawned_tier[t] < tier_cfg->count) {
             g_game.wave_spawn_timer_tier[t]++;
-            int interval = wdef->tiers[t].delay;
+            int interval = tier_cfg->delay;
             if (interval < 1) interval = 1;
             if (g_game.wave_spawn_timer_tier[t] >= interval) {
                 g_game.wave_spawn_timer_tier[t] = 0;
@@ -375,7 +377,7 @@ void game_update_simulation(void) {
                 /* Base enemy HP is constant; waves tune composition and timing. */
                 int hp = (int)g_balance.enemy_hp[t];
                 if (hp < 1) hp = 1;
-            spawn_enemy(t, hp, wdef->tiers[t].speed);
+                spawn_enemy(t, hp, tier_cfg->speed);
             }
         }
     }
@@ -1097,6 +1099,15 @@ static void calib_modify_val(int delta) {
         balance_config_save();
         return;
     }
+    if (row >= 12 && row < 24) {
+        int tier = 3 + ((row - 12) / 4), param = (row - 12) % 4;
+        WaveTierConfig *tc = &g_balance.advanced_waves[w][tier - 3];
+        int *v = (param == 0) ? &tc->count : (param == 1) ? &tc->delay : (param == 2) ? &tc->speed : &g_balance.enemy_hp[tier];
+        *v += delta;
+        if (*v < 0) *v = (param == 0) ? 0 : 1;
+        if (*v > 999999) *v = 999999;
+        g_game.calib_saved_timer = 20; balance_config_save(); return;
+    }
     if ((row % 4) == 3) {
         int tier_hp = row / 4;
         g_balance.enemy_hp[tier_hp] += delta;
@@ -1161,7 +1172,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row on the current page.
-    int max_rows = (g_game.calib_page == 0) ? 12 : ((g_game.calib_page == 1) ? 48 : 35);
+    int max_rows = (g_game.calib_page == 0) ? 24 : ((g_game.calib_page == 1) ? 48 : 35);
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
     }
@@ -1219,11 +1230,14 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         }
 
         // Parameter rows touch hitboxes (12 rows)
-        for (int r = 0; r < 12; r++) {
+        int visible_first = (g_game.calib_page == 0) ? (g_game.calib_row / 10) * 10 : 0;
+        int visible_count = (g_game.calib_page == 0) ? 10 : 12;
+        for (int r = 0; r < visible_count; r++) {
+            int actual = visible_first + r;
             int ry = 31 + r * 10;
             if (touch.py >= ry && touch.py <= ry + 9) {
-                g_game.calib_row = r;
-                int rparam = r % 4;
+                g_game.calib_row = actual;
+                int rparam = actual % 4;
                 int rstep = (r == 11 || rparam == 0 || rparam == 3) ? 1 : ((rparam == 1) ? 5 : 2);
                 // Tap on [-] box (175..205) or [+] box (212..242)
                 if (touch.px >= 175 && touch.px <= 205) {

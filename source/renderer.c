@@ -635,24 +635,32 @@ void renderer_draw_ui_calibration(void) {
     int w = g_game.calib_wave_idx;
     const WaveDef *wd = &g_balance.waves[w];
 
-    // 12 rows: every per-wave tier variable plus wave reward
-    static const char *row_labels[12] = {
+    // 24 rows, shown ten at a time while scrolling with Up/Down
+    static const char *row_labels[24] = {
         "T1 LARVA COUNT", "T1 LARVA DELAY", "T1 LARVA SPEED", "T1 LARVA HP",
         "T2 RIPPER COUNT", "T2 RIPPER DELAY", "T2 RIPPER SPEED", "T2 RIPPER HP",
-        "T3 HORMAG COUNT", "T3 HORMAG DELAY", "T3 HORMAG SPEED", "WAVE SCRAP"
+        "T3 HORMAG COUNT", "T3 HORMAG DELAY", "T3 HORMAG SPEED", "WAVE SCRAP",
+        "T4 RAVENER COUNT", "T4 RAVENER DELAY", "T4 RAVENER SPEED", "T4 RAVENER HP",
+        "T5 CARNIFEX COUNT", "T5 CARNIFEX DELAY", "T5 CARNIFEX SPEED", "T5 CARNIFEX HP",
+        "T6 HIEROPH COUNT", "T6 HIEROPH DELAY", "T6 HIEROPH SPEED", "T6 HIEROPH HP"
     };
 
-    for (int r = 0; r < 12; r++) {
+    int first_row = (g_game.calib_row / 10) * 10;
+    for (int n = 0; n < 10 && first_row + n < 24; n++) {
+        int r = first_row + n;
         int tier = r / 4;
         int param = r % 4;
         int val = 0;
         if (r == 11) val = wd->scrap_base;
-        else if (param == 0) val = wd->tiers[tier].count;
-        else if (param == 1) val = wd->tiers[tier].delay;
-        else if (param == 2) val = wd->tiers[tier].speed;
+        else if (tier < 3 && param == 0) val = wd->tiers[tier].count;
+        else if (tier < 3 && param == 1) val = wd->tiers[tier].delay;
+        else if (tier < 3 && param == 2) val = wd->tiers[tier].speed;
         else if (param == 3) val = g_balance.enemy_hp[tier];
+        else if (tier >= 3 && param == 0) val = g_balance.advanced_waves[w][tier - 3].count;
+        else if (tier >= 3 && param == 1) val = g_balance.advanced_waves[w][tier - 3].delay;
+        else if (tier >= 3 && param == 2) val = g_balance.advanced_waves[w][tier - 3].speed;
 
-        int y = 31 + r * 10;
+        int y = 31 + n * 10;
         int is_sel = (g_game.calib_row == r);
         uint16_t row_bg = is_sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL;
         uint16_t row_border = is_sel ? COLOR_AMBER : COLOR_IRON_BORDER;
