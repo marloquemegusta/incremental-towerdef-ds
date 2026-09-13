@@ -147,8 +147,23 @@ typedef enum {
     MODE_PAUSED,
     MODE_GAME_OVER,
     MODE_UPGRADES,
-    MODE_CALIBRATION
+    MODE_CALIBRATION,
+    MODE_DEBUG_SANDBOX
 } GameMode;
+
+// Debug / Test Sandbox parameters state
+typedef struct {
+    int enemy_tier;       // 0..5 (Biocaste)
+    int enemy_hp;         // 1..99999
+    int enemy_speed;      // 0..120 px/s (0 = frozen dummy)
+    int turret_firerate;  // 1..30 frames fire interval
+    int turret_range;     // 30..200 px radius
+    int turret_damage;    // 1..999 damage per bullet
+    int turret_infinite_ammo; // 1 = infinite ammo
+    int run_sim;          // 0 = paused/step, 1 = live continuous
+    int edit_row;         // 0..5 for D-Pad parameter tuning
+    int spawn_count;
+} DebugSandboxState;
 
 // Editable configuration per enemy tier inside each Wave
 typedef struct {
@@ -233,6 +248,7 @@ typedef struct {
     int calib_saved_timer;       // Feedback notification ("SAVED")
 
     UpgradeTree upgrades;
+    DebugSandboxState sandbox;
 } GameContext;
 
 // Upgrades helper
@@ -267,6 +283,8 @@ void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held);
+void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held);
+void game_sandbox_spawn_enemy(int x, int y);
 void game_toggle_pause(void);
 void game_reset_to_prep(void);
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration);
@@ -302,6 +320,7 @@ void renderer_draw_ui_pause(void);
 void renderer_draw_ui_game_over(void);
 void renderer_draw_ui_upgrades(void);
 void renderer_draw_ui_calibration(void);
+void renderer_draw_ui_sandbox(void);
 void renderer_present(void);
 
 // Top screen presentation
