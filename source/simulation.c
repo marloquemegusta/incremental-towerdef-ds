@@ -86,10 +86,29 @@ void balance_config_load(void) {
     FILE *f = fopen("fat:/towerds_balance.bin", "rb");
     if (!f) f = fopen("towerds_balance.bin", "rb");
     if (f) {
-        GameBalanceConfig loaded;
-        if (fread(&loaded, sizeof(GameBalanceConfig), 1, f) == 1) {
-            if (loaded.magic == 0x544F5744) {
-                memcpy(&g_balance, &loaded, sizeof(GameBalanceConfig));
+        uint8_t raw[sizeof(GameBalanceConfig)];
+        size_t n = fread(raw, 1, sizeof(raw), f);
+        if (n == sizeof(GameBalanceConfig)) {
+            GameBalanceConfig loaded;
+            memcpy(&loaded, raw, sizeof(loaded));
+            if (loaded.magic == 0x544F5744) memcpy(&g_balance, &loaded, sizeof(g_balance));
+        } else if (n == 1576) {
+            /* Migrate the previous 6-upgrade format without losing user tuning. */
+            uint32_t old_magic;
+            memcpy(&old_magic, raw + 1572, sizeof(old_magic));
+            if (old_magic == 0x544F5744) {
+                memcpy(&g_balance.waves[0], raw, 1120);
+                memcpy(&g_balance.enemy_hp[0], raw + 1120, 24);
+                memcpy(&g_balance.enemy_scrap[0], raw + 1144, 24);
+                memcpy(&g_balance.upgrade_costs[0][0], raw + 1168, 240);
+                memcpy(&g_balance.turret_damage[0], raw + 1408, 20);
+                memcpy(&g_balance.turret_fire_interval[0], raw + 1428, 20);
+                memcpy(&g_balance.turret_range[0], raw + 1448, 20);
+                memcpy(&g_balance.turret_magazine[0], raw + 1468, 24);
+                memcpy(&g_balance.bunker_start_hp, raw + 1492, 16);
+                memcpy(&g_balance.enemy_bite_damage[0], raw + 1508, 24);
+                memcpy(&g_balance.enemy_bite_interval[0], raw + 1532, 24);
+                memcpy(&g_balance.conveyor_reload_interval[0], raw + 1556, 16);
             }
         }
         fclose(f);
