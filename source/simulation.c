@@ -1203,13 +1203,28 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         g_game.calib_wave_idx = (g_game.calib_wave_idx + 1) % 20;
     }
 
-    // Up / Down: select parameter row on the current page.
+    // Up / Down: select parameter row. Held buttons repeat, then accelerate.
     int max_rows = (g_game.calib_page == 0) ? 24 : ((g_game.calib_page == 1) ? 48 : 40);
+    int nav_dir = 0;
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
+        g_game.calib_hold_timer = 0;
+        nav_dir = -1;
     }
     if (keys_down & KEY_DOWN) {
         g_game.calib_row = (g_game.calib_row + 1) % max_rows;
+        g_game.calib_hold_timer = 0;
+        nav_dir = 1;
+    }
+    if (!nav_dir && (keys_held & (KEY_UP | KEY_DOWN))) {
+        g_game.calib_hold_timer++;
+        if (g_game.calib_hold_timer >= 10) {
+            int repeat_every = (g_game.calib_hold_timer >= 45) ? 1 : 3;
+            if ((g_game.calib_hold_timer % repeat_every) == 0) {
+                nav_dir = (keys_held & KEY_UP) ? -1 : 1;
+                g_game.calib_row = (g_game.calib_row + max_rows + nav_dir) % max_rows;
+            }
+        }
     }
 
     // Left / Right with continuous autorepeat

@@ -581,7 +581,7 @@ void renderer_draw_ui_calibration(void) {
 
     // Title banner
     renderer_draw_text(6, 4, "CALIBRATION", COLOR_AMBER);
-    renderer_draw_text(150, 4, "X PREV Y NEXT", COLOR_WHITE);
+    renderer_draw_text(145, 4, "X <TAB   TAB> Y", COLOR_WHITE);
     if (g_game.calib_saved_timer > 0) {
         g_game.calib_saved_timer--;
         renderer_draw_text(180, 4, "SAVED (SD)", COLOR_PHOSPHOR_GREEN);
@@ -589,7 +589,8 @@ void renderer_draw_ui_calibration(void) {
 
     if (g_game.calib_page != 0) {
         char buf[64];
-        const char *title = (g_game.calib_page == 1) ? "GLOBAL / TURRET" : "UPGRADE COSTS";
+        static const char *page_titles[3] = { "WAVE SPAWNS", "COMBAT / ENEMIES", "UPGRADE COSTS" };
+        const char *title = page_titles[g_game.calib_page];
         renderer_draw_text(6, 18, title, COLOR_WHITE);
         snprintf(buf, sizeof(buf), "PAGE %d/3", g_game.calib_page + 1);
         renderer_draw_text(190, 18, buf, COLOR_AMBER);
@@ -623,8 +624,8 @@ void renderer_draw_ui_calibration(void) {
             }
             snprintf(buf, sizeof(buf), "%d  [-] [+]", val); renderer_draw_text(150, y + 2, buf, COLOR_PHOSPHOR_GREEN);
         }
-        renderer_draw_text(8, 166, "X PREV  Y NEXT  B BACK", COLOR_AMBER);
-        renderer_draw_text(8, 178, "LEFT/RIGHT EDIT - AUTO SAVE", COLOR_PHOSPHOR_GREEN);
+        renderer_draw_text(8, 166, "X <TAB   TAB> Y   B BACK", COLOR_AMBER);
+        renderer_draw_text(8, 178, "UP/DOWN NAV (HOLD=FAST)  L/R EDIT", COLOR_PHOSPHOR_GREEN);
         return;
     }
 
@@ -640,6 +641,7 @@ void renderer_draw_ui_calibration(void) {
     char buf[64];
     snprintf(buf, sizeof(buf), "SELECT WAVE: %d/20 (L/R)", g_game.calib_wave_idx + 1);
     renderer_draw_text(52, 20, buf, COLOR_WHITE);
+    renderer_draw_text(190, 20, "TAB 1/3", COLOR_AMBER);
 
     int w = g_game.calib_wave_idx;
     const WaveDef *wd = &g_balance.waves[w];
