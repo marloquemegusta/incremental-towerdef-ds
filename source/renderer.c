@@ -589,33 +589,29 @@ void renderer_draw_ui_calibration(void) {
 
     if (g_game.calib_page != 0) {
         char buf[64];
-        static const char *page_titles[3] = { "WAVE SPAWNS", "COMBAT / ENEMIES", "UPGRADE COSTS" };
+        static const char *page_titles[4] = { "WAVE SPAWNS", "ENEMY STATS", "BASE / TURRETS", "UPGRADES" };
         const char *title = page_titles[g_game.calib_page];
         renderer_draw_text(6, 18, title, COLOR_WHITE);
-        snprintf(buf, sizeof(buf), "PAGE %d/3", g_game.calib_page + 1);
+        snprintf(buf, sizeof(buf), "PAGE %d/4", g_game.calib_page + 1);
         renderer_draw_text(190, 18, buf, COLOR_AMBER);
         int first = (g_game.calib_page == 1) ? (g_game.calib_row / 10) * 10 : (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 1) ? 48 : 40;
-        static const char *global_labels[48] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4", "RANGE LV0", "RANGE LV1", "RANGE LV2", "RANGE LV3", "RANGE LV4", "LARVA HP", "RIPPER HP", "HORMAGAUNT HP", "RAVENER HP", "CARNIFEX HP", "HIEROPHANT HP", "LARVA SCRAP", "RIPPER SCRAP", "HORMAGAUNT SCRAP", "RAVENER SCRAP", "CARNIFEX SCRAP", "HIEROPHANT SCRAP", "LARVA BITE DMG", "RIPPER BITE DMG", "HORMAGAUNT BITE DMG", "RAVENER BITE DMG", "CARNIFEX BITE DMG", "HIEROPHANT BITE DMG", "CONVEYOR LV0", "CONVEYOR LV1", "CONVEYOR LV2", "CONVEYOR LV3", "LARVA BITE FRAMES", "RIPPER BITE FRAMES", "HORMAGAUNT BITE FRAMES", "RAVENER BITE FRAMES", "CARNIFEX BITE FRAMES", "HIEROPHANT BITE FRAMES", "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4", "MAGAZINE LV5" };
+        int last = (g_game.calib_page == 3) ? 40 : 24;
+        static const char *enemy_labels[24] = { "LARVA HP", "LARVA SCRAP", "LARVA BITE DMG", "LARVA BITE FRAMES", "RIPPER HP", "RIPPER SCRAP", "RIPPER BITE DMG", "RIPPER BITE FRAMES", "HORMAG HP", "HORMAG SCRAP", "HORMAG BITE DMG", "HORMAG BITE FRAMES", "RAVENER HP", "RAVENER SCRAP", "RAVENER BITE DMG", "RAVENER BITE FRAMES", "CARNIFEX HP", "CARNIFEX SCRAP", "CARNIFEX BITE DMG", "CARNIFEX BITE FRAMES", "HIEROPH HP", "HIEROPH SCRAP", "HIEROPH BITE DMG", "HIEROPH BITE FRAMES" };
+        static const char *base_labels[24] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4", "RANGE LV0", "RANGE LV1", "RANGE LV2", "RANGE LV3", "RANGE LV4", "CONVEYOR LV0", "CONVEYOR LV1", "CONVEYOR LV2", "CONVEYOR LV3", "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4", "MAGAZINE LV5" };
         for (int n = 0; n < 10 && first + n < last; n++) {
             int r = first + n, val = 0;
-            if (g_game.calib_page == 1) {
+            if (g_game.calib_page == 1) { int e=r/4, f=r%4; val = f==0 ? g_balance.enemy_hp[e] : f==1 ? g_balance.enemy_scrap[e] : f==2 ? g_balance.enemy_bite_damage[e] : g_balance.enemy_bite_interval[e]; }
+            else if (g_game.calib_page == 2) {
                 if (r < 4) { int *p[4] = { &g_balance.bunker_start_hp, &g_balance.wave_duration_frames, &g_balance.wave_bonus_base, &g_balance.wave_bonus_per_wave }; val = *p[r]; }
-                else if (r < 9) val = g_balance.turret_damage[r - 4];
-                else if (r < 14) val = g_balance.turret_range[r - 9];
-                else if (r < 20) val = g_balance.enemy_hp[r - 14];
-                else if (r < 26) val = g_balance.enemy_scrap[r - 20];
-                else if (r < 32) val = g_balance.enemy_bite_damage[r - 26];
-                else if (r < 36) val = g_balance.conveyor_reload_interval[r - 32];
-                else if (r < 42) val = g_balance.enemy_bite_interval[r - 36];
-                else if (r < 48) val = g_balance.turret_magazine[r - 42];
+                else if (r < 9) val = g_balance.turret_damage[r-4]; else if (r < 14) val = g_balance.turret_range[r-9]; else if (r < 18) val = g_balance.conveyor_reload_interval[r-14]; else val = g_balance.turret_magazine[r-18];
             } else {
                 int u = r / 5, l = r % 5; val = (int)g_balance.upgrade_costs[u][l];
             }
             int y = 32 + n * 13; int sel = (r == g_game.calib_row);
             renderer_fill_rect(6, y, 244, 12, sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL);
             renderer_draw_rect(6, y, 244, 12, sel ? COLOR_AMBER : COLOR_IRON_BORDER);
-            if (g_game.calib_page == 1) renderer_draw_text(10, y + 2, global_labels[r], COLOR_WHITE);
+            if (g_game.calib_page == 1) renderer_draw_text(10, y + 2, enemy_labels[r], COLOR_WHITE);
+            else if (g_game.calib_page == 2) renderer_draw_text(10, y + 2, base_labels[r], COLOR_WHITE);
             else {
                 static const char *names[7] = { "CALIBER", "FIRE RATE", "MAG SIZE", "BIO HARVEST", "SUPPLY CONVEYOR", "AUTO TARGET", "EXTRA TURRETS" };
                 if (r < 35) snprintf(buf, sizeof(buf), "%s LV%d", names[r / 5], r % 5);
@@ -641,7 +637,7 @@ void renderer_draw_ui_calibration(void) {
     char buf[64];
     snprintf(buf, sizeof(buf), "SELECT WAVE: %d/20 (L/R)", g_game.calib_wave_idx + 1);
     renderer_draw_text(52, 20, buf, COLOR_WHITE);
-    renderer_draw_text(190, 20, "TAB 1/3", COLOR_AMBER);
+    renderer_draw_text(190, 20, "TAB 1/4", COLOR_AMBER);
 
     int w = g_game.calib_wave_idx;
     const WaveDef *wd = &g_balance.waves[w];
