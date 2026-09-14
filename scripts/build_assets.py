@@ -261,7 +261,12 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
     frame %= type->frame_count;
     int source_dir = 0;
     if (type->render_mode == ENEMY_RENDER_DIRECTIONAL && type->direction_count > 0) {
-        source_dir = dir % type->direction_count;
+        // The Hydralisk master is ordered from the front/down pose through
+        // the side poses to the rear/up pose. It contains one extra end pose;
+        // use the first eight source directions and keep the game compass order.
+        static const uint8_t source_direction_for_game_direction[8] =
+            { 4, 3, 2, 1, 0, 7, 6, 5 };
+        source_dir = source_direction_for_game_direction[dir & 7];
     }
 
     const EnemyFrameDef *fd = &type->frames[source_dir][frame];
