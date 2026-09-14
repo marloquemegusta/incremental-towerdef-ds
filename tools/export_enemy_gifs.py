@@ -47,22 +47,9 @@ for pose in range(7):
                 r, g, b, a = pixels[x, y]
                 if abs(r - g) < 8 and abs(g - b) < 8 and 80 <= r <= 180:
                     pixels[x, y] = (96, 96, 96, 255)
-        collage.alpha_composite(cell, (direction * display_size, pose * 0))
-    # The grid is laid out as directions across columns; repeat the current
-    # pose as a single readable row with all nine views.
-    row = Image.new("RGBA", (display_size * 9, display_size), (96, 96, 96, 255))
-    for direction in range(9):
-        cell = source.crop((direction * cell_size, pose * cell_size,
-                            (direction + 1) * cell_size, (pose + 1) * cell_size))
-        cell = cell.resize((display_size, display_size), Image.Resampling.NEAREST)
-        pixels = cell.load()
-        for y in range(display_size):
-            for x in range(display_size):
-                r, g, b, a = pixels[x, y]
-                if abs(r - g) < 8 and abs(g - b) < 8 and 80 <= r <= 180:
-                    pixels[x, y] = (96, 96, 96, 255)
-        row.alpha_composite(cell, (direction * display_size, 0))
-    collage_frames.append(row)
+        collage.alpha_composite(cell, ((direction % 3) * display_size,
+                                       (direction // 3) * display_size))
+    collage_frames.append(collage)
 
 collage_frames[0].save(DEST_DIR / "t2_hydralisk_walk_views.gif",
                         save_all=True, append_images=collage_frames[1:],
