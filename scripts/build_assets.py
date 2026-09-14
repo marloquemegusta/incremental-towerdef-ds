@@ -265,7 +265,7 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
         // the side poses to the rear/up pose. It contains one extra end pose;
         // use the first eight source directions and keep the game compass order.
         static const uint8_t source_direction_for_game_direction[8] =
-            { 4, 3, 2, 1, 0, 7, 6, 5 };
+            { 0, 1, 2, 3, 4, 5, 6, 7 };
         source_dir = source_direction_for_game_direction[dir & 7];
     }
 
@@ -302,12 +302,11 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
         int angle = direction_angles[dir & 7];
         int c = fixed_cos(angle);
         int s = fixed_sin(angle);
-        int ac = (c < 0) ? -c : c;
-        int as = (s < 0) ? -s : s;
-        int rw = (ac * w + as * h + 255) >> 8;
-        int rh = (as * w + ac * h + 255) >> 8;
-        if (rw < 1) rw = 1;
-        if (rh < 1) rh = 1;
+        // Keep one stable square canvas for every angle. Recomputing the
+        // rotated bounds per frame makes the sprite visibly jump when its
+        // direction changes and can clip edge pixels at diagonal angles.
+        int rw = w + h;
+        int rh = rw;
         int rox = cx - (rw / 2);
         int roy = cy - (rh / 2);
         int src_cx = w / 2;
