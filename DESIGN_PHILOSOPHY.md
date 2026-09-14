@@ -50,12 +50,16 @@ Documento canónico consolidado de visión de juego, arquitectura de simulación
 
 ## 4. Estructura de Oleadas y Sistema de Calibración en Hardware
 
-### A. Las 20 Oleadas de Asedio
-El modo estándar se compone de **20 oleadas incrementales**. Cada oleada define de forma independiente la composición de las tres primeras castas xenos:
-
-1. **Tier 1 (Larva Rastrera - Micro-Swarm):** Horda rápida de choque, bajo impacto por baja, volumen alto.
-2. **Tier 2 (Ripper Devorador - Vanguardia):** Tamaño medio, mayor resistencia y valor de biomasa intermedio.
-3. **Tier 3 (Hormagaunt - Asalto Biológico):** Unidad de ruptura, mayor vitalidad y cadencia de avance sostenida.
+### A. Las 20 Oleadas de Asedio y el Plantel de Amenazas (8 Especies StarCraft)
+El modo estándar se compone de **20 oleadas incrementales**. Cada oleada define de forma independiente la composición y cadencia de aparición de las 8 especies de amenazas xenos, superando el esquema lineal de tiers en favor de roles tácticos bien diferenciados:
+1. **Scourge (Volador Kamikaze):** Amenaza aérea rápida y errática; obliga a priorizar el cielo antes de que impacte.
+2. **Zergling (Enjambre de Choque):** Alta velocidad y volumen masivo; pone a prueba la saturación del Heavy Bolter.
+3. **Hydralisk (Infantería Pesada a Distancia):** Andanada sostenida de bio-espinas contra la línea defensiva.
+4. **Mutalisk (Cazador Alado de Flanco):** Alta movilidad aérea a cota superior con sombra dinámica proyectada.
+5. **Defiler (Caster Biológico / Debilitador):** Unidad reptante de gran resistencia que distorsiona las líneas de tiro.
+6. **Lurker (Ariete Acorazado con Espinas):** Cuadrúpedo rompe-líneas de blindaje pesado; absorbe grandes impactos balísticos.
+7. **Guardian (Bombardero Pesado de Asedio):** Fortaleza volante lenta de largo alcance que asedia el Sanctum desde la lejanía.
+8. **Ultralisk (Titán Coloso / Boss de Asedio):** Apisonadora biológica monstruosa con hojas Kaiser; requiere fuego concentrado inmediato.
 
 ### B. Menú de Calibración Canónico (`[CALIB]`)
 - **Acceso Exclusivo:** Disponible únicamente durante la fase de preparación (`MODE_PREPARATION`) pulsando el botón táctil **`[CALIB]`**. Se ha retirado cualquier atajo directo de botón físico (`KEY_Y` queda inactivo) para evitar activaciones accidentales durante el juego.
