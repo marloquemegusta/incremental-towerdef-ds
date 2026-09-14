@@ -12,6 +12,8 @@
 typedef struct {
     uint8_t w;
     uint8_t h;
+    int8_t offset_x;
+    int8_t offset_y;
     const uint16_t *pixels;
 } EnemyFrameDef;
 
