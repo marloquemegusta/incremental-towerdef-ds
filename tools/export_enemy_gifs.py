@@ -60,3 +60,24 @@ for direction in range(9):
                     save_all=True, append_images=frames[1:],
                     duration=140, loop=0, disposal=2, transparency=0)
     print(f"wrote direction {direction} ({frames[0].width}x{frames[0].height}, 7 poses)")
+
+# One animated 3x3 table: each square keeps one direction fixed while all
+# nine squares advance through their own seven-frame walk cycle together.
+table_frames = []
+table_cell_width = cell_width * scale
+table_cell_height = cell_height * scale
+for pose in range(7):
+    table = Image.new("RGBA", (table_cell_width * 3, table_cell_height * 3), (0, 0, 0, 0))
+    for direction in range(9):
+        cell = source.crop((pose * cell_width, direction * cell_height,
+                            (pose + 1) * cell_width,
+                            (direction + 1) * cell_height))
+        cell = cell.resize((table_cell_width, table_cell_height), Image.Resampling.NEAREST)
+        table.alpha_composite(cell, ((direction % 3) * table_cell_width,
+                                     (direction // 3) * table_cell_height))
+    table_frames.append(table)
+
+table_frames[0].save(DEST_DIR / "t2_hydralisk_walk_all_views_4x.gif",
+                     save_all=True, append_images=table_frames[1:],
+                     duration=140, loop=0, disposal=2, transparency=0)
+print(f"wrote {DEST_DIR / 't2_hydralisk_walk_all_views_4x.gif'} (3x3 table, 7 poses)")

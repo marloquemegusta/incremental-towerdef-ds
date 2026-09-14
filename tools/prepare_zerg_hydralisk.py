@@ -16,9 +16,10 @@ row_pitch = 58
 master = Image.new("RGBA", (cell_width * 7, cell_height * 9), (0, 0, 0, 0))
 for direction in range(9):
     for pose in range(7):
-        cell = im.crop((2 + pose * column_pitch, 2 + direction * row_pitch,
-                        2 + pose * column_pitch + cell_width,
-                        2 + direction * row_pitch + cell_height))
+        # Source layout is 7 animation rows x 9 directions.
+        cell = im.crop((2 + direction * column_pitch, 2 + pose * row_pitch,
+                        2 + direction * column_pitch + cell_width,
+                        2 + pose * row_pitch + cell_height))
         pixels = cell.load()
         for y in range(cell.height):
             for x in range(cell.width):
