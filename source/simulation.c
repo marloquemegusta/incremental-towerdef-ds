@@ -50,8 +50,8 @@ static const GameBalanceConfig s_default_balance = {
         { .tiers = { { 220,  8, 48, 30 }, { 110, 15, 55, 80 }, { 80, 30, 65, 160 } }, .scrap_base = 40 },
         { .tiers = { { 250,  6, 50, 35 }, { 130, 12, 56, 90 }, { 100, 25, 66, 180 } }, .scrap_base = 50 }
     },
-    .enemy_hp = { 1, 8, 40, 160, 2500, 40000 },
-    .enemy_scrap = { 1, 3, 10, 60, 750, 20000 },
+    .enemy_hp = { 18, 25, 75, 160, 320, 500, 1100, 2600 },
+    .enemy_scrap = { 4, 5, 15, 35, 70, 120, 250, 600 },
     .upgrade_costs = { {15,25,40,65,100}, {20,30,45,70,110}, {15,25,35,55,85}, {25,40,65,105,170}, {50,90,160,0,0}, {80,0,0,0,0}, {200,400,800,1600,0} },
     .turret_damage = { 2, 3, 4, 6, 8 },
     .turret_fire_interval = { 18, 14, 10, 7, 5 },
@@ -59,8 +59,8 @@ static const GameBalanceConfig s_default_balance = {
     .turret_magazine = { 20, 35, 50, 70, 100, 150 },
     .bunker_start_hp = 100, .wave_duration_frames = 1800,
     .wave_bonus_base = 10, .wave_bonus_per_wave = 5,
-    .enemy_bite_damage = { 1, 3, 5, 7, 9, 11 },
-    .enemy_bite_interval = { 45, 45, 45, 45, 45, 45 },
+    .enemy_bite_damage = { 8, 2, 4, 6, 10, 14, 20, 35 },
+    .enemy_bite_interval = { 30, 40, 45, 40, 50, 45, 60, 50 },
     .conveyor_reload_interval = { 9999, 60, 20, 10 },
     .range_upgrade_costs = { 30, 60, 120, 240, 480 },
     .magic = 0x544F5744 // "TOWD"
@@ -360,7 +360,7 @@ void game_start_wave(void) {
     const WaveDef *wdef = &g_balance.waves[w_idx];
 
     g_game.enemies_to_spawn = 0;
-    for (int t = 0; t < 6; t++) {
+    for (int t = 0; t < 8; t++) {
         const WaveTierConfig *tier_cfg = (t < 3) ? &wdef->tiers[t] : &g_balance.advanced_waves[w_idx][t - 3];
         g_game.enemies_to_spawn += tier_cfg->count;
         g_game.wave_spawned_tier[t] = 0;
@@ -370,6 +370,30 @@ void game_start_wave(void) {
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_death_particles, 0, sizeof(g_death_particles));
+
+    // Showcase swarm with all 8 distinct StarCraft species:
+    // 0: Scourge (Fast Kamikaze flyer with ground shadow)
+    spawn_enemy(0, 18, 48);
+    spawn_enemy(0, 18, 46);
+    // 1: Zergling (Agile vanguard swarmer, dual claw attack)
+    spawn_enemy(1, 25, 40);
+    spawn_enemy(1, 25, 38);
+    // 2: Hydralisk (Upright needle spitter assault)
+    spawn_enemy(2, 75, 32);
+    spawn_enemy(2, 75, 34);
+    // 3: Mutalisk (Bat-winged hunter flyer with ground shadow)
+    spawn_enemy(3, 160, 36);
+    spawn_enemy(3, 160, 34);
+    // 4: Defiler (Creeping bio-caster)
+    spawn_enemy(4, 320, 26);
+    spawn_enemy(4, 320, 25);
+    // 5: Lurker (Armored quadruped ram with spines)
+    spawn_enemy(5, 500, 28);
+    spawn_enemy(5, 500, 30);
+    // 6: Guardian (Heavy manta bomber flyer with ground shadow)
+    spawn_enemy(6, 1100, 22);
+    // 7: Ultralisk (Titanic colossus boss, massive Kaiser blades)
+    spawn_enemy(7, 2600, 20);
 
     // Reset locked targets
     for (int t = 0; t < MAX_TURRETS; t++) {
@@ -401,8 +425,9 @@ void game_update_simulation(void) {
     if (w_idx >= 20) w_idx = 19;
     const WaveDef *wdef = &g_balance.waves[w_idx];
 
-    // 1. Spawning per tier (all six enemy variants)
-    for (int t = 0; t < 6; t++) {
+    // 1. Spawning per tier (all 8 enemy variants in roster)
+    for (int t = 0; t < ENEMY_VARIANT_COUNT; t++) {
+        // Map variant to wave config slots
         const WaveTierConfig *tier_cfg = (t < 3) ? &wdef->tiers[t] : &g_balance.advanced_waves[w_idx][t - 3];
         if (g_game.wave_spawned_tier[t] < tier_cfg->count) {
             g_game.wave_spawn_timer_tier[t]++;
@@ -474,9 +499,12 @@ void game_update_simulation(void) {
             // Bite Turret!
             g_enemies[i].biting_target = hitting_turret;
             g_enemies[i].bite_timer++;
-            if (g_enemies[i].bite_timer >= g_balance.enemy_bite_interval[g_enemies[i].variant]) {
+            int b_variant = g_enemies[i].variant;
+            if (b_variant < 0) b_variant = 0;
+            if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
+            if (g_enemies[i].bite_timer >= g_balance.enemy_bite_interval[b_variant]) {
                 g_enemies[i].bite_timer = 0;
-                int bite_dmg = g_balance.enemy_bite_damage[g_enemies[i].variant];
+                int bite_dmg = g_balance.enemy_bite_damage[b_variant];
                 if (g_turrets[hitting_turret].hp > bite_dmg) {
                     g_turrets[hitting_turret].hp -= bite_dmg;
                 } else {
@@ -497,33 +525,74 @@ void game_update_simulation(void) {
             if (spd < 1) spd = 1;
         }
 
+        // 4b. Soft separation repulsion between nearby enemies to prevent stacking/overlap
+        int sep_force_x = 0;
+        int sep_force_y = 0;
+        for (int j = 0; j < MAX_ENEMIES; j++) {
+            if (i == j || !g_enemies[j].active) continue;
+            // Only check enemies within a fast bounding box (Manhattan distance < 32 px)
+            int odx = ex - g_enemies[j].x;
+            int ody = ey - g_enemies[j].y;
+            int aodx = (odx < 0) ? -odx : odx;
+            int aody = (ody < 0) ? -ody : ody;
+            if (aodx < TO_FP(24) && aody < TO_FP(24)) {
+                int dist_sq = (aodx >> FP_SHIFT) * (aodx >> FP_SHIFT) + (aody >> FP_SHIFT) * (aody >> FP_SHIFT);
+                // Repel if closer than 16 px center-to-center
+                if (dist_sq < (16 * 16) && dist_sq > 0) {
+                    // Small repulsive impulse in fixed point (~0.25 to 0.5 px)
+                    int push = TO_FP(1) / 3;
+                    if (odx > 0) sep_force_x += push;
+                    else if (odx < 0) sep_force_x -= push;
+                    if (ody > 0) sep_force_y += push / 2;
+                    else if (ody < 0) sep_force_y -= push / 2;
+                }
+            }
+        }
+        ex += sep_force_x;
+        // Keep within battlefield bounds [8..248]
+        if (ex < TO_FP(8)) ex = TO_FP(8);
+        if (ex > TO_FP(248)) ex = TO_FP(248);
+        g_enemies[i].x = ex;
+
         // Check if reaching Bunker Sanctum baseline (py >= 344):
-        // Never teleport! If outside the bunker front width (104..152), walk purely horizontally.
+        // Never teleport! Stagger frontline along bunker wall (x: 88..168) using index-based slot
+        int slot_x = 88 + ((i * 13) % 80); // Distributed slots across 80 px width
         if (py >= 344) {
             g_enemies[i].y = TO_FP(344);
             g_enemies[i].vy = 0;
 
-            if (px < 104) {
+            if (px < slot_x - 3) {
                 g_enemies[i].x += spd;
                 g_enemies[i].vx = spd;
-                g_enemies[i].dir = 0; // East
+                g_enemies[i].dir = 2; // East (dir 2 = East in 8-way compass)
                 g_enemies[i].biting_target = -1;
                 continue;
-            } else if (px > 152) {
+            } else if (px > slot_x + 3) {
                 g_enemies[i].x -= spd;
                 g_enemies[i].vx = -spd;
-                g_enemies[i].dir = 2; // West
+                g_enemies[i].dir = 6; // West (dir 6 = West in 8-way compass)
                 g_enemies[i].biting_target = -1;
                 continue;
             }
 
-            // Arrived at Bunker front wall: bite the Sanctum!
+            // Arrived at Bunker slot: bite the Sanctum!
             g_enemies[i].vx = 0;
+            g_enemies[i].dir = 4; // Face South against the bunker wall
             g_enemies[i].biting_target = 99;
             g_enemies[i].bite_timer++;
+
+            // Cycle attack animation while attacking
+            const EnemyTypeDef *type = &g_enemy_types[g_enemies[i].variant];
+            if (type->attack_frame_count > 0) {
+                g_enemies[i].anim_frame = (g_enemies[i].bite_timer / 6) % type->attack_frame_count;
+            }
+
             if (g_enemies[i].bite_timer >= 40) {
                 g_enemies[i].bite_timer = 0;
-                uint64_t bite_dmg = g_balance.enemy_bite_damage[g_enemies[i].variant];
+                int b_variant = g_enemies[i].variant;
+                if (b_variant < 0) b_variant = 0;
+                if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
+                uint64_t bite_dmg = g_balance.enemy_bite_damage[b_variant];
                 if (g_game.mode != MODE_DEBUG_SANDBOX) {
                     if (g_game.bunker_hp > bite_dmg) {
                         g_game.bunker_hp -= bite_dmg;
@@ -538,14 +607,13 @@ void game_update_simulation(void) {
         }
 
         // Advance: vertical downward in parallel lanes across top screen and upper bottom screen
-        g_enemies[i].y += spd;
+        g_enemies[i].y += spd + sep_force_y;
         g_enemies[i].vy = spd;
-        g_enemies[i].vx = 0;
+        g_enemies[i].vx = sep_force_x;
 
-        // Funnel X towards Sanctum bunker front ONLY in lower bottom screen (py > 255)
+        // Funnel X towards Sanctum bunker slot in lower bottom screen (py > 255)
         if (spd > 0 && py > 255) {
-            // Distribute across bunker front width (x: 110..146) based on initial lane
-            int target_x = TO_FP(110 + ((ex >> FP_SHIFT) * 36) / 256);
+            int target_x = TO_FP(slot_x);
             int h_spd = spd / 3;
             if (h_spd < 1) h_spd = 1;
             if (ex < target_x - TO_FP(4)) {
@@ -786,8 +854,11 @@ void game_update_simulation(void) {
             int local_y = gy - 192;
             int gx = FROM_FP(g_enemies[e].x);
 
-            static const int s_hit_r[ENEMY_VARIANT_COUNT] = { 6, 7, 9, 12, 16, 18 };
-            int r = s_hit_r[g_enemies[e].variant];
+            static const int s_hit_r[ENEMY_VARIANT_COUNT] = { 8, 7, 9, 12, 14, 14, 16, 22 };
+            int v = g_enemies[e].variant;
+            if (v < 0) v = 0;
+            if (v >= ENEMY_VARIANT_COUNT) v = ENEMY_VARIANT_COUNT - 1;
+            int r = s_hit_r[v];
 
             // Check collision at both current position and midpoint to prevent tunneling
             int hit_curr = (abs(curr_bx - gx) <= r && abs(curr_by - local_y) <= r);
@@ -804,7 +875,7 @@ void game_update_simulation(void) {
                     g_game.enemies_alive--;
                     g_game.enemies_killed++;
 
-                    uint64_t base_scrap = g_balance.enemy_scrap[g_enemies[e].variant];
+                    uint64_t base_scrap = g_balance.enemy_scrap[v];
                     uint64_t reward = base_scrap * (1 + g_game.upgrades.bio_harvest_lvl);
                     g_game.scrap += reward;
 
@@ -1208,7 +1279,7 @@ static void calib_modify_val(int delta) {
     if (g_game.calib_page == 1) {
         int enemy = g_game.calib_row / 4, field = g_game.calib_row % 4;
         if (enemy < 0) enemy = 0;
-        if (enemy > 5) enemy = 5;
+        if (enemy >= ENEMY_VARIANT_COUNT) enemy = ENEMY_VARIANT_COUNT - 1;
         if (field == 0) { int n = (int)g_balance.enemy_hp[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_hp[enemy] = (uint32_t)n; }
         else if (field == 1) { int n = (int)g_balance.enemy_scrap[enemy] + delta; if (n < 0) n = 0; g_balance.enemy_scrap[enemy] = (uint32_t)n; }
         else if (field == 2) { g_balance.enemy_bite_damage[enemy] += delta; if (g_balance.enemy_bite_damage[enemy] < 1) g_balance.enemy_bite_damage[enemy] = 1; }
@@ -1304,7 +1375,7 @@ static void calib_modify_val(int delta) {
 
     int row = g_game.calib_row;
     if (row < 0) row = 0;
-    if (row > 11) row = 11;
+    if (row >= 32) row = 31;
 
     if (row == 11) {
         wd->scrap_base += delta;
@@ -1314,8 +1385,9 @@ static void calib_modify_val(int delta) {
         balance_config_save();
         return;
     }
-    if (row >= 12 && row < 24) {
+    if (row >= 12 && row < 32) {
         int tier = 3 + ((row - 12) / 4), param = (row - 12) % 4;
+        if (tier >= 8) tier = 7;
         WaveTierConfig *tc = &g_balance.advanced_waves[w][tier - 3];
         if (param == 3) {
             int hp = (int)g_balance.enemy_hp[tier] + delta;
@@ -1372,20 +1444,23 @@ static void calib_modify_val(int delta) {
 }
 
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held) {
+    // B exits calibration back to preparation
     if (keys_down & KEY_B) {
-        g_game.mode = g_game.previous_mode;
+        g_game.mode = MODE_PREPARATION;
         return;
     }
 
+    // X / Y cycle pages (0..3)
     if (keys_down & KEY_X) {
         g_game.calib_page = (g_game.calib_page + 3) % 4;
         g_game.calib_row = 0;
-    } else if (keys_down & KEY_Y) {
+    }
+    if (keys_down & KEY_Y) {
         g_game.calib_page = (g_game.calib_page + 1) % 4;
         g_game.calib_row = 0;
     }
 
-    // L / R: cycle waves (1..20)
+    // L / R cycle wave index (0..19)
     if (keys_down & KEY_L) {
         g_game.calib_wave_idx = (g_game.calib_wave_idx + 19) % 20;
     }
@@ -1394,7 +1469,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row. Held buttons repeat, then accelerate.
-    int max_rows = (g_game.calib_page == 0) ? 24 : ((g_game.calib_page == 1) ? 24 : ((g_game.calib_page == 2) ? 24 : 40));
+    int max_rows = (g_game.calib_page == 0) ? 32 : ((g_game.calib_page == 1) ? 32 : ((g_game.calib_page == 2) ? 24 : 40));
     int nav_dir = 0;
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;

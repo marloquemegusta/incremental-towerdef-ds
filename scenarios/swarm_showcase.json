@@ -1,0 +1,33 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 30,
+      "capture": "boot"
+    },
+    {
+      "tap": {
+        "x": 220,
+        "y": 182
+      },
+      "frames": 5
+    },
+    {
+      "release": true,
+      "frames": 10
+    },
+    {
+      "frames": 1200,
+      "capture_sequence": "mixed_swarm",
+      "capture_every": 10,
+      "capture": "end"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "boot",
+      "to": "end",
+      "min_changed_pixels": 100
+    }
+  }
+}

@@ -269,49 +269,94 @@ void renderer_draw_turret(const Turret *t, int is_selected) {
 }
 
 void renderer_draw_enemies_top(void) {
+    // Collect visible enemies on top screen
+    int visible_indices[MAX_ENEMIES];
+    int count = 0;
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
+        int gy = FROM_FP(g_enemies[i].y);
+        if (gy >= -32 && gy < 192) {
+            visible_indices[count++] = i;
+        }
+    }
+
+    // Insertion sort by Y (typically < 40 enemies on screen, takes negligible cycles)
+    for (int i = 1; i < count; i++) {
+        int key = visible_indices[i];
+        int key_y = g_enemies[key].y;
+        int j = i - 1;
+        while (j >= 0 && g_enemies[visible_indices[j]].y > key_y) {
+            visible_indices[j + 1] = visible_indices[j];
+            j--;
+        }
+        visible_indices[j + 1] = key;
+    }
+
+    // Render sorted back-to-front (smaller Y first, larger Y drawn on top)
+    for (int idx = 0; idx < count; idx++) {
+        int i = visible_indices[idx];
         int gx = FROM_FP(g_enemies[i].x);
         int gy = FROM_FP(g_enemies[i].y);
-        // Top screen: Y in [0..191]
-        if (gy >= -16 && gy < 192) {
-            enemy_draw_sprite_to_buffer(g_top_backbuffer, gx, gy, g_enemies[i].variant,
-                                       g_enemies[i].anim_frame, g_enemies[i].dir);
-            // Health bar if damaged
-            if (g_enemies[i].hp < g_enemies[i].max_hp) {
-                int bw = 14;
-                int bx = gx - bw / 2;
-                int by = gy - 10;
-                top_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
-                int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
-                if (fill > 0) {
-                    top_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
-                }
+        enemy_draw_sprite_to_buffer(g_top_backbuffer, gx, gy, g_enemies[i].variant,
+                                   g_enemies[i].anim_frame, g_enemies[i].dir,
+                                   (g_enemies[i].biting_target == 99));
+        // Health bar if damaged
+        if (g_enemies[i].hp < g_enemies[i].max_hp) {
+            int bw = 14;
+            int bx = gx - bw / 2;
+            int by = gy - 10;
+            top_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
+            int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
+            if (fill > 0) {
+                top_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
             }
         }
     }
 }
 
 void renderer_draw_enemies_bottom(void) {
+    // Collect visible enemies on bottom screen (global Y in [192..383])
+    int visible_indices[MAX_ENEMIES];
+    int count = 0;
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
+        int gy = FROM_FP(g_enemies[i].y);
+        int ly = gy - 192;
+        if (ly >= -32 && ly < SCREEN_H) {
+            visible_indices[count++] = i;
+        }
+    }
+
+    // Insertion sort by Y
+    for (int i = 1; i < count; i++) {
+        int key = visible_indices[i];
+        int key_y = g_enemies[key].y;
+        int j = i - 1;
+        while (j >= 0 && g_enemies[visible_indices[j]].y > key_y) {
+            visible_indices[j + 1] = visible_indices[j];
+            j--;
+        }
+        visible_indices[j + 1] = key;
+    }
+
+    // Render sorted back-to-front
+    for (int idx = 0; idx < count; idx++) {
+        int i = visible_indices[idx];
         int gx = FROM_FP(g_enemies[i].x);
         int gy = FROM_FP(g_enemies[i].y);
-        // Bottom screen: Y in [192..383] -> local Y = gy - 192
         int ly = gy - 192;
-        if (ly >= -16 && ly < SCREEN_H) {
-            enemy_draw_sprite_to_buffer(g_backbuffer, gx, ly, g_enemies[i].variant,
-                                       g_enemies[i].anim_frame, g_enemies[i].dir);
-            // Health bar if damaged
-            if (g_enemies[i].hp < g_enemies[i].max_hp) {
-                int bw = 14;
-                int bx = gx - bw / 2;
-                int by = ly - 10;
-                renderer_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
-                int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
-                if (fill > 0) {
-                    renderer_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
-                }
+        enemy_draw_sprite_to_buffer(g_backbuffer, gx, ly, g_enemies[i].variant,
+                                   g_enemies[i].anim_frame, g_enemies[i].dir,
+                                   (g_enemies[i].biting_target == 99));
+        // Health bar if damaged
+        if (g_enemies[i].hp < g_enemies[i].max_hp) {
+            int bw = 14;
+            int bx = gx - bw / 2;
+            int by = ly - 10;
+            renderer_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
+            int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
+            if (fill > 0) {
+                renderer_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
             }
         }
     }
@@ -597,13 +642,22 @@ void renderer_draw_ui_calibration(void) {
         renderer_draw_text(6, 18, title, COLOR_WHITE);
         snprintf(buf, sizeof(buf), "PAGE %d/4", g_game.calib_page + 1);
         renderer_draw_text(190, 18, buf, COLOR_AMBER);
-        int first = (g_game.calib_page == 1) ? (g_game.calib_row / 10) * 10 : (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 3) ? 40 : 24;
-        static const char *enemy_labels[24] = { "LARVA HP", "LARVA SCRAP", "LARVA BITE DMG", "LARVA BITE FRAMES", "RIPPER HP", "RIPPER SCRAP", "RIPPER BITE DMG", "RIPPER BITE FRAMES", "HORMAG HP", "HORMAG SCRAP", "HORMAG BITE DMG", "HORMAG BITE FRAMES", "RAVENER HP", "RAVENER SCRAP", "RAVENER BITE DMG", "RAVENER BITE FRAMES", "CARNIFEX HP", "CARNIFEX SCRAP", "CARNIFEX BITE DMG", "CARNIFEX BITE FRAMES", "HIEROPH HP", "HIEROPH SCRAP", "HIEROPH BITE DMG", "HIEROPH BITE FRAMES" };
+        int first = (g_game.calib_row / 10) * 10;
+        int last = (g_game.calib_page == 1) ? 32 : ((g_game.calib_page == 3) ? 40 : 24);
+        static const char *enemy_labels[32] = {
+            "SCOURGE HP", "SCOURGE SCRAP", "SCOURGE DMG", "SCOURGE FRM",
+            "ZERGLING HP", "ZERGLING SCRAP", "ZERGLING DMG", "ZERGLING FRM",
+            "HYDRA HP", "HYDRA SCRAP", "HYDRA DMG", "HYDRA FRM",
+            "MUTA HP", "MUTA SCRAP", "MUTA DMG", "MUTA FRM",
+            "DEFILER HP", "DEFILER SCRAP", "DEFILER DMG", "DEFILER FRM",
+            "LURKER HP", "LURKER SCRAP", "LURKER DMG", "LURKER FRM",
+            "GUARDIAN HP", "GUARDIAN SCRAP", "GUARDIAN DMG", "GUARDIAN FRM",
+            "ULTRA HP", "ULTRA SCRAP", "ULTRA DMG", "ULTRA FRM"
+        };
         static const char *base_labels[24] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4", "RANGE LV0", "RANGE LV1", "RANGE LV2", "RANGE LV3", "RANGE LV4", "CONVEYOR LV0", "CONVEYOR LV1", "CONVEYOR LV2", "CONVEYOR LV3", "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4", "MAGAZINE LV5" };
         for (int n = 0; n < 10 && first + n < last; n++) {
             int r = first + n, val = 0;
-            if (g_game.calib_page == 1) { int e=r/4, f=r%4; val = f==0 ? g_balance.enemy_hp[e] : f==1 ? g_balance.enemy_scrap[e] : f==2 ? g_balance.enemy_bite_damage[e] : g_balance.enemy_bite_interval[e]; }
+            if (g_game.calib_page == 1) { int e=r/4, f=r%4; if (e>=8) e=7; val = f==0 ? g_balance.enemy_hp[e] : f==1 ? g_balance.enemy_scrap[e] : f==2 ? g_balance.enemy_bite_damage[e] : g_balance.enemy_bite_interval[e]; }
             else if (g_game.calib_page == 2) {
                 if (r < 4) { int *p[4] = { &g_balance.bunker_start_hp, &g_balance.wave_duration_frames, &g_balance.wave_bonus_base, &g_balance.wave_bonus_per_wave }; val = *p[r]; }
                 else if (r < 9) val = g_balance.turret_damage[r-4]; else if (r < 14) val = g_balance.turret_range[r-9]; else if (r < 18) val = g_balance.conveyor_reload_interval[r-14]; else val = g_balance.turret_magazine[r-18];
@@ -645,18 +699,21 @@ void renderer_draw_ui_calibration(void) {
     int w = g_game.calib_wave_idx;
     const WaveDef *wd = &g_balance.waves[w];
 
-    // 24 rows, shown ten at a time while scrolling with Up/Down
-    static const char *row_labels[24] = {
-        "T1 LARVA COUNT", "T1 LARVA DELAY", "T1 LARVA SPEED", "T1 LARVA HP",
-        "T2 RIPPER COUNT", "T2 RIPPER DELAY", "T2 RIPPER SPEED", "T2 RIPPER HP",
-        "T3 HORMAG COUNT", "T3 HORMAG DELAY", "T3 HORMAG SPEED", "WAVE SCRAP",
-        "T4 RAVENER COUNT", "T4 RAVENER DELAY", "T4 RAVENER SPEED", "T4 RAVENER HP",
-        "T5 CARNIFEX COUNT", "T5 CARNIFEX DELAY", "T5 CARNIFEX SPEED", "T5 CARNIFEX HP",
-        "T6 HIEROPH COUNT", "T6 HIEROPH DELAY", "T6 HIEROPH SPEED", "T6 HIEROPH HP"
+    // 33 rows (4 params per 8 species + wave scrap), shown ten at a time while scrolling with Up/Down
+    static const char *row_labels[33] = {
+        "SCOURGE COUNT", "SCOURGE DELAY", "SCOURGE SPEED", "SCOURGE HP",
+        "ZERGLING COUNT", "ZERGLING DELAY", "ZERGLING SPEED", "ZERGLING HP",
+        "HYDRA COUNT", "HYDRA DELAY", "HYDRA SPEED", "WAVE SCRAP",
+        "MUTA COUNT", "MUTA DELAY", "MUTA SPEED", "MUTA HP",
+        "DEFILER COUNT", "DEFILER DELAY", "DEFILER SPEED", "DEFILER HP",
+        "LURKER COUNT", "LURKER DELAY", "LURKER SPEED", "LURKER HP",
+        "GUARDIAN COUNT", "GUARDIAN DELAY", "GUARDIAN SPEED", "GUARDIAN HP",
+        "ULTRA COUNT", "ULTRA DELAY", "ULTRA SPEED", "ULTRA HP",
+        "EXTRA SLOT"
     };
 
     int first_row = (g_game.calib_row / 10) * 10;
-    for (int n = 0; n < 10 && first_row + n < 24; n++) {
+    for (int n = 0; n < 10 && first_row + n < 32; n++) {
         int r = first_row + n;
         int tier = r / 4;
         int param = r % 4;
@@ -666,9 +723,9 @@ void renderer_draw_ui_calibration(void) {
         else if (tier < 3 && param == 1) val = wd->tiers[tier].delay;
         else if (tier < 3 && param == 2) val = wd->tiers[tier].speed;
         else if (param == 3) val = g_balance.enemy_hp[tier];
-        else if (tier >= 3 && param == 0) val = g_balance.advanced_waves[w][tier - 3].count;
-        else if (tier >= 3 && param == 1) val = g_balance.advanced_waves[w][tier - 3].delay;
-        else if (tier >= 3 && param == 2) val = g_balance.advanced_waves[w][tier - 3].speed;
+        else if (tier >= 3 && tier < 8 && param == 0) val = g_balance.advanced_waves[w][tier - 3].count;
+        else if (tier >= 3 && tier < 8 && param == 1) val = g_balance.advanced_waves[w][tier - 3].delay;
+        else if (tier >= 3 && tier < 8 && param == 2) val = g_balance.advanced_waves[w][tier - 3].speed;
 
         int y = 31 + n * 10;
         int is_sel = (g_game.calib_row == r);
@@ -724,10 +781,10 @@ void renderer_draw_ui_sandbox(void) {
                   g_game.sandbox.run_sim ? COLOR_LED_GREEN : COLOR_AMBER);
 
     // D-Pad adjustable parameters (Rows 0..5)
-    static const char *s_tier_names[6] = { "T0 LARVA", "T1 RIPPER", "T2 HORMAG", "T3 WARRIOR", "T4 GENEST", "T5 CARNIFEX" };
+    static const char *s_tier_names[8] = { "SCOURGE", "ZERGLING", "HYDRALISK", "MUTALISK", "DEFILER", "LURKER", "GUARDIAN", "ULTRALISK" };
     char buf[48];
 
-    const char *labels[6] = { "ENEMY TIER", "ENEMY HP", "ENEMY SPEED", "TURRET RANGE", "FIRE CADENCE", "BULLET DMG" };
+    const char *labels[6] = { "ENEMY SPECIES", "ENEMY HP", "ENEMY SPEED", "TURRET RANGE", "FIRE CADENCE", "BULLET DMG" };
     for (int r = 0; r < 6; r++) {
         int y = 26 + r * 14;
         int is_sel = (g_game.sandbox.edit_row == r);

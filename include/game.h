@@ -182,8 +182,8 @@ typedef struct {
 
 typedef struct {
     WaveDef waves[20];
-    uint32_t enemy_hp[6];
-    uint32_t enemy_scrap[6];
+    uint32_t enemy_hp[8];
+    uint32_t enemy_scrap[8];
     uint64_t upgrade_costs[7][5];
     int turret_damage[5];
     int turret_fire_interval[5];
@@ -193,10 +193,10 @@ typedef struct {
     int wave_duration_frames;
     int wave_bonus_base;
     int wave_bonus_per_wave;
-    int enemy_bite_damage[6];
-    int enemy_bite_interval[6];
+    int enemy_bite_damage[8];
+    int enemy_bite_interval[8];
     int conveyor_reload_interval[4];
-    WaveTierConfig advanced_waves[20][3];
+    WaveTierConfig advanced_waves[20][5];
     uint64_t range_upgrade_costs[5];
     uint32_t magic;           // 0x544F5744 ("TOWD")
 } GameBalanceConfig;
@@ -255,8 +255,8 @@ typedef struct {
     int upgrade_flash_timer;
     int upgrade_flash_idx;
 
-    int wave_spawned_tier[6];
-    int wave_spawn_timer_tier[6];
+    int wave_spawned_tier[8];
+    int wave_spawn_timer_tier[8];
 
     // Calibration UI navigation
     int calib_row;               // 0..11 (per tier: Count, Delay, Speed, HP; wave scrap)

@@ -117,16 +117,19 @@ def build_tiles():
     print(f"  -> Generated source/sector1_data.c ({tile_count} tiles of 16x16 px)")
 
 def build_enemies():
-    print("[2/3] Building Tyranid Enemy Sprites...")
+    print("[2/3] Building Tyranid & StarCraft Enemy Sprites...")
     enemies_dir = "assets/sprites/enemies"
 
+    # Tuple: (name, walk_file, attack_file, num_walk_frames, num_attack_frames, hp, scrap, render_mode, is_flying, flight_altitude)
     enemy_defs = [
-        ("t0_larva", "t0_larva_strip_master_1x.png", 4, 1, 1, 0),
-        ("t1_ripper", "t1_ripper_strip_master_1x.png", 4, 8, 3, 0),
-        ("t2_hormagaunt", "t2_hydralisk_walk_strip_master_1x.png", 7, 40, 10, 1),
-        ("t3_ravener", "t3_ravener_strip_master_1x.png", 4, 160, 60, 0),
-        ("t4_carnifex", "t4_carnifex_strip_master_1x.png", 4, 2500, 750, 0),
-        ("t5_hierophant", "t5_hierophant_strip_master_1x.png", 4, 40000, 20000, 0),
+        ("t0_scourge", "t3_scourge_fly_strip_master_1x.png", None, 5, 0, 18, 4, 1, 1, 10),
+        ("t1_zergling", "t1_zergling_walk_strip_master_1x.png", "t1_zergling_attack_strip_master_1x.png", 7, 5, 25, 5, 1, 0, 0),
+        ("t2_hydralisk", "t2_hydralisk_walk_strip_master_1x.png", "t2_hydralisk_attack_strip_master_1x.png", 7, 5, 75, 15, 1, 0, 0),
+        ("t3_mutalisk", "sc_mutalisk_fly_strip_master_1x.png", None, 5, 0, 160, 35, 1, 1, 14),
+        ("t4_defiler", "sc_defiler_walk_strip_master_1x.png", None, 8, 0, 320, 70, 1, 0, 0),
+        ("t5_lurker", "sc_lurker_walk_strip_master_1x.png", None, 7, 0, 500, 120, 1, 0, 0),
+        ("t6_guardian", "sc_guardian_fly_strip_master_1x.png", None, 7, 0, 1100, 250, 1, 1, 16),
+        ("t7_ultralisk", "t4_ultralisk_walk_strip_master_1x.png", "t4_ultralisk_attack_strip_master_1x.png", 9, 6, 2600, 600, 1, 0, 0),
     ]
 
     enemy_count = len(enemy_defs)
@@ -141,30 +144,36 @@ def build_enemies():
 #define ENEMY_VARIANT_COUNT {enemy_count}
 #define ENEMY_RENDER_ROTATED 0
 #define ENEMY_RENDER_DIRECTIONAL 1
-#define ENEMY_MAX_DIRECTIONS 8
-#define ENEMY_MAX_FRAMES 7
+#define ENEMY_MAX_DIRECTIONS 5
+#define ENEMY_MAX_FRAMES 9
+#define ENEMY_MAX_ATTACK_FRAMES 6
 
 typedef struct {{
     uint8_t w;
     uint8_t h;
     int8_t offset_x;
     int8_t offset_y;
+    int8_t flip_ox;
     const uint16_t *pixels;
 }} EnemyFrameDef;
 
 typedef struct {{
     uint8_t render_mode;
+    uint8_t is_flying;
+    int8_t flight_altitude;
     uint8_t direction_count;
     uint8_t frame_count;
+    uint8_t attack_frame_count;
     uint32_t default_hp;
     uint32_t scrap_value;
     EnemyFrameDef frames[ENEMY_MAX_DIRECTIONS][ENEMY_MAX_FRAMES];
+    EnemyFrameDef attack_frames[ENEMY_MAX_DIRECTIONS][ENEMY_MAX_ATTACK_FRAMES];
 }} EnemyTypeDef;
 
 extern const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT];
 
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir);
-void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir);
+void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking);
 
 #endif // ENEMY_DATA_H
 ''')
@@ -175,8 +184,8 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
 
         enemies_meta = []
 
-        for name, strip_file, num_frames, hp, scrap, render_mode in enemy_defs:
-            path = os.path.join(enemies_dir, strip_file)
+        for name, walk_file, att_file, num_frames, num_att, hp, scrap, render_mode, is_flying, flight_alt in enemy_defs:
+            path = os.path.join(enemies_dir, walk_file)
             if not os.path.exists(path):
                 raise FileNotFoundError(f"Missing enemy master strip: {path}")
 
@@ -184,12 +193,13 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
             if render_mode == 1:
                 if im.height % 8 != 0 or im.width % num_frames != 0:
                     raise ValueError(
-                        f"Directional master {strip_file} must be {num_frames} columns x 8 rows; got {im.size}"
+                        f"Directional master {walk_file} must be {num_frames} columns x 8 rows; got {im.size}"
                     )
                 source_frame_w = im.width // num_frames
                 source_frame_h = im.height // 8
-                direction_count = 8
+                direction_count = 5
                 direction_sizes = []
+                parity = source_frame_w % 2
                 for d_idx in range(direction_count):
                     bbox = None
                     for f_idx in range(num_frames):
@@ -202,19 +212,23 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
                                 max(bbox[2], current[2]), max(bbox[3], current[3]))
                     if bbox is None:
                         bbox = (0, 0, source_frame_w, source_frame_h)
-                    direction_sizes.append((bbox[2] - bbox[0], bbox[3] - bbox[1],
-                                            bbox[0] - source_frame_w // 2,
+                    dw = bbox[2] - bbox[0]
+                    ox = bbox[0] - source_frame_w // 2
+                    flip_ox = -ox - dw + parity
+                    direction_sizes.append((dw, bbox[3] - bbox[1],
+                                            ox,
                                             bbox[1] - source_frame_h // 2,
+                                            flip_ox,
                                             bbox))
             else:
                 frame_w = im.width // num_frames
                 frame_h = im.height
                 direction_count = 1
-                direction_sizes = [(frame_w, frame_h, 0, 0, (0, 0, frame_w, frame_h))]
+                direction_sizes = [(frame_w, frame_h, 0, 0, 0, (0, 0, frame_w, frame_h))]
 
-            frame_data = []
+            # Write walk frame pixel arrays (stored for first 5 directions: 0=N, 1=NE, 2=E, 3=SE, 4=S)
             for d_idx in range(direction_count):
-                dir_w, dir_h, offset_x, offset_y, bbox = direction_sizes[d_idx]
+                dir_w, dir_h, offset_x, offset_y, flip_ox, bbox = direction_sizes[d_idx]
                 for f_idx in range(num_frames):
                     if render_mode == 1:
                         box = (f_idx * source_frame_w + bbox[0],
@@ -227,7 +241,6 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
                         crop_w, crop_h = frame_w, frame_h
                     frame_crop = im.crop(box)
                     pixels = [to_bgr555(*p) for p in get_image_pixels(frame_crop)]
-                    frame_data.append(pixels)
 
                     fc.write(f"static const uint16_t s_{name}_d{d_idx}_f{f_idx}[{crop_w * crop_h}] = {{\n    ")
                     for y in range(crop_h):
@@ -237,47 +250,138 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
                         fc.write(line)
                     fc.write("\n};\n\n")
 
-            enemies_meta.append((name, num_frames, direction_count, direction_sizes, hp, scrap, render_mode))
+            # Process attack frames if available
+            att_direction_sizes = []
+            if att_file and num_att > 0:
+                att_path = os.path.join(enemies_dir, att_file)
+                im_att = Image.open(att_path).convert("RGBA")
+                att_source_w = im_att.width // num_att
+                att_source_h = im_att.height // 8
+                att_parity = att_source_w % 2
+                for d_idx in range(5):
+                    bbox = None
+                    for f_idx in range(num_att):
+                        frame = im_att.crop((f_idx * att_source_w, d_idx * att_source_h,
+                                             (f_idx + 1) * att_source_w, (d_idx + 1) * att_source_h))
+                        current = frame.getbbox()
+                        if current:
+                            bbox = current if bbox is None else (
+                                min(bbox[0], current[0]), min(bbox[1], current[1]),
+                                max(bbox[2], current[2]), max(bbox[3], current[3]))
+                    if bbox is None:
+                        bbox = (0, 0, att_source_w, att_source_h)
+                    adw = bbox[2] - bbox[0]
+                    aox = bbox[0] - att_source_w // 2
+                    a_flip_ox = -aox - adw + att_parity
+                    att_direction_sizes.append((adw, bbox[3] - bbox[1],
+                                                aox,
+                                                bbox[1] - att_source_h // 2,
+                                                a_flip_ox,
+                                                bbox))
+                for d_idx in range(5):
+                    dir_w, dir_h, offset_x, offset_y, flip_ox, bbox = att_direction_sizes[d_idx]
+                    for f_idx in range(num_att):
+                        box = (f_idx * att_source_w + bbox[0],
+                               d_idx * att_source_h + bbox[1],
+                               f_idx * att_source_w + bbox[2],
+                               d_idx * att_source_h + bbox[3])
+                        frame_crop = im_att.crop(box)
+                        pixels = [to_bgr555(*p) for p in get_image_pixels(frame_crop)]
+                        fc.write(f"static const uint16_t s_{name}_att_d{d_idx}_f{f_idx}[{dir_w * dir_h}] = {{\n    ")
+                        for y in range(dir_h):
+                            line = ", ".join(f"0x{p:04X}" for p in pixels[y * dir_w : (y + 1) * dir_w])
+                            if y < dir_h - 1:
+                                line += ", "
+                            fc.write(line)
+                        fc.write("\n};\n\n")
+
+            enemies_meta.append((name, num_frames, num_att, direction_count, direction_sizes, att_direction_sizes, hp, scrap, render_mode, is_flying, flight_alt))
 
         # Array of types
         fc.write("const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {\n")
-        for name, nframes, ndirections, direction_sizes, hp, scrap, render_mode in enemies_meta:
+        for name, nframes, natt, ndirections, direction_sizes, att_direction_sizes, hp, scrap, render_mode, is_flying, flight_alt in enemies_meta:
             fc.write(f"    {{ // {name}\n")
-            fc.write(f"        {render_mode}, {ndirections}, {nframes}, {hp}, {scrap},\n        {{\n")
-            for d_idx in range(8):
+            fc.write(f"        {render_mode}, {is_flying}, {flight_alt}, {ndirections}, {nframes}, {natt}, {hp}, {scrap},\n        {{\n")
+            # Walk frames (5 directions: 0..4)
+            for d_idx in range(5):
                 fc.write("            {\n")
-                for f_idx in range(7):
+                for f_idx in range(9):
                     if d_idx < ndirections and f_idx < nframes:
-                        fw, fh, offset_x, offset_y, _ = direction_sizes[d_idx]
-                        fc.write(f"                {{ {fw}, {fh}, {offset_x}, {offset_y}, s_{name}_d{d_idx}_f{f_idx} }},\n")
+                        fw, fh, offset_x, offset_y, flip_ox, _ = direction_sizes[d_idx]
+                        fc.write(f"                {{ {fw}, {fh}, {offset_x}, {offset_y}, {flip_ox}, s_{name}_d{d_idx}_f{f_idx} }},\n")
                     else:
-                        fc.write("                { 0, 0, 0, 0, 0 },\n")
+                        fc.write("                { 0, 0, 0, 0, 0, 0 },\n")
+                fc.write("            },\n")
+            fc.write("        },\n        {\n")
+            # Attack frames (5 directions: 0..4)
+            for d_idx in range(5):
+                fc.write("            {\n")
+                for f_idx in range(6):
+                    if natt > 0 and d_idx < 5 and f_idx < natt:
+                        fw, fh, offset_x, offset_y, flip_ox, _ = att_direction_sizes[d_idx]
+                        fc.write(f"                {{ {fw}, {fh}, {offset_x}, {offset_y}, {flip_ox}, s_{name}_att_d{d_idx}_f{f_idx} }},\n")
+                    else:
+                        fc.write("                { 0, 0, 0, 0, 0, 0 },\n")
                 fc.write("            },\n")
             fc.write("        }\n    },\n")
         fc.write("};\n\n")
 
         # Drawing routine
-        fc.write('''void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir) {
+        fc.write('''void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking) {
     if (!buffer) return;
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
     const EnemyTypeDef *type = &g_enemy_types[variant];
-    if (type->frame_count == 0) return;
-    frame %= type->frame_count;
-    int source_dir = 0;
-    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL && type->direction_count > 0) {
-        // Directional masters are already normalized to the game compass.
-        source_dir = (dir & 7) % type->direction_count;
+
+    // 1. Draw dynamic ground shadow for flying units
+    if (type->is_flying && type->flight_altitude > 0) {
+        static const int8_t shadow_span[9] = { 4, 7, 9, 10, 10, 10, 9, 7, 4 };
+        for (int dy = -4; dy <= 4; dy++) {
+            int py = cy + dy;
+            if (py < 0 || py >= SCREEN_H) continue;
+            int half_w = shadow_span[dy + 4];
+            for (int dx = -half_w; dx <= half_w; dx++) {
+                int px = cx + dx;
+                if (px < 0 || px >= SCREEN_W) continue;
+                uint16_t c = buffer[py * SCREEN_W + px];
+                buffer[py * SCREEN_W + px] = (c >> 1) & 0x3DEF;
+            }
+        }
+        cy -= type->flight_altitude;
     }
 
-    const EnemyFrameDef *fd = &type->frames[source_dir][frame];
+    int source_dir = 0;
+    int flip_h = 0;
+    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
+        int d = dir & 7;
+        if (d > 4) {
+            flip_h = 1;
+            if (d == 5) source_dir = 3;      // SW mirrors SE
+            else if (d == 6) source_dir = 2; // W mirrors E
+            else if (d == 7) source_dir = 1; // NW mirrors NE
+        } else {
+            source_dir = d;
+        }
+    }
+
+    const EnemyFrameDef *fd = 0;
+    if (is_attacking && type->attack_frame_count > 0) {
+        frame %= type->attack_frame_count;
+        fd = &type->attack_frames[source_dir][frame];
+    } else {
+        if (type->frame_count == 0) return;
+        frame %= type->frame_count;
+        fd = &type->frames[source_dir][frame];
+    }
+
     int w = fd->w;
     int h = fd->h;
     const uint16_t *src = fd->pixels;
+    if (!src || w == 0 || h == 0) return;
 
     int ox;
     int oy;
     if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
-        ox = cx + fd->offset_x;
+        ox = cx + (flip_h ? fd->flip_ox : fd->offset_x);
         oy = cy + fd->offset_y;
     } else {
         ox = cx - (w / 2);
@@ -288,23 +392,20 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
         for (int y = 0; y < h; y++) {
             int dst_y = oy + y;
             if (dst_y < 0 || dst_y >= SCREEN_H) continue;
+            const uint16_t *row_src = &src[y * w];
             for (int x = 0; x < w; x++) {
                 int draw_x = ox + x;
                 if (draw_x < 0 || draw_x >= SCREEN_W) continue;
-                uint16_t col = src[y * w + x];
+                int src_x = flip_h ? (w - 1 - x) : x;
+                uint16_t col = row_src[src_x];
                 if (col & 0x8000) buffer[dst_y * SCREEN_W + draw_x] = col;
             }
         }
     } else {
-        // Rotated assets use the source's right-facing pose as angle zero.
-        // Direction 4 is south/down on screen, so it rotates by +90 degrees.
         static const int direction_angles[8] = { 192, 224, 0, 32, 64, 96, 128, 160 };
         int angle = direction_angles[dir & 7];
         int c = fixed_cos(angle);
         int s = fixed_sin(angle);
-        // Keep one stable square canvas for every angle. Recomputing the
-        // rotated bounds per frame makes the sprite visibly jump when its
-        // direction changes and can clip edge pixels at diagonal angles.
         int rw = w + h;
         int rh = rw;
         int rox = cx - (rw / 2);
@@ -333,7 +434,7 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
 }
 
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
-    enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir);
+    enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir, 0);
 }
 ''')
 
