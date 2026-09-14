@@ -65,6 +65,7 @@
 
 typedef struct {
     int x, y;            // Q8 fixed point in global space [0..255, 0..383]
+    int vx, vy;          // Q8 velocities for lead-target prediction
     uint64_t hp;
     uint64_t max_hp;
     int active;
@@ -147,8 +148,23 @@ typedef enum {
     MODE_PAUSED,
     MODE_GAME_OVER,
     MODE_UPGRADES,
-    MODE_CALIBRATION
+    MODE_CALIBRATION,
+    MODE_DEBUG_SANDBOX
 } GameMode;
+
+// Debug / Test Sandbox parameters state
+typedef struct {
+    int enemy_tier;       // 0..5 (Biocaste)
+    int enemy_hp;         // 1..99999
+    int enemy_speed;      // 0..120 px/s (0 = frozen dummy)
+    int turret_firerate;  // 1..30 frames fire interval
+    int turret_range;     // 30..200 px radius
+    int turret_damage;    // 1..999 damage per bullet
+    int turret_infinite_ammo; // 1 = infinite ammo
+    int run_sim;          // 0 = paused/step, 1 = live continuous
+    int edit_row;         // 0..5 for D-Pad parameter tuning
+    int spawn_count;
+} DebugSandboxState;
 
 // Editable configuration per enemy tier inside each Wave
 typedef struct {
@@ -166,6 +182,22 @@ typedef struct {
 
 typedef struct {
     WaveDef waves[20];
+    uint32_t enemy_hp[6];
+    uint32_t enemy_scrap[6];
+    uint64_t upgrade_costs[7][5];
+    int turret_damage[5];
+    int turret_fire_interval[5];
+    int turret_range[5];
+    int turret_magazine[6];
+    int bunker_start_hp;
+    int wave_duration_frames;
+    int wave_bonus_base;
+    int wave_bonus_per_wave;
+    int enemy_bite_damage[6];
+    int enemy_bite_interval[6];
+    int conveyor_reload_interval[4];
+    WaveTierConfig advanced_waves[20][3];
+    uint64_t range_upgrade_costs[5];
     uint32_t magic;           // 0x544F5744 ("TOWD")
 } GameBalanceConfig;
 
@@ -223,16 +255,18 @@ typedef struct {
     int upgrade_flash_timer;
     int upgrade_flash_idx;
 
-    int wave_spawned_tier[3];    // Number of enemies spawned so far for Tier 0..2 in current wave
-    int wave_spawn_timer_tier[3];// Timers for each tier spawn in current wave
+    int wave_spawned_tier[6];
+    int wave_spawn_timer_tier[6];
 
     // Calibration UI navigation
-    int calib_row;               // 0..8 (3 rows per tier: Count, Delay, Speed)
+    int calib_row;               // 0..11 (per tier: Count, Delay, Speed, HP; wave scrap)
     int calib_wave_idx;          // 0..19 (Wave 1..20)
+    int calib_page;              // 0 waves, 1 enemy stats, 2 base/turrets, 3 upgrades
     int calib_hold_timer;        // For autorepeat continuous adjustment
     int calib_saved_timer;       // Feedback notification ("SAVED")
 
     UpgradeTree upgrades;
+    DebugSandboxState sandbox;
 } GameContext;
 
 // Upgrades helper
@@ -267,6 +301,8 @@ void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held);
+void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held);
+void game_sandbox_spawn_enemy(int x, int y);
 void game_toggle_pause(void);
 void game_reset_to_prep(void);
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration);
@@ -302,6 +338,7 @@ void renderer_draw_ui_pause(void);
 void renderer_draw_ui_game_over(void);
 void renderer_draw_ui_upgrades(void);
 void renderer_draw_ui_calibration(void);
+void renderer_draw_ui_sandbox(void);
 void renderer_present(void);
 
 // Top screen presentation
