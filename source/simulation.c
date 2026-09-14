@@ -168,6 +168,18 @@ void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
     }
 }
 
+static int enemy_direction_from_delta(int dx, int dy) {
+    int ax = (dx < 0) ? -dx : dx;
+    int ay = (dy < 0) ? -dy : dy;
+
+    if (ax == 0 && ay == 0) return -1;
+    if (ay == 0) return (dx > 0) ? 2 : 6;
+    if (ax * 2 < ay) return (dy < 0) ? 0 : 4;
+    if (ay * 2 < ax) return (dx > 0) ? 2 : 6;
+    if (dx > 0) return (dy < 0) ? 1 : 3;
+    return (dy < 0) ? 7 : 5;
+}
+
 static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) {
@@ -185,7 +197,7 @@ static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
             if (spd < 10) spd = 10;
             g_enemies[i].speed = spd;
 
-            g_enemies[i].dir = 1; // South
+            g_enemies[i].dir = 4; // South in the 8-way compass
             g_enemies[i].anim_frame = 0;
             g_enemies[i].biting_target = -1;
             g_enemies[i].bite_timer = 0;
@@ -380,11 +392,15 @@ void game_update_simulation(void) {
 
         int ex = g_enemies[i].x;
         int ey = g_enemies[i].y;
+        int old_x = ex;
+        int old_y = ey;
         int px = FROM_FP(ex);
         int py = FROM_FP(ey);
 
-        // Animation frame
-        g_enemies[i].anim_frame = (g_game.sim_ticks_elapsed / 8) % 4;
+        // Animation frame: each enemy type may have a different walk length.
+        int frame_count = g_enemy_types[g_enemies[i].variant].frame_count;
+        if (frame_count < 1) frame_count = 4;
+        g_enemies[i].anim_frame = (g_game.sim_ticks_elapsed / 8) % frame_count;
 
         // Check if hitting any placed turret (physical obstruction & biting!)
         int hitting_turret = -1;
@@ -459,6 +475,10 @@ void game_update_simulation(void) {
             else if (ex > target_base_x) ex -= (spd / 2);
             g_enemies[i].x = ex;
         }
+
+        int move_dir = enemy_direction_from_delta(g_enemies[i].x - old_x,
+                                                   g_enemies[i].y - old_y);
+        if (move_dir >= 0) g_enemies[i].dir = move_dir;
     }
 
     // 5. Update Turrets & Logistics (Factorio conveyors & reloading)

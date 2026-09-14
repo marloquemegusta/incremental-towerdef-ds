@@ -121,12 +121,12 @@ def build_enemies():
     enemies_dir = "assets/sprites/enemies"
 
     enemy_defs = [
-        ("t0_larva", "t0_larva_strip_master_1x.png", 4, 1, 1),
-        ("t1_ripper", "t1_ripper_strip_master_1x.png", 4, 8, 3),
-        ("t2_hormagaunt", "t2_hormagaunt_strip_master_1x.png", 4, 40, 10),
-        ("t3_ravener", "t3_ravener_strip_master_1x.png", 4, 160, 60),
-        ("t4_carnifex", "t4_carnifex_strip_master_1x.png", 4, 2500, 750),
-        ("t5_hierophant", "t5_hierophant_strip_master_1x.png", 4, 40000, 20000),
+        ("t0_larva", "t0_larva_strip_master_1x.png", 4, 1, 1, 0),
+        ("t1_ripper", "t1_ripper_strip_master_1x.png", 4, 8, 3, 0),
+        ("t2_hormagaunt", "t2_hydralisk_walk_strip_master_1x.png", 7, 40, 10, 1),
+        ("t3_ravener", "t3_ravener_strip_master_1x.png", 4, 160, 60, 0),
+        ("t4_carnifex", "t4_carnifex_strip_master_1x.png", 4, 2500, 750, 0),
+        ("t5_hierophant", "t5_hierophant_strip_master_1x.png", 4, 40000, 20000, 0),
     ]
 
     enemy_count = len(enemy_defs)
@@ -139,6 +139,10 @@ def build_enemies():
 #include <nds.h>
 
 #define ENEMY_VARIANT_COUNT {enemy_count}
+#define ENEMY_RENDER_ROTATED 0
+#define ENEMY_RENDER_DIRECTIONAL 1
+#define ENEMY_MAX_DIRECTIONS 8
+#define ENEMY_MAX_FRAMES 7
 
 typedef struct {{
     uint8_t w;
@@ -147,10 +151,12 @@ typedef struct {{
 }} EnemyFrameDef;
 
 typedef struct {{
+    uint8_t render_mode;
+    uint8_t direction_count;
     uint8_t frame_count;
     uint32_t default_hp;
     uint32_t scrap_value;
-    EnemyFrameDef frames[4];
+    EnemyFrameDef frames[ENEMY_MAX_DIRECTIONS][ENEMY_MAX_FRAMES];
 }} EnemyTypeDef;
 
 extern const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT];
@@ -167,39 +173,56 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
 
         enemies_meta = []
 
-        for name, strip_file, num_frames, hp, scrap in enemy_defs:
+        for name, strip_file, num_frames, hp, scrap, render_mode in enemy_defs:
             path = os.path.join(enemies_dir, strip_file)
             if not os.path.exists(path):
                 raise FileNotFoundError(f"Missing enemy master strip: {path}")
 
             im = Image.open(path).convert("RGBA")
-            frame_w = im.width // num_frames
-            frame_h = im.height
+            if render_mode == 1:
+                frame_w = im.width // num_frames
+                frame_h = im.height // 9
+                direction_count = 8
+            else:
+                frame_w = im.width // num_frames
+                frame_h = im.height
+                direction_count = 1
 
             frame_data = []
-            for f_idx in range(num_frames):
-                box = (f_idx * frame_w, 0, (f_idx + 1) * frame_w, frame_h)
-                frame_crop = im.crop(box)
-                pixels = [to_bgr555(*p) for p in get_image_pixels(frame_crop)]
-                frame_data.append(pixels)
+            for d_idx in range(direction_count):
+                for f_idx in range(num_frames):
+                    if render_mode == 1:
+                        box = (f_idx * frame_w, d_idx * frame_h,
+                               (f_idx + 1) * frame_w, (d_idx + 1) * frame_h)
+                    else:
+                        box = (f_idx * frame_w, 0, (f_idx + 1) * frame_w, frame_h)
+                    frame_crop = im.crop(box)
+                    pixels = [to_bgr555(*p) for p in get_image_pixels(frame_crop)]
+                    frame_data.append(pixels)
 
-                fc.write(f"static const uint16_t s_{name}_f{f_idx}[{frame_w * frame_h}] = {{\n    ")
-                for y in range(frame_h):
-                    line = ", ".join(f"0x{p:04X}" for p in pixels[y * frame_w : (y + 1) * frame_w])
-                    if y < frame_h - 1:
-                        line += ", "
-                    fc.write(line)
-                fc.write("\n};\n\n")
+                    fc.write(f"static const uint16_t s_{name}_d{d_idx}_f{f_idx}[{frame_w * frame_h}] = {{\n    ")
+                    for y in range(frame_h):
+                        line = ", ".join(f"0x{p:04X}" for p in pixels[y * frame_w : (y + 1) * frame_w])
+                        if y < frame_h - 1:
+                            line += ", "
+                        fc.write(line)
+                    fc.write("\n};\n\n")
 
-            enemies_meta.append((name, frame_w, frame_h, num_frames, hp, scrap))
+            enemies_meta.append((name, frame_w, frame_h, num_frames, direction_count, hp, scrap, render_mode))
 
         # Array of types
         fc.write("const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {\n")
-        for name, fw, fh, nframes, hp, scrap in enemies_meta:
+        for name, fw, fh, nframes, ndirections, hp, scrap, render_mode in enemies_meta:
             fc.write(f"    {{ // {name}\n")
-            fc.write(f"        {nframes}, {hp}, {scrap},\n        {{\n")
-            for f_idx in range(nframes):
-                fc.write(f"            {{ {fw}, {fh}, s_{name}_f{f_idx} }},\n")
+            fc.write(f"        {render_mode}, {ndirections}, {nframes}, {hp}, {scrap},\n        {{\n")
+            for d_idx in range(8):
+                fc.write("            {\n")
+                for f_idx in range(7):
+                    if d_idx < ndirections and f_idx < nframes:
+                        fc.write(f"                {{ {fw}, {fh}, s_{name}_d{d_idx}_f{f_idx} }},\n")
+                    else:
+                        fc.write("                { 0, 0, 0 },\n")
+                fc.write("            },\n")
             fc.write("        }\n    },\n")
         fc.write("};\n\n")
 
@@ -207,9 +230,15 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
         fc.write('''void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir) {
     if (!buffer) return;
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
-    frame = frame & 3;
+    const EnemyTypeDef *type = &g_enemy_types[variant];
+    if (type->frame_count == 0) return;
+    frame %= type->frame_count;
+    int source_dir = 0;
+    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL && type->direction_count > 0) {
+        source_dir = dir % type->direction_count;
+    }
 
-    const EnemyFrameDef *fd = &g_enemy_types[variant].frames[frame];
+    const EnemyFrameDef *fd = &type->frames[source_dir][frame];
     int w = fd->w;
     int h = fd->h;
     const uint16_t *src = fd->pixels;
@@ -223,7 +252,7 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
 
         for (int x = 0; x < w; x++) {
             int draw_x;
-            if (dir == 2) {
+            if (type->render_mode == ENEMY_RENDER_ROTATED && (dir == 5 || dir == 6 || dir == 7)) {
                 draw_x = ox + (w - 1 - x);
             } else {
                 draw_x = ox + x;
