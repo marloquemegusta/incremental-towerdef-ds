@@ -70,7 +70,7 @@ typedef struct {
     int active;
     int speed;           // Q8 speed
     int variant;         // 0..5 (Biocaste Tier)
-    int dir;             // 0=East, 1=South, 2=West, 3=North
+    int dir;             // 8-way compass: N, NE, E, SE, S, SW, W, NW
     int anim_frame;
     int biting_target;   // -1=None/Marching, 0..3=Turret ID, 99=Bunker Sanctum
     int bite_timer;
