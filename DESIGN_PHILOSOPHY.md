@@ -59,18 +59,11 @@ El modo estándar se compone de **20 oleadas incrementales**. Cada oleada define
 
 ### B. Menú de Calibración Canónico (`[CALIB]`)
 - **Acceso Exclusivo:** Disponible únicamente durante la fase de preparación (`MODE_PREPARATION`) pulsando el botón táctil **`[CALIB]`**. Se ha retirado cualquier atajo directo de botón físico (`KEY_Y` queda inactivo) para evitar activaciones accidentales durante el juego.
-- **Navegación Unificada por Oleada:**
-  - El menú presenta una única pantalla por oleada seleccionada ($1..20$), navegable con los gatillos `L` / `R` o mediante los botones táctiles en pantalla `[<]` y `[>]`.
-  - Cada pantalla expone exactamente **9 parámetros editables** (3 parámetros $\times$ 3 Tiers):
-    - `T1 LARVA COUNT`: Cantidad total de larvas en la oleada ($0..200$).
-    - `T1 LARVA DELAY`: Intervalo entre spawns de larvas en frames ($5..300$ f).
-    - `T1 LARVA SPEED`: Velocidad de avance ($10..150$ px/s).
-    - `T2 RIPPER COUNT`: Cantidad de rippers en la oleada.
-    - `T2 RIPPER DELAY`: Intervalo de rippers en frames.
-    - `T2 RIPPER SPEED`: Velocidad de avance.
-    - `T3 HORMAG COUNT`: Cantidad de hormagaunts en la oleada.
-    - `T3 HORMAG DELAY`: Intervalo de hormagaunts en frames.
-    - `T3 HORMAG SPEED`: Velocidad de avance.
+- **Navegación Multitap (4 Páginas):**
+  - **Página 1 (Wave Spawns):** Presenta la composición de la oleada activa ($1..20$), navegable con los gatillos `L` / `R` o mediante los botones táctiles `[<]` y `[>]`. Permite calibrar conteo, retardo de spawn, velocidad y vida para las 8 especies xenos más la recompensa de chatarra base (32 filas por oleada).
+  - **Página 2 (Enemy Stats):** Calibración directa de los 4 atributos base (HP, Chatarra, Daño de mordisco, Intervalo de ataque) para cada una de las 8 especies de StarCraft.
+  - **Página 3 (Base & Turrets):** Calibración de la vida del búnker, duración de oleada, cadencia, alcance, daño y capacidad de munición de las torretas.
+  - **Página 4 (Upgrades):** Calibración de la curva de costes de todas las ramas del árbol de mejoras de la Forja.
 - **Control Ergonómico & Autorrepetición:**
   - Selección de fila con Cruceta Arriba/Abajo o toque directo en la fila.
   - Modificación de valor mediante `[-]` y `[+]` táctiles o Cruceta Izquierda/Derecha.

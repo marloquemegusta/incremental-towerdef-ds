@@ -46,17 +46,19 @@ $$\text{Daño Recibido} = \max(1, \text{Daño Bala} - \text{Armadura Enemigo})$$
 
 ---
 
-## 4. Jerarquía Oficial de Amenazas Xenos (6 Tiers)
-Selección oficial de enemigos para el motor de juego (con todas las 18 variantes preservadas en `assets/sprites/enemies/`):
+## 4. Plantel Canónico de Amenazas Xenos (8 Especies StarCraft)
+Transición del esquema rígido de "Tiers" lineales a un **sistema de roles y amenazas tácticas** que dinamiza la incrementalidad (velocidad, blindaje, vuelo, sombra y asalto pesado):
 
-| Tier | Enemigo Oficial | Tamaño | Rol & Comportamiento | Stats Base |
-| :--- | :--- | :---: | :--- | :--- |
-| **Tier 0** | **0A. Micro-Larva Rastrera** | $2 \times 2$ px | Horda masiva milimétrica (100+ en pantalla). Se estira y encoge. | 1 HP \| 0 Arm \| 1 Chatarra |
-| **Tier 1** | **1A. Ripper Devorador** | $6 \times 4$ px | Parásito carnívoro con ondulación continua en S y mordisco voraz. | 8 HP \| 0 Arm \| 3 Chatarra |
-| **Tier 2** | **2A. Gárgola Bio-Scout** | $9 \times 9$ px | Volador ágil con aleteo rítmico membranoso y bio-aguijón venenoso. | 35 HP \| 0 Arm \| 12 Chatarra |
-| **Tier 3** | **3A. Ravener Serpiente** | $14 \times 10$ px | Excavador acorazado con onda espinal sinusoidal y 4 guadañas de hueso. | 160 HP \| 2 Arm \| 60 Chatarra |
-| **Tier 4** | **4B. Haruspex Fauces Vivas** | $20 \times 20$ px | Bestia de asedio pesada con boca circular dentada y tentáculos prensiles. | 2.8k HP \| 5 Arm \| 850 Chatarra |
-| **Tier 5** | **5A. Bio-Titán Hierofante** | $28 \times 28$ px | Coloso arácnido de 4 zancas titánicas, chimeneas de bio-humo y cañones. | 40k HP \| 8 Arm \| 20.000 Chatarra |
+| ID | Especie | Arquetipo / Amenaza | Tamaño | Comportamiento en Simulación | Stats Base (HP / Scrap) |
+| :---: | :--- | :--- | :---: | :--- | :--- |
+| **0** | **Scourge** | Volador Kamikaze veloz | $31 \times 27$ px | Hostigador ultrarrápido con sombra dinámica, gran velocidad | 18 HP \| 4 Chatarra |
+| **1** | **Zergling** | Vanguardia / Enjambre ágil | $40 \times 39$ px | Corredor rápido en masa, animación de ataque doble con garras | 25 HP \| 5 Chatarra |
+| **2** | **Hydralisk** | Asalto medio a distancia | $42 \times 55$ px | Infantería pesada erecta, andanada de bio-espinas | 75 HP \| 15 Chatarra |
+| **3** | **Mutalisk** | Cazador alado de flanco | $64 \times 72$ px | Planeador ágil a cota alta, sombra dinámica sobre el terreno | 160 HP \| 35 Chatarra |
+| **4** | **Defiler** | Caster biológico / Debilitador | $69 \times 59$ px | Reptante sinuoso de gran resistencia y dispersión de biomasa | 320 HP \| 70 Chatarra |
+| **5** | **Lurker** | Ariete acorazado con espinas | $69 \times 64$ px | Cuadrúpedo blindado rompe-líneas de alta absorción de daño | 500 HP \| 120 Chatarra |
+| **6** | **Guardian** | Bombardero pesado de asedio | $78 \times 70$ px | Silueta colosal de manta aérea, sombra profunda proyectada | 1.100 HP \| 250 Chatarra |
+| **7** | **Ultralisk** | Titán coloso / Boss | $98 \times 105$ px | Apisonadora colosal con hojas Kaiser oscilantes y mordisco demoledor | 2.600 HP \| 600 Chatarra |
 
 ### Paleta Cromática Canónica del Enjambre (Regla de Exclusividad)
 Para garantizar legibilidad visual inmediata contra el suelo metálico de las trincheras (`RGB 18, 18, 24`), la gama violeta/púrpura queda **estrictamente reservada para las entidades del enjambre**:
