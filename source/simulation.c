@@ -199,6 +199,7 @@ static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
 
             g_enemies[i].dir = 4; // South in the 8-way compass
             g_enemies[i].anim_frame = 0;
+            g_enemies[i].anim_distance = 0;
             g_enemies[i].biting_target = -1;
             g_enemies[i].bite_timer = 0;
 
@@ -397,11 +398,6 @@ void game_update_simulation(void) {
         int px = FROM_FP(ex);
         int py = FROM_FP(ey);
 
-        // Animation frame: each enemy type may have a different walk length.
-        int frame_count = g_enemy_types[g_enemies[i].variant].frame_count;
-        if (frame_count < 1) frame_count = 4;
-        g_enemies[i].anim_frame = (g_game.sim_ticks_elapsed / 8) % frame_count;
-
         // Check if hitting any placed turret (physical obstruction & biting!)
         int hitting_turret = -1;
         if (py >= 192) {
@@ -478,7 +474,27 @@ void game_update_simulation(void) {
 
         int move_dir = enemy_direction_from_delta(g_enemies[i].x - old_x,
                                                    g_enemies[i].y - old_y);
+        int move_dx = g_enemies[i].x - old_x;
+        int move_dy = g_enemies[i].y - old_y;
+        int move_ax = (move_dx < 0) ? -move_dx : move_dx;
+        int move_ay = (move_dy < 0) ? -move_dy : move_dy;
+        int move_distance = move_ax + move_ay;
         if (move_dir >= 0) g_enemies[i].dir = move_dir;
+
+        // Walk animation is distance-based: one pose per four pixels moved.
+        // This keeps slow and fast enemy tiers visually synchronized.
+        if (move_distance > 0) {
+            g_enemies[i].anim_distance += move_distance;
+            int walk_frames = g_enemy_types[g_enemies[i].variant].frame_count;
+            if (walk_frames < 1) walk_frames = 4;
+            while (g_enemies[i].anim_distance >= (4 * FP_ONE)) {
+                g_enemies[i].anim_distance -= (4 * FP_ONE);
+                g_enemies[i].anim_frame++;
+                if (g_enemies[i].anim_frame >= walk_frames) {
+                    g_enemies[i].anim_frame = 0;
+                }
+            }
+        }
     }
 
     // 5. Update Turrets & Logistics (Factorio conveyors & reloading)

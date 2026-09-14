@@ -796,23 +796,50 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
         oy = cy - (h / 2);
     }
 
-    for (int y = 0; y < h; y++) {
-        int dst_y = oy + y;
-        if (dst_y < 0 || dst_y >= SCREEN_H) continue;
-
-        for (int x = 0; x < w; x++) {
-            int draw_x;
-            if (type->render_mode == ENEMY_RENDER_ROTATED && (dir == 5 || dir == 6 || dir == 7)) {
-                draw_x = ox + (w - 1 - x);
-            } else {
-                draw_x = ox + x;
+    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
+        for (int y = 0; y < h; y++) {
+            int dst_y = oy + y;
+            if (dst_y < 0 || dst_y >= SCREEN_H) continue;
+            for (int x = 0; x < w; x++) {
+                int draw_x = ox + x;
+                if (draw_x < 0 || draw_x >= SCREEN_W) continue;
+                uint16_t col = src[y * w + x];
+                if (col & 0x8000) buffer[dst_y * SCREEN_W + draw_x] = col;
             }
+        }
+    } else {
+        // Rotated assets use the source's right-facing pose as angle zero.
+        // Direction 4 is south/down on screen, so it rotates by +90 degrees.
+        static const int direction_angles[8] = { 192, 224, 0, 32, 64, 96, 128, 160 };
+        int angle = direction_angles[dir & 7];
+        int c = fixed_cos(angle);
+        int s = fixed_sin(angle);
+        int ac = (c < 0) ? -c : c;
+        int as = (s < 0) ? -s : s;
+        int rw = (ac * w + as * h + 255) >> 8;
+        int rh = (as * w + ac * h + 255) >> 8;
+        if (rw < 1) rw = 1;
+        if (rh < 1) rh = 1;
+        int rox = cx - (rw / 2);
+        int roy = cy - (rh / 2);
+        int src_cx = w / 2;
+        int src_cy = h / 2;
 
-            if (draw_x < 0 || draw_x >= SCREEN_W) continue;
-
-            uint16_t col = src[y * w + x];
-            if (col & 0x8000) {
-                buffer[dst_y * SCREEN_W + draw_x] = col;
+        for (int y = 0; y < rh; y++) {
+            int dst_y = roy + y;
+            if (dst_y < 0 || dst_y >= SCREEN_H) continue;
+            for (int x = 0; x < rw; x++) {
+                int draw_x = rox + x;
+                if (draw_x < 0 || draw_x >= SCREEN_W) continue;
+                int dx = x - (rw / 2);
+                int dy = y - (rh / 2);
+                int sx = ((dx * c) + (dy * s)) >> 8;
+                int sy = ((-dx * s) + (dy * c)) >> 8;
+                sx += src_cx;
+                sy += src_cy;
+                if (sx < 0 || sx >= w || sy < 0 || sy >= h) continue;
+                uint16_t col = src[sy * w + sx];
+                if (col & 0x8000) buffer[dst_y * SCREEN_W + draw_x] = col;
             }
         }
     }
