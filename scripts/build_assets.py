@@ -147,6 +147,8 @@ def build_enemies():
 typedef struct {{
     uint8_t w;
     uint8_t h;
+    int8_t offset_x;
+    int8_t offset_y;
     const uint16_t *pixels;
 }} EnemyFrameDef;
 
@@ -180,48 +182,72 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
 
             im = Image.open(path).convert("RGBA")
             if render_mode == 1:
-                frame_w = im.width // num_frames
-                frame_h = im.height // 9
+                source_frame_w = im.width // num_frames
+                source_frame_h = im.height // 9
                 direction_count = 8
+                direction_sizes = []
+                for d_idx in range(direction_count):
+                    bbox = None
+                    for f_idx in range(num_frames):
+                        frame = im.crop((f_idx * source_frame_w, d_idx * source_frame_h,
+                                         (f_idx + 1) * source_frame_w, (d_idx + 1) * source_frame_h))
+                        current = frame.getbbox()
+                        if current:
+                            bbox = current if bbox is None else (
+                                min(bbox[0], current[0]), min(bbox[1], current[1]),
+                                max(bbox[2], current[2]), max(bbox[3], current[3]))
+                    if bbox is None:
+                        bbox = (0, 0, source_frame_w, source_frame_h)
+                    direction_sizes.append((bbox[2] - bbox[0], bbox[3] - bbox[1],
+                                            bbox[0] - source_frame_w // 2,
+                                            bbox[1] - source_frame_h // 2,
+                                            bbox))
             else:
                 frame_w = im.width // num_frames
                 frame_h = im.height
                 direction_count = 1
+                direction_sizes = [(frame_w, frame_h, 0, 0, (0, 0, frame_w, frame_h))]
 
             frame_data = []
             for d_idx in range(direction_count):
+                dir_w, dir_h, offset_x, offset_y, bbox = direction_sizes[d_idx]
                 for f_idx in range(num_frames):
                     if render_mode == 1:
-                        box = (f_idx * frame_w, d_idx * frame_h,
-                               (f_idx + 1) * frame_w, (d_idx + 1) * frame_h)
+                        box = (f_idx * source_frame_w + bbox[0],
+                               d_idx * source_frame_h + bbox[1],
+                               f_idx * source_frame_w + bbox[2],
+                               d_idx * source_frame_h + bbox[3])
+                        crop_w, crop_h = dir_w, dir_h
                     else:
                         box = (f_idx * frame_w, 0, (f_idx + 1) * frame_w, frame_h)
+                        crop_w, crop_h = frame_w, frame_h
                     frame_crop = im.crop(box)
                     pixels = [to_bgr555(*p) for p in get_image_pixels(frame_crop)]
                     frame_data.append(pixels)
 
-                    fc.write(f"static const uint16_t s_{name}_d{d_idx}_f{f_idx}[{frame_w * frame_h}] = {{\n    ")
-                    for y in range(frame_h):
-                        line = ", ".join(f"0x{p:04X}" for p in pixels[y * frame_w : (y + 1) * frame_w])
-                        if y < frame_h - 1:
+                    fc.write(f"static const uint16_t s_{name}_d{d_idx}_f{f_idx}[{crop_w * crop_h}] = {{\n    ")
+                    for y in range(crop_h):
+                        line = ", ".join(f"0x{p:04X}" for p in pixels[y * crop_w : (y + 1) * crop_w])
+                        if y < crop_h - 1:
                             line += ", "
                         fc.write(line)
                     fc.write("\n};\n\n")
 
-            enemies_meta.append((name, frame_w, frame_h, num_frames, direction_count, hp, scrap, render_mode))
+            enemies_meta.append((name, num_frames, direction_count, direction_sizes, hp, scrap, render_mode))
 
         # Array of types
         fc.write("const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {\n")
-        for name, fw, fh, nframes, ndirections, hp, scrap, render_mode in enemies_meta:
+        for name, nframes, ndirections, direction_sizes, hp, scrap, render_mode in enemies_meta:
             fc.write(f"    {{ // {name}\n")
             fc.write(f"        {render_mode}, {ndirections}, {nframes}, {hp}, {scrap},\n        {{\n")
             for d_idx in range(8):
                 fc.write("            {\n")
                 for f_idx in range(7):
                     if d_idx < ndirections and f_idx < nframes:
-                        fc.write(f"                {{ {fw}, {fh}, s_{name}_d{d_idx}_f{f_idx} }},\n")
+                        fw, fh, offset_x, offset_y, _ = direction_sizes[d_idx]
+                        fc.write(f"                {{ {fw}, {fh}, {offset_x}, {offset_y}, s_{name}_d{d_idx}_f{f_idx} }},\n")
                     else:
-                        fc.write("                { 0, 0, 0 },\n")
+                        fc.write("                { 0, 0, 0, 0, 0 },\n")
                 fc.write("            },\n")
             fc.write("        }\n    },\n")
         fc.write("};\n\n")
@@ -243,8 +269,15 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
     int h = fd->h;
     const uint16_t *src = fd->pixels;
 
-    int ox = cx - (w / 2);
-    int oy = cy - (h / 2);
+    int ox;
+    int oy;
+    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
+        ox = cx + fd->offset_x;
+        oy = cy + fd->offset_y;
+    } else {
+        ox = cx - (w / 2);
+        oy = cy - (h / 2);
+    }
 
     for (int y = 0; y < h; y++) {
         int dst_y = oy + y;
