@@ -1035,6 +1035,25 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
 
 static void calib_modify_val(int delta) {
     if (g_game.calib_page == 1) {
+        int enemy = g_game.calib_row / 4, field = g_game.calib_row % 4;
+        if (enemy < 0) enemy = 0;
+        if (enemy > 5) enemy = 5;
+        if (field == 0) { int n = (int)g_balance.enemy_hp[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_hp[enemy] = (uint32_t)n; }
+        else if (field == 1) { int n = (int)g_balance.enemy_scrap[enemy] + delta; if (n < 0) n = 0; g_balance.enemy_scrap[enemy] = (uint32_t)n; }
+        else if (field == 2) { g_balance.enemy_bite_damage[enemy] += delta; if (g_balance.enemy_bite_damage[enemy] < 1) g_balance.enemy_bite_damage[enemy] = 1; }
+        else { g_balance.enemy_bite_interval[enemy] += delta; if (g_balance.enemy_bite_interval[enemy] < 1) g_balance.enemy_bite_interval[enemy] = 1; }
+        g_game.calib_saved_timer = 20; balance_config_save(); return;
+    }
+    if (g_game.calib_page == 2) {
+        int r = g_game.calib_row;
+        if (r < 4) { int *p[4] = { &g_balance.bunker_start_hp, &g_balance.wave_duration_frames, &g_balance.wave_bonus_base, &g_balance.wave_bonus_per_wave }; *p[r] += delta; if (*p[r] < 0) *p[r] = 0; }
+        else if (r < 9) { int i = r - 4; g_balance.turret_damage[i] += delta; if (g_balance.turret_damage[i] < 1) g_balance.turret_damage[i] = 1; }
+        else if (r < 14) { int i = r - 9; g_balance.turret_range[i] += delta * 2; if (g_balance.turret_range[i] < 1) g_balance.turret_range[i] = 1; }
+        else if (r < 18) { int i = r - 14; g_balance.conveyor_reload_interval[i] += delta * 5; if (g_balance.conveyor_reload_interval[i] < 1) g_balance.conveyor_reload_interval[i] = 1; }
+        else { int i = r - 18; g_balance.turret_magazine[i] += delta; if (g_balance.turret_magazine[i] < 1) g_balance.turret_magazine[i] = 1; }
+        g_game.calib_saved_timer = 20; balance_config_save(); return;
+    }
+    if (g_game.calib_page == 3) {
         int *v = 0;
         switch (g_game.calib_row) {
             case 0: v = &g_balance.bunker_start_hp; break;
@@ -1089,7 +1108,7 @@ static void calib_modify_val(int delta) {
         }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
     }
-    if (g_game.calib_page == 2) {
+    if (g_game.calib_page == 3) {
         if (g_game.calib_row >= 35 && g_game.calib_row < 40) {
             int level = g_game.calib_row - 35;
             int64_t n = (int64_t)g_balance.range_upgrade_costs[level] + delta;
@@ -1188,10 +1207,10 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     if (keys_down & KEY_X) {
-        g_game.calib_page = (g_game.calib_page + 2) % 3;
+        g_game.calib_page = (g_game.calib_page + 3) % 4;
         g_game.calib_row = 0;
     } else if (keys_down & KEY_Y) {
-        g_game.calib_page = (g_game.calib_page + 1) % 3;
+        g_game.calib_page = (g_game.calib_page + 1) % 4;
         g_game.calib_row = 0;
     }
 
@@ -1204,7 +1223,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row. Held buttons repeat, then accelerate.
-    int max_rows = (g_game.calib_page == 0) ? 24 : ((g_game.calib_page == 1) ? 48 : 40);
+    int max_rows = (g_game.calib_page == 0) ? 24 : ((g_game.calib_page == 1) ? 24 : ((g_game.calib_page == 2) ? 24 : 40));
     int nav_dir = 0;
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
@@ -1256,12 +1275,12 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     if (keys_down & KEY_TOUCH) {
         // Visible page navigation fallback: touch the header.
         if (touch.py >= 0 && touch.py <= 27 && touch.px >= 150 && touch.px <= 205) {
-            g_game.calib_page = (g_game.calib_page + 2) % 3;
+            g_game.calib_page = (g_game.calib_page + 3) % 4;
             g_game.calib_row = 0;
             return;
         }
         if (touch.py >= 0 && touch.py <= 27 && touch.px > 205) {
-            g_game.calib_page = (g_game.calib_page + 1) % 3;
+            g_game.calib_page = (g_game.calib_page + 1) % 4;
             g_game.calib_row = 0;
             return;
         }
