@@ -30,24 +30,33 @@ for name, frame_count in ENEMIES:
     )
     print(f"wrote {DEST_DIR / f'{name}.gif'} ({frame_width}x{strip.height}, {frame_count} frames)")
 
-# Hydralisk walk-cycle collage: 9 directions x 7 poses, synchronized.
+# Hydralisk walk-cycle previews: one looping GIF per direction.
 source = Image.open(SOURCE_DIR / "t2_hydralisk_walk_strip_master_1x.png").convert("RGBA")
 cell_width = 42
 cell_height = 55
-display_size = 32
-collage_frames = []
-for pose in range(7):
-    collage = Image.new("RGBA", (display_size * 9, display_size * 9), (96, 96, 96, 255))
-    for direction in range(9):
-        cell = source.crop((pose * cell_width, direction * cell_height,
-                            (pose + 1) * cell_width,
-                            (direction + 1) * cell_height))
-        cell = cell.resize((display_size, display_size), Image.Resampling.NEAREST)
-        collage.alpha_composite(cell, ((direction % 3) * display_size,
-                                       (direction // 3) * display_size))
-    collage_frames.append(collage)
+scale = 4
+for direction in range(9):
+    frames = []
+    for pose in range(7):
+        frames.append(source.crop((pose * cell_width, direction * cell_height,
+                                   (pose + 1) * cell_width,
+                                   (direction + 1) * cell_height)))
 
-collage_frames[0].save(DEST_DIR / "t2_hydralisk_walk_views.gif",
-                        save_all=True, append_images=collage_frames[1:],
-                        duration=140, loop=0, disposal=2)
-print(f"wrote {DEST_DIR / 't2_hydralisk_walk_views.gif'} (9 views, 7 poses)")
+    # Use the union of all non-transparent pixels so every frame shares a
+    # tight, stable canvas without gray extraction-sheet margins.
+    bbox = None
+    for frame in frames:
+        current = frame.getbbox()
+        if current:
+            bbox = current if bbox is None else (
+                min(bbox[0], current[0]), min(bbox[1], current[1]),
+                max(bbox[2], current[2]), max(bbox[3], current[3]))
+    if bbox is None:
+        bbox = (0, 0, cell_width, cell_height)
+    frames = [frame.crop(bbox).resize(
+        ((bbox[2] - bbox[0]) * scale, (bbox[3] - bbox[1]) * scale),
+        Image.Resampling.NEAREST) for frame in frames]
+    frames[0].save(DEST_DIR / f"t2_hydralisk_walk_dir{direction}_4x.gif",
+                    save_all=True, append_images=frames[1:],
+                    duration=140, loop=0, disposal=2, transparency=0)
+    print(f"wrote direction {direction} ({frames[0].width}x{frames[0].height}, 7 poses)")
