@@ -1,0 +1,24 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    { "frames": 30, "capture": "01_prep" },
+    { "tap": { "x": 120, "y": 178 }, "frames": 10 },
+    { "release": true, "frames": 15, "capture": "02_waves" },
+    { "button_down": "Y", "frames": 5 },
+    { "button_up": "Y", "frames": 15, "capture": "03_enemy_stats" },
+    { "button_down": "Y", "frames": 5 },
+    { "button_up": "Y", "frames": 15, "capture": "04_base_turrets" },
+    { "button_down": "Y", "frames": 5 },
+    { "button_up": "Y", "frames": 15, "capture": "05_upgrades" },
+    { "button_down": "X", "frames": 5 },
+    { "button_up": "X", "frames": 15, "capture": "06_base_back" }
+  ],
+  "assertions": {
+    "screen_changed": { "from": "02_waves", "to": "03_enemy_stats", "min_changed_pixels": 100 },
+    "screen_changes": [
+      { "from": "03_enemy_stats", "to": "04_base_turrets", "min_changed_pixels": 100 },
+      { "from": "04_base_turrets", "to": "05_upgrades", "min_changed_pixels": 100 },
+      { "from": "05_upgrades", "to": "06_base_back", "min_changed_pixels": 100 }
+    ]
+  }
+}
