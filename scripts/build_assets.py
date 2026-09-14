@@ -141,7 +141,7 @@ def build_enemies():
 #define ENEMY_VARIANT_COUNT {enemy_count}
 #define ENEMY_RENDER_ROTATED 0
 #define ENEMY_RENDER_DIRECTIONAL 1
-#define ENEMY_MAX_DIRECTIONS 8
+#define ENEMY_MAX_DIRECTIONS 9
 #define ENEMY_MAX_FRAMES 7
 
 typedef struct {{
@@ -184,7 +184,7 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
             if render_mode == 1:
                 source_frame_w = im.width // num_frames
                 source_frame_h = im.height // 9
-                direction_count = 8
+                direction_count = 9
                 direction_sizes = []
                 for d_idx in range(direction_count):
                     bbox = None
@@ -240,7 +240,7 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
         for name, nframes, ndirections, direction_sizes, hp, scrap, render_mode in enemies_meta:
             fc.write(f"    {{ // {name}\n")
             fc.write(f"        {render_mode}, {ndirections}, {nframes}, {hp}, {scrap},\n        {{\n")
-            for d_idx in range(8):
+            for d_idx in range(9):
                 fc.write("            {\n")
                 for f_idx in range(7):
                     if d_idx < ndirections and f_idx < nframes:
@@ -261,11 +261,11 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
     frame %= type->frame_count;
     int source_dir = 0;
     if (type->render_mode == ENEMY_RENDER_DIRECTIONAL && type->direction_count > 0) {
-        // The Hydralisk master is ordered from the front/down pose through
-        // the side poses to the rear/up pose. It contains one extra end pose;
-        // use the first eight source directions and keep the game compass order.
+        // Source rows are ordered around the Hydralisk from rear/up through
+        // the side poses to the front/down pose in the ninth row. The game
+        // compass is N, NE, E, SE, S, SW, W, NW.
         static const uint8_t source_direction_for_game_direction[8] =
-            { 0, 1, 2, 3, 4, 5, 6, 7 };
+            { 0, 1, 2, 3, 8, 7, 6, 5 };
         source_dir = source_direction_for_game_direction[dir & 7];
     }
 
