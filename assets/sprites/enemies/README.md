@@ -8,16 +8,19 @@ Esta carpeta contiene los sprites maestros oficiales para las 6 biocastas de enj
 - **Previsualización Animada:** El archivo GIF (`*_preview.gif`) es exclusivamente ilustrativo para verificar el ciclo de caminata.
 - **Archivo Histórico:** Todas las propuestas previas y hojas de exploración se conservan en `archive/`.
 
-## Catálogo de Biocastas Canónicas (T0 a T5)
+## Catálogo de Especies Canónicas (8 Unidades)
 
-| Biocasta | Tipo | Tamaño Frame | Frames | Asset Maestro (1x) | Preview Animado |
-| :--- | :--- | :--- | :---: | :--- | :--- |
-| **T0 Larva** | Micro-parásito veloz | 4x4 px | 4 | `t0_larva_strip_master_1x.png` | `t0_larva_preview.gif` |
-| **T1 Ripper** | Devorador de enjambre | 6x5 px | 4 | `t1_ripper_strip_master_1x.png` | `t1_ripper_preview.gif` |
-| **T2 Hormagaunt** | Vanguardia ágil | 9x9 px | 4 | `t2_hormagaunt_strip_master_1x.png` | `t2_hormagaunt_preview.gif` |
-| **T3 Ravener** | Subterráneo / Excavador | 15x11 px | 4 | `t3_ravener_strip_master_1x.png` | `t3_ravener_preview.gif` |
-| **T4 Carnifex** | Asedio pesado / Bio-ariete | 21x21 px | 4 | `t4_carnifex_strip_master_1x.png` | `t4_carnifex_preview.gif` |
-| **T5 Hierophant** | Titán colosal / Bio-titán | 30x30 px | 4 | `t5_hierophant_strip_master_1x.png` | `t5_hierophant_preview.gif` |
+| ID | Especie | Rol / Amenaza | Tamaño Frame | Frames Anim | Altitud Vuelo | Asset Maestro (1x) |
+| :---: | :--- | :--- | :---: | :---: | :---: | :--- |
+| **0** | **Scourge** | Volador Kamikaze ultrarrápido | $31 \times 27$ px | 5 (Vuelo) | 10 px | `t3_scourge_fly_strip_master_1x.png` |
+| **1** | **Zergling** | Vanguardia / Enjambre ágil | $40 \times 39$ px | 7 (Paso) + 5 (Ataque) | 0 px | `t1_zergling_walk_strip_master_1x.png` |
+| **2** | **Hydralisk** | Asalto medio a distancia | $42 \times 55$ px | 7 (Paso) + 5 (Ataque) | 0 px | `t2_hydralisk_walk_strip_master_1x.png` |
+| **3** | **Mutalisk** | Cazador alado de flanco | $64 \times 72$ px | 5 (Vuelo) | 14 px | `sc_mutalisk_fly_strip_master_1x.png` |
+| **4** | **Defiler** | Caster biológico / Debilitador | $69 \times 59$ px | 8 (Paso) | 0 px | `sc_defiler_walk_strip_master_1x.png` |
+| **5** | **Lurker** | Ariete acorazado con espinas | $69 \times 64$ px | 7 (Paso) | 0 px | `sc_lurker_walk_strip_master_1x.png` |
+| **6** | **Guardian** | Bombardero pesado de asedio | $78 \times 70$ px | 7 (Vuelo) | 16 px | `sc_guardian_fly_strip_master_1x.png` |
+| **7** | **Ultralisk** | Titán coloso / Boss demoledor | $98 \times 105$ px | 9 (Paso) + 6 (Ataque) | 0 px | `t4_ultralisk_walk_strip_master_1x.png` |
 
-- **Róster Comparativo Completo:** `ds_enemies_roster.gif` (muestra las 6 castas animadas a escala 1:1 en pantalla DS de 256x192).
+> [!NOTE]
+> Para optimizar la memoria EWRAM de Nintendo DS (límite 4 MB), se almacenan únicamente **5 direcciones** (N, NE, E, SE, S) y las direcciones restantes (SW, W, NW) se espejan horizontalmente en tiempo de ejecución (`flip_h`), reduciendo el consumo de sprites a **1.85 MB**. Las hojas maestras de 12 propuestas y los assets de prueba de larvas se archivan en `archive/`.
 
