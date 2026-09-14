@@ -302,7 +302,7 @@ void tiles_draw_central_bunker(uint16_t *buffer, int cx, int cy, uint64_t hp, ui
 }
 
 void tiles_draw_xenos_to_buffer(uint16_t *buffer, int cx, int cy, int dir, int anim_frame, int variant) {
-    enemy_draw_sprite_to_buffer(buffer, cx, cy, variant, anim_frame, dir);
+    enemy_draw_sprite_to_buffer(buffer, cx, cy, variant, anim_frame, dir, 0);
 }
 
 void tiles_draw_turret_base(int cx, int cy, int is_selected) {
