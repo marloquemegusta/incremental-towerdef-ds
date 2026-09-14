@@ -181,6 +181,22 @@ typedef struct {
 
 typedef struct {
     WaveDef waves[20];
+    uint32_t enemy_hp[6];
+    uint32_t enemy_scrap[6];
+    uint64_t upgrade_costs[7][5];
+    int turret_damage[5];
+    int turret_fire_interval[5];
+    int turret_range[5];
+    int turret_magazine[6];
+    int bunker_start_hp;
+    int wave_duration_frames;
+    int wave_bonus_base;
+    int wave_bonus_per_wave;
+    int enemy_bite_damage[6];
+    int enemy_bite_interval[6];
+    int conveyor_reload_interval[4];
+    WaveTierConfig advanced_waves[20][3];
+    uint64_t range_upgrade_costs[5];
     uint32_t magic;           // 0x544F5744 ("TOWD")
 } GameBalanceConfig;
 
@@ -238,12 +254,13 @@ typedef struct {
     int upgrade_flash_timer;
     int upgrade_flash_idx;
 
-    int wave_spawned_tier[3];    // Number of enemies spawned so far for Tier 0..2 in current wave
-    int wave_spawn_timer_tier[3];// Timers for each tier spawn in current wave
+    int wave_spawned_tier[6];
+    int wave_spawn_timer_tier[6];
 
     // Calibration UI navigation
-    int calib_row;               // 0..8 (3 rows per tier: Count, Delay, Speed)
+    int calib_row;               // 0..11 (per tier: Count, Delay, Speed, HP; wave scrap)
     int calib_wave_idx;          // 0..19 (Wave 1..20)
+    int calib_page;              // 0 waves, 1 enemy stats, 2 base/turrets, 3 upgrades
     int calib_hold_timer;        // For autorepeat continuous adjustment
     int calib_saved_timer;       // Feedback notification ("SAVED")
 

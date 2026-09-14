@@ -488,16 +488,18 @@ void renderer_draw_ui_upgrades(void) {
     static const struct {
         int x, y, w, h;
         const char *title;
-    } s_card_pos[6] = {
+    } s_card_pos[8] = {
         { 10, 24, 110, 32, "CALIBER" },
         { 130, 24, 110, 32, "FIRE RATE" },
         { 10, 62, 110, 32, "MAG SIZE" },
         { 130, 62, 110, 32, "BIO HARVEST" },
         { 10, 100, 110, 32, "AUTO SUPPLY" },
-        { 130, 100, 110, 32, "AUTO TARGET" }
+        { 130, 100, 110, 32, "AUTO TARGET" },
+        { 10, 138, 110, 32, "EXTRA TURRETS" },
+        { 130, 138, 110, 32, "RANGE" }
     };
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 8; i++) {
         int x = s_card_pos[i].x;
         int y = s_card_pos[i].y;
         int w = s_card_pos[i].w;
@@ -552,15 +554,27 @@ void renderer_draw_ui_upgrades(void) {
                 snprintf(buf, sizeof(buf), "MAXED");
             }
             renderer_draw_text(x + 4, y + 16, buf, cost_col);
+        } else if (i == 6) {
+            snprintf(buf, sizeof(buf), "TURRETS +%d", g_game.upgrades.extra_turrets);
+            renderer_draw_text(x + 4, y + 4, buf, text_col);
+            snprintf(buf, sizeof(buf), "+1  %s$", cost_str);
+            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+        } else if (i == 7) {
+            int lv = g_game.upgrades.range_lvl;
+            snprintf(buf, sizeof(buf), "RANGE LV%d", lv);
+            renderer_draw_text(x + 4, y + 4, buf, text_col);
+            if (lv < 5) snprintf(buf, sizeof(buf), "%d>%d %s$", g_balance.turret_range[lv], g_balance.turret_range[lv + 1], cost_str);
+            else snprintf(buf, sizeof(buf), "MAXED");
+            renderer_draw_text(x + 4, y + 16, buf, cost_col);
         }
     }
 
     if (g_game.upgrade_flash_timer > 0) g_game.upgrade_flash_timer--;
 
     // Return button
-    renderer_fill_rect(90, 150, 76, 28, COLOR_LED_GREEN);
-    renderer_draw_rect(90, 150, 76, 28, COLOR_WHITE);
-    renderer_draw_text(108, 160, "BACK", COLOR_BLACK);
+    renderer_fill_rect(130, 174, 76, 16, COLOR_LED_GREEN);
+    renderer_draw_rect(130, 174, 76, 16, COLOR_WHITE);
+    renderer_draw_text(153, 178, "BACK", COLOR_BLACK);
 }
 
 void renderer_draw_ui_calibration(void) {
@@ -569,10 +583,49 @@ void renderer_draw_ui_calibration(void) {
     renderer_draw_rect(2, 2, SCREEN_W - 4, SCREEN_H - 4, COLOR_IRON_BORDER);
 
     // Title banner
-    renderer_draw_text(6, 4, "WAVE CALIBRATION", COLOR_AMBER);
+    renderer_draw_text(6, 4, "CALIBRATION", COLOR_AMBER);
+    renderer_draw_text(145, 4, "X <TAB   TAB> Y", COLOR_WHITE);
     if (g_game.calib_saved_timer > 0) {
         g_game.calib_saved_timer--;
         renderer_draw_text(180, 4, "SAVED (SD)", COLOR_PHOSPHOR_GREEN);
+    }
+
+    if (g_game.calib_page != 0) {
+        char buf[64];
+        static const char *page_titles[4] = { "WAVE SPAWNS", "ENEMY STATS", "BASE / TURRETS", "UPGRADES" };
+        const char *title = page_titles[g_game.calib_page];
+        renderer_draw_text(6, 18, title, COLOR_WHITE);
+        snprintf(buf, sizeof(buf), "PAGE %d/4", g_game.calib_page + 1);
+        renderer_draw_text(190, 18, buf, COLOR_AMBER);
+        int first = (g_game.calib_page == 1) ? (g_game.calib_row / 10) * 10 : (g_game.calib_row / 10) * 10;
+        int last = (g_game.calib_page == 3) ? 40 : 24;
+        static const char *enemy_labels[24] = { "LARVA HP", "LARVA SCRAP", "LARVA BITE DMG", "LARVA BITE FRAMES", "RIPPER HP", "RIPPER SCRAP", "RIPPER BITE DMG", "RIPPER BITE FRAMES", "HORMAG HP", "HORMAG SCRAP", "HORMAG BITE DMG", "HORMAG BITE FRAMES", "RAVENER HP", "RAVENER SCRAP", "RAVENER BITE DMG", "RAVENER BITE FRAMES", "CARNIFEX HP", "CARNIFEX SCRAP", "CARNIFEX BITE DMG", "CARNIFEX BITE FRAMES", "HIEROPH HP", "HIEROPH SCRAP", "HIEROPH BITE DMG", "HIEROPH BITE FRAMES" };
+        static const char *base_labels[24] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4", "RANGE LV0", "RANGE LV1", "RANGE LV2", "RANGE LV3", "RANGE LV4", "CONVEYOR LV0", "CONVEYOR LV1", "CONVEYOR LV2", "CONVEYOR LV3", "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4", "MAGAZINE LV5" };
+        for (int n = 0; n < 10 && first + n < last; n++) {
+            int r = first + n, val = 0;
+            if (g_game.calib_page == 1) { int e=r/4, f=r%4; val = f==0 ? g_balance.enemy_hp[e] : f==1 ? g_balance.enemy_scrap[e] : f==2 ? g_balance.enemy_bite_damage[e] : g_balance.enemy_bite_interval[e]; }
+            else if (g_game.calib_page == 2) {
+                if (r < 4) { int *p[4] = { &g_balance.bunker_start_hp, &g_balance.wave_duration_frames, &g_balance.wave_bonus_base, &g_balance.wave_bonus_per_wave }; val = *p[r]; }
+                else if (r < 9) val = g_balance.turret_damage[r-4]; else if (r < 14) val = g_balance.turret_range[r-9]; else if (r < 18) val = g_balance.conveyor_reload_interval[r-14]; else val = g_balance.turret_magazine[r-18];
+            } else {
+                int u = r / 5, l = r % 5; val = (int)g_balance.upgrade_costs[u][l];
+            }
+            int y = 32 + n * 13; int sel = (r == g_game.calib_row);
+            renderer_fill_rect(6, y, 244, 12, sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL);
+            renderer_draw_rect(6, y, 244, 12, sel ? COLOR_AMBER : COLOR_IRON_BORDER);
+            if (g_game.calib_page == 1) renderer_draw_text(10, y + 2, enemy_labels[r], COLOR_WHITE);
+            else if (g_game.calib_page == 2) renderer_draw_text(10, y + 2, base_labels[r], COLOR_WHITE);
+            else {
+                static const char *names[7] = { "CALIBER", "FIRE RATE", "MAG SIZE", "BIO HARVEST", "SUPPLY CONVEYOR", "AUTO TARGET", "EXTRA TURRETS" };
+                if (r < 35) snprintf(buf, sizeof(buf), "%s LV%d", names[r / 5], r % 5);
+                else snprintf(buf, sizeof(buf), "RANGE LV%d", r - 35);
+                renderer_draw_text(10, y + 2, buf, COLOR_WHITE);
+            }
+            snprintf(buf, sizeof(buf), "%d  [-] [+]", val); renderer_draw_text(150, y + 2, buf, COLOR_PHOSPHOR_GREEN);
+        }
+        renderer_draw_text(8, 166, "X <TAB   TAB> Y   B BACK", COLOR_AMBER);
+        renderer_draw_text(8, 178, "UP/DOWN NAV (HOLD=FAST)  L/R EDIT", COLOR_PHOSPHOR_GREEN);
+        return;
     }
 
     // Wave Selector Bar: [<] WAVE X/20 [>]
@@ -587,26 +640,37 @@ void renderer_draw_ui_calibration(void) {
     char buf[64];
     snprintf(buf, sizeof(buf), "SELECT WAVE: %d/20 (L/R)", g_game.calib_wave_idx + 1);
     renderer_draw_text(52, 20, buf, COLOR_WHITE);
+    renderer_draw_text(190, 20, "TAB 1/4", COLOR_AMBER);
 
     int w = g_game.calib_wave_idx;
     const WaveDef *wd = &g_balance.waves[w];
 
-    // 9 Rows grouped across the 3 Tiers (Tier 0: Larva, Tier 1: Ripper, Tier 2: Hormagaunt)
-    static const char *row_labels[9] = {
-        "T1 LARVA COUNT", "T1 LARVA DELAY", "T1 LARVA SPEED",
-        "T2 RIPPER COUNT", "T2 RIPPER DELAY", "T2 RIPPER SPEED",
-        "T3 HORMAG COUNT", "T3 HORMAG DELAY", "T3 HORMAG SPEED"
+    // 24 rows, shown ten at a time while scrolling with Up/Down
+    static const char *row_labels[24] = {
+        "T1 LARVA COUNT", "T1 LARVA DELAY", "T1 LARVA SPEED", "T1 LARVA HP",
+        "T2 RIPPER COUNT", "T2 RIPPER DELAY", "T2 RIPPER SPEED", "T2 RIPPER HP",
+        "T3 HORMAG COUNT", "T3 HORMAG DELAY", "T3 HORMAG SPEED", "WAVE SCRAP",
+        "T4 RAVENER COUNT", "T4 RAVENER DELAY", "T4 RAVENER SPEED", "T4 RAVENER HP",
+        "T5 CARNIFEX COUNT", "T5 CARNIFEX DELAY", "T5 CARNIFEX SPEED", "T5 CARNIFEX HP",
+        "T6 HIEROPH COUNT", "T6 HIEROPH DELAY", "T6 HIEROPH SPEED", "T6 HIEROPH HP"
     };
 
-    for (int r = 0; r < 9; r++) {
-        int tier = r / 3;
-        int param = r % 3;
+    int first_row = (g_game.calib_row / 10) * 10;
+    for (int n = 0; n < 10 && first_row + n < 24; n++) {
+        int r = first_row + n;
+        int tier = r / 4;
+        int param = r % 4;
         int val = 0;
-        if (param == 0) val = wd->tiers[tier].count;
-        else if (param == 1) val = wd->tiers[tier].delay;
-        else if (param == 2) val = wd->tiers[tier].speed;
+        if (r == 11) val = wd->scrap_base;
+        else if (tier < 3 && param == 0) val = wd->tiers[tier].count;
+        else if (tier < 3 && param == 1) val = wd->tiers[tier].delay;
+        else if (tier < 3 && param == 2) val = wd->tiers[tier].speed;
+        else if (param == 3) val = g_balance.enemy_hp[tier];
+        else if (tier >= 3 && param == 0) val = g_balance.advanced_waves[w][tier - 3].count;
+        else if (tier >= 3 && param == 1) val = g_balance.advanced_waves[w][tier - 3].delay;
+        else if (tier >= 3 && param == 2) val = g_balance.advanced_waves[w][tier - 3].speed;
 
-        int y = 36 + r * 13;
+        int y = 31 + n * 10;
         int is_sel = (g_game.calib_row == r);
         uint16_t row_bg = is_sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL;
         uint16_t row_border = is_sel ? COLOR_AMBER : COLOR_IRON_BORDER;
@@ -615,13 +679,13 @@ void renderer_draw_ui_calibration(void) {
         // Highlight header tier group with slightly warmer text
         if (param == 0 && !is_sel) txt_col = COLOR_AMBER;
 
-        renderer_fill_rect(6, y, 244, 12, row_bg);
-        renderer_draw_rect(6, y, 244, 12, row_border);
+        renderer_fill_rect(6, y, 244, 10, row_bg);
+        renderer_draw_rect(6, y, 244, 10, row_border);
 
-        renderer_draw_text(10, y + 2, row_labels[r], txt_col);
+        renderer_draw_text(10, y + 1, row_labels[r], txt_col);
 
         snprintf(buf, sizeof(buf), "%d", val);
-        renderer_draw_text(142, y + 2, buf, COLOR_PHOSPHOR_GREEN);
+        renderer_draw_text(142, y + 1, buf, COLOR_PHOSPHOR_GREEN);
 
         // [-] button
         renderer_fill_rect(178, y + 1, 24, 10, COLOR_BLACK);
