@@ -5,20 +5,23 @@ SOURCE = Path("assets/sprites/enemies/zerg_hydralisk_source.png")
 DEST = Path("assets/sprites/enemies/t2_hormagaunt_strip_master_1x.png")
 MASTER = Path("assets/sprites/enemies/t2_hydralisk_walk_strip_master_1x.png")
 
-# The upper 7x9 grid is the Hydralisk walk cycle: 9 directions, 7 poses.
-# Use four poses from the first orientation for the current DS enemy format.
+# The source has 7 animation rows x 9 source directions. The canonical master
+# uses 8 rows in the shared game order: N, NE, E, SE, S, SW, W, NW.
+# The source's ninth column is the front/down pose; the source order is not
+# the order used by the game, so normalize it here once and for all.
+CANONICAL_SOURCE_DIRECTIONS = (0, 1, 2, 3, 8, 7, 6, 5)
 im = Image.open(SOURCE).convert("RGBA")
 cell_width = 42
 cell_height = 55
 column_pitch = 45
 row_pitch = 58
 
-master = Image.new("RGBA", (cell_width * 7, cell_height * 9), (0, 0, 0, 0))
-for direction in range(9):
+master = Image.new("RGBA", (cell_width * 7, cell_height * 8), (0, 0, 0, 0))
+for canonical_direction, source_direction in enumerate(CANONICAL_SOURCE_DIRECTIONS):
     for pose in range(7):
         # Source layout is 7 animation rows x 9 directions.
-        cell = im.crop((2 + direction * column_pitch, 2 + pose * row_pitch,
-                        2 + direction * column_pitch + cell_width,
+        cell = im.crop((2 + source_direction * column_pitch, 2 + pose * row_pitch,
+                        2 + source_direction * column_pitch + cell_width,
                         2 + pose * row_pitch + cell_height))
         pixels = cell.load()
         for y in range(cell.height):
@@ -26,7 +29,7 @@ for direction in range(9):
                 r, g, b, a = pixels[x, y]
                 if abs(r - g) < 8 and abs(g - b) < 8 and 80 <= r <= 180:
                     pixels[x, y] = (0, 0, 0, 0)
-        master.alpha_composite(cell, (pose * cell_width, direction * cell_height))
+        master.alpha_composite(cell, (pose * cell_width, canonical_direction * cell_height))
 MASTER.parent.mkdir(parents=True, exist_ok=True)
 master.save(MASTER)
 
