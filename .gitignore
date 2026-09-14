@@ -1,4 +1,4 @@
-﻿# Precompiled runtime binaries (fetched via scripts/setup.ps1)
+# Precompiled runtime binaries (fetched via scripts/setup.ps1)
 runtime/bin/*.so
 runtime/bin/desmume-agent
 !runtime/bin/.gitkeep
@@ -21,3 +21,7 @@ runtime/build/
 # Local archives
 *.tar.gz
 *.zip
+
+# Temporary scratch and staging
+scratch/
+
