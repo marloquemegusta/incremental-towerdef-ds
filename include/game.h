@@ -180,6 +180,7 @@ typedef struct {
     int enemy_bite_interval[6];
     int conveyor_reload_interval[4];
     WaveTierConfig advanced_waves[20][3];
+    uint64_t range_upgrade_costs[5];
     uint32_t magic;           // 0x544F5744 ("TOWD")
 } GameBalanceConfig;
 

@@ -485,17 +485,18 @@ void renderer_draw_ui_upgrades(void) {
     static const struct {
         int x, y, w, h;
         const char *title;
-    } s_card_pos[7] = {
+    } s_card_pos[8] = {
         { 10, 24, 110, 32, "CALIBER" },
         { 130, 24, 110, 32, "FIRE RATE" },
         { 10, 62, 110, 32, "MAG SIZE" },
         { 130, 62, 110, 32, "BIO HARVEST" },
         { 10, 100, 110, 32, "AUTO SUPPLY" },
         { 130, 100, 110, 32, "AUTO TARGET" },
-        { 10, 138, 110, 32, "EXTRA TURRETS" }
+        { 10, 138, 110, 32, "EXTRA TURRETS" },
+        { 130, 138, 110, 32, "RANGE" }
     };
 
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 8; i++) {
         int x = s_card_pos[i].x;
         int y = s_card_pos[i].y;
         int w = s_card_pos[i].w;
@@ -555,6 +556,13 @@ void renderer_draw_ui_upgrades(void) {
             renderer_draw_text(x + 4, y + 4, buf, text_col);
             snprintf(buf, sizeof(buf), "+1  %s$", cost_str);
             renderer_draw_text(x + 4, y + 16, buf, cost_col);
+        } else if (i == 7) {
+            int lv = g_game.upgrades.range_lvl;
+            snprintf(buf, sizeof(buf), "RANGE LV%d", lv);
+            renderer_draw_text(x + 4, y + 4, buf, text_col);
+            if (lv < 5) snprintf(buf, sizeof(buf), "%d>%d %s$", g_balance.turret_range[lv], g_balance.turret_range[lv + 1], cost_str);
+            else snprintf(buf, sizeof(buf), "MAXED");
+            renderer_draw_text(x + 4, y + 16, buf, cost_col);
         }
     }
 
@@ -586,7 +594,7 @@ void renderer_draw_ui_calibration(void) {
         snprintf(buf, sizeof(buf), "PAGE %d/3", g_game.calib_page + 1);
         renderer_draw_text(190, 18, buf, COLOR_AMBER);
         int first = (g_game.calib_page == 1) ? (g_game.calib_row / 10) * 10 : (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 1) ? 48 : 35;
+        int last = (g_game.calib_page == 1) ? 48 : 40;
         static const char *global_labels[48] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4", "RANGE LV0", "RANGE LV1", "RANGE LV2", "RANGE LV3", "RANGE LV4", "LARVA HP", "RIPPER HP", "HORMAGAUNT HP", "RAVENER HP", "CARNIFEX HP", "HIEROPHANT HP", "LARVA SCRAP", "RIPPER SCRAP", "HORMAGAUNT SCRAP", "RAVENER SCRAP", "CARNIFEX SCRAP", "HIEROPHANT SCRAP", "LARVA BITE DMG", "RIPPER BITE DMG", "HORMAGAUNT BITE DMG", "RAVENER BITE DMG", "CARNIFEX BITE DMG", "HIEROPHANT BITE DMG", "CONVEYOR LV0", "CONVEYOR LV1", "CONVEYOR LV2", "CONVEYOR LV3", "LARVA BITE FRAMES", "RIPPER BITE FRAMES", "HORMAGAUNT BITE FRAMES", "RAVENER BITE FRAMES", "CARNIFEX BITE FRAMES", "HIEROPHANT BITE FRAMES", "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4", "MAGAZINE LV5" };
         for (int n = 0; n < 10 && first + n < last; n++) {
             int r = first + n, val = 0;
@@ -609,7 +617,8 @@ void renderer_draw_ui_calibration(void) {
             if (g_game.calib_page == 1) renderer_draw_text(10, y + 2, global_labels[r], COLOR_WHITE);
             else {
                 static const char *names[7] = { "CALIBER", "FIRE RATE", "MAG SIZE", "BIO HARVEST", "SUPPLY CONVEYOR", "AUTO TARGET", "EXTRA TURRETS" };
-                snprintf(buf, sizeof(buf), "%s LV%d", names[r / 5], r % 5);
+                if (r < 35) snprintf(buf, sizeof(buf), "%s LV%d", names[r / 5], r % 5);
+                else snprintf(buf, sizeof(buf), "RANGE LV%d", r - 35);
                 renderer_draw_text(10, y + 2, buf, COLOR_WHITE);
             }
             snprintf(buf, sizeof(buf), "%d  [-] [+]", val); renderer_draw_text(150, y + 2, buf, COLOR_PHOSPHOR_GREEN);

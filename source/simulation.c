@@ -62,6 +62,7 @@ static const GameBalanceConfig s_default_balance = {
     .enemy_bite_damage = { 1, 3, 5, 7, 9, 11 },
     .enemy_bite_interval = { 45, 45, 45, 45, 45, 45 },
     .conveyor_reload_interval = { 9999, 60, 20, 10 },
+    .range_upgrade_costs = { 30, 60, 120, 240, 480 },
     .magic = 0x544F5744 // "TOWD"
 };
 
@@ -92,6 +93,14 @@ void balance_config_load(void) {
             GameBalanceConfig loaded;
             memcpy(&loaded, raw, sizeof(loaded));
             if (loaded.magic == 0x544F5744) memcpy(&g_balance, &loaded, sizeof(g_balance));
+        } else if (n == 2576) {
+            uint32_t old_magic;
+            memcpy(&old_magic, raw + 2572, sizeof(old_magic));
+            if (old_magic == 0x544F5744) {
+                memcpy(&g_balance, raw, 2572);
+                memcpy(&g_balance.range_upgrade_costs[0], (uint64_t[5]){30,60,120,240,480}, sizeof(g_balance.range_upgrade_costs));
+                g_balance.magic = 0x544F5744;
+            }
         } else if (n == 1576) {
             /* Migrate the previous 6-upgrade format without losing user tuning. */
             uint32_t old_magic;
@@ -879,6 +888,10 @@ void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_he
 
 uint64_t upgrade_get_cost(int idx) {
     /* Costs are part of the persisted balance so calibration can tune them. */
+    if (idx == 7) {
+        int level = g_game.upgrades.range_lvl;
+        return (level >= 0 && level < 5) ? g_balance.range_upgrade_costs[level] : 999999;
+    }
     if (idx >= 0 && idx < 7) {
         int levels[7] = { g_game.upgrades.caliber_lvl, g_game.upgrades.firerate_lvl,
             g_game.upgrades.mag_size_lvl, g_game.upgrades.bio_harvest_lvl,
@@ -969,6 +982,7 @@ void upgrade_purchase(int idx) {
                 }
             }
             break;
+        case 7: g_game.upgrades.range_lvl++; break;
     }
 }
 
@@ -1012,6 +1026,9 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
         // Tab 7: Extra turrets (10, 138, 110, 32)
         else if (touch.px >= 10 && touch.px <= 120 && touch.py >= 136 && touch.py <= 172) {
             upgrade_purchase(6);
+        }
+        else if (touch.px >= 130 && touch.px <= 240 && touch.py >= 136 && touch.py <= 172) {
+            upgrade_purchase(7);
         }
     }
 }
@@ -1073,6 +1090,14 @@ static void calib_modify_val(int delta) {
         g_game.calib_saved_timer = 20; balance_config_save(); return;
     }
     if (g_game.calib_page == 2) {
+        if (g_game.calib_row >= 35 && g_game.calib_row < 40) {
+            int level = g_game.calib_row - 35;
+            int64_t n = (int64_t)g_balance.range_upgrade_costs[level] + delta;
+            if (n < 0) n = 0;
+            if (n > 999999) n = 999999;
+            g_balance.range_upgrade_costs[level] = (uint64_t)n;
+            g_game.calib_saved_timer = 20; balance_config_save(); return;
+        }
         int up = g_game.calib_row / 5, level = g_game.calib_row % 5;
         if (up >= 0 && up < 6) {
             int64_t n = (int64_t)g_balance.upgrade_costs[up][level] + delta;
@@ -1179,7 +1204,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row on the current page.
-    int max_rows = (g_game.calib_page == 0) ? 24 : ((g_game.calib_page == 1) ? 48 : 35);
+    int max_rows = (g_game.calib_page == 0) ? 24 : ((g_game.calib_page == 1) ? 48 : 40);
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
     }

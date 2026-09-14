@@ -6,3 +6,4 @@ upgrade_id,name,max_level,cost_0,cost_1,cost_2,cost_3,cost_4
 4,conveyor,3,50,90,160,,
 5,auto_target,1,80,,,,
 6,extra_turrets,3,200,400,800,1600,
+7,range,5,30,60,120,240,480

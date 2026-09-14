@@ -51,6 +51,7 @@ def compile_balance(root, output):
     blob += struct.pack("<4i", 9999, 60, 20, 10)
     # Optional tiers 3..5 for each wave: zero by default, ready for editing.
     blob += struct.pack("<240i", *([0] * 240))
+    blob += struct.pack("<5Q", 30, 60, 120, 240, 480)
     blob += struct.pack("<I", MAGIC)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(blob)
