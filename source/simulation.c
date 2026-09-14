@@ -1118,7 +1118,7 @@ static void calib_modify_val(int delta) {
             g_game.calib_saved_timer = 20; balance_config_save(); return;
         }
         int up = g_game.calib_row / 5, level = g_game.calib_row % 5;
-        if (up >= 0 && up < 6) {
+        if (up >= 0 && up < 7) {
             int64_t n = (int64_t)g_balance.upgrade_costs[up][level] + delta;
             if (n < 0) n = 0;
             if (n > 999999) n = 999999;
