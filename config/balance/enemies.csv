@@ -1,0 +1,7 @@
+enemy_id,name,default_hp,scrap_value
+0,larva,1,1
+1,ripper,8,3
+2,hormagaunt,40,10
+3,ravener,160,60
+4,carnifex,2500,750
+5,hierophant,40000,20000

@@ -26,21 +26,44 @@ int main(void) {
             }
         }
 
-        // SELECT toggles Upgrade Tree directly
-        if (keys_down & KEY_SELECT) {
-            if (g_game.mode == MODE_UPGRADES) {
-                g_game.mode = (g_game.previous_mode == MODE_UPGRADES || g_game.previous_mode == MODE_PAUSED) 
-                              ? MODE_PREPARATION : g_game.previous_mode;
-            } else if (g_game.mode != MODE_GAME_OVER && g_game.mode != MODE_CALIBRATION) {
-                g_game.previous_mode = g_game.mode;
-                g_game.mode = MODE_UPGRADES;
+        // Invisible Debug Hotkey: L + SELECT toggles Test Sandbox Lab
+        static int s_sandbox_hotkey_held = 0;
+        int hotkey_active = ((keys_held & KEY_L) != 0 && (keys_held & KEY_SELECT) != 0);
+        if (hotkey_active) {
+            if (!s_sandbox_hotkey_held) {
+                s_sandbox_hotkey_held = 1;
+                if (g_game.mode == MODE_DEBUG_SANDBOX) {
+                    g_game.mode = g_game.previous_mode;
+                } else if (g_game.mode != MODE_GAME_OVER) {
+                    g_game.previous_mode = g_game.mode;
+                    g_game.mode = MODE_DEBUG_SANDBOX;
+                    if (!g_turrets[0].placed) {
+                        g_turrets[0].placed = 1;
+                        g_turrets[0].x = 128;
+                        g_turrets[0].y = 104;
+                        g_turrets[0].ammo = 50;
+                        g_turrets[0].max_ammo = 50;
+                    }
+                }
+            }
+        } else {
+            s_sandbox_hotkey_held = 0;
+            if (keys_down & KEY_SELECT) {
+                // SELECT toggles Upgrade Tree directly
+                if (g_game.mode == MODE_UPGRADES) {
+                    g_game.mode = (g_game.previous_mode == MODE_UPGRADES || g_game.previous_mode == MODE_PAUSED) 
+                                  ? MODE_PREPARATION : g_game.previous_mode;
+                } else if (g_game.mode != MODE_GAME_OVER && g_game.mode != MODE_CALIBRATION && g_game.mode != MODE_DEBUG_SANDBOX) {
+                    g_game.previous_mode = g_game.mode;
+                    g_game.mode = MODE_UPGRADES;
+                }
             }
         }
 
-
-
         // Bottom Screen mode-specific input
-        if (g_game.mode == MODE_PAUSED) {
+        if (g_game.mode == MODE_DEBUG_SANDBOX) {
+            game_handle_input_sandbox(touch, keys_down, keys_held);
+        } else if (g_game.mode == MODE_PAUSED) {
             game_handle_input_pause(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_PREPARATION) {
             game_handle_input_prep(touch, keys_down, keys_held);
@@ -54,12 +77,14 @@ int main(void) {
             game_handle_input_game_over(touch, keys_down, keys_held);
         }
 
-        // Simulation update (strictly during active WAVE mode)
+        // Simulation update (during active WAVE mode or live SANDBOX mode)
         if (g_game.mode == MODE_WAVE) {
             game_update_simulation();
             if (g_game.fast_forward == 2 && g_game.mode == MODE_WAVE) {
                 game_update_simulation();
             }
+        } else if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.run_sim) {
+            game_update_simulation();
         }
 
         // Visual render (Top Screen: Continuous Urban Ground + Inbound Swarm)
@@ -96,6 +121,8 @@ int main(void) {
                 renderer_draw_ui_pause();
             } else if (g_game.mode == MODE_GAME_OVER) {
                 renderer_draw_ui_game_over();
+            } else if (g_game.mode == MODE_DEBUG_SANDBOX) {
+                renderer_draw_ui_sandbox();
             }
         }
 

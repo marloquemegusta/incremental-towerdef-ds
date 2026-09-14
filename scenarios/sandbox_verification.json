@@ -1,0 +1,65 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 20,
+      "capture": "01_before_sandbox"
+    },
+    {"button_down": "L", "frames": 2},
+    {"button_down": "SELECT", "frames": 2, "capture": "02_sandbox_opened"},
+    {"button_up": "SELECT", "frames": 2},
+    {"button_up": "L", "frames": 2},
+    {
+      "tap": {
+        "x": 128,
+        "y": 60
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 20,
+      "capture": "03_enemy_spawned_frozen"
+    },
+    {
+      "frames": 30,
+      "capture": "04_turret_firing_at_spawned"
+    },
+    {
+      "tap": {
+        "x": 28,
+        "y": 160
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 10,
+      "capture": "05_cleared_sandbox"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_before_sandbox",
+      "to": "02_sandbox_opened",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {
+        "from": "01_before_sandbox",
+        "to": "02_sandbox_opened",
+        "min_changed_pixels": 50
+      },
+      {
+        "from": "02_sandbox_opened",
+        "to": "03_enemy_spawned_frozen",
+        "min_changed_pixels": 10
+      },
+      {
+        "from": "03_enemy_spawned_frozen",
+        "to": "04_turret_firing_at_spawned",
+        "min_changed_pixels": 10
+      }
+    ]
+  }
+}
