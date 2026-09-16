@@ -32,21 +32,9 @@
 - [x] Limpieza de assets canónicos: exclusivamente 8 especies del enjambre StarCraft visibles en `assets/sprites/enemies/`.
 - [x] Resolución de `[OQ-01]` a `[OQ-04]` (Muralla unificada, marea continua pautada, escalera de automatización del disparo y economía limpia Chatarra + Núcleos sin energía pasiva).
 - [x] **Especificación Maestra y Contrato de Fase 1:** Documento `docs/PHASE_1_SPEC.md` consolidado con el alcance completo del prototipo jugable.
-- [ ] **Desarrollo de Fase 1 en 3 Sesiones Atómicas:**
-  - [ ] **Sesión 1: Muralla, Sockets y Balística Táctil:**
-    - [ ] Geometría de muralla única en $Y=344..383$ con barra de salud integrada (`wall_hp`).
-    - [ ] Ranuras físicas (Socket central activo para el jugador, sockets laterales bloqueados).
-    - [ ] Motor balístico de impacto y pirotecnia: `1 Tap = 1 Disparo`, trazadoras luminosas, chispas de impacto (`combat_sparks`), eyección de casquillos y micro-screen shake.
-    - [ ] Escenario y build de validación en DeSmuME.
-  - [ ] **Sesión 2: Marea Continua y Picos de Alerta:**
-    - [ ] Spawner de flujo frontal continuo (pantalla superior $Y=0$ a inferior $Y=192$).
-    - [ ] Sistema de picos de horda compacta con temporizador en HUD superior (`ALERTA EN 0:XX`).
-    - [ ] Telemetría superior (bajas, chatarra, supervivencia) y daño por contacto en muralla.
-    - [ ] Escenario y build de validación en DeSmuME.
-  - [ ] **Sesión 3: Árbol Visual de Mejoras y Balance Incremental:**
-    - [ ] Interfaz visual del Árbol de Tecnologías (nodos interconectados, estados y pausa táctica total).
-    - [ ] 6 Ramas: Automatización (Hold + Auto-target), Daño, Cadencia, Sockets, Economía e Integridad.
-    - [ ] Bucle de Game Over con estadísticas y reintento instantáneo en 1 tap.
-    - [ ] Balance de progresión incremental, test en DeSmuME y subida a Nintendo DS real (`towerdefense.nds`).
+- [ ] **Desarrollo de Fase 1 (Detalle técnico en [docs/PHASE_1_SPEC.md](docs/PHASE_1_SPEC.md)):**
+  - [ ] **Sesión 1:** Diseño e implementación de Muralla, Sockets y Balística Táctil.
+  - [ ] **Sesión 2:** Marea continua y Picos de Alerta con HUD superior.
+  - [ ] **Sesión 3:** Árbol visual de mejoras, pausa táctica y balance incremental.
 
 
