@@ -1,12 +1,11 @@
-# Sprites de Enemigos Tiránidos (Assets Canónicos)
+# Sprites de Amenazas Xenos StarCraft (Assets Canónicos)
 
-Esta carpeta contiene los sprites maestros oficiales para las 6 biocastas de enjambre de `towerds`.
+Esta carpeta contiene **única y exclusivamente** los sprites maestros oficiales para las 8 especies del enjambre xenos (StarCraft) de `towerds`.
 
 ## Convención Canónica (AGENTS.md Regla 6)
 - **Asset Maestro:** Cada entidad animada tiene como asset canónico su **cinta completa de animación 1x** (`*_strip_master_1x.png`).
-- **Previsualización HD:** La versión 4x (`*_strip_master_4x.png`) sirve para inspección visual directa.
-- **Previsualización Animada:** El archivo GIF (`*_preview.gif`) es exclusivamente ilustrativo para verificar el ciclo de caminata.
-- **Archivo Histórico:** Todas las propuestas previas y hojas de exploración se conservan en `archive/`.
+- **Archivo Histórico:** Los assets de exploración previa y las castas Tyranid heredadas (T0-T5) se preservan en `archive/tyranid_legacy/`.
+- **Rips y Fuentes en Bruto:** Los spritesheets y capturas originales sin procesar se almacenan en `raw_masters/`.
 
 ## Catálogo de Especies Canónicas (8 Unidades)
 
