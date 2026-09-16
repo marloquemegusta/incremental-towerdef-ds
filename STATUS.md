@@ -31,12 +31,22 @@
 - [x] Consolidación de visión canónica en `DESIGN.md` (unificación de documentos, muralla modular en $Y=344$, hoja de ruta de fases y archivo de legacy docs).
 - [x] Limpieza de assets canónicos: exclusivamente 8 especies del enjambre StarCraft visibles en `assets/sprites/enemies/`.
 - [x] Resolución de `[OQ-01]` a `[OQ-04]` (Muralla unificada, marea continua pautada, escalera de automatización del disparo y economía limpia Chatarra + Núcleos sin energía pasiva).
-- [ ] **Prototipo Jugable Fase 1 (Siguiente Sesión):**
-  - [ ] Implementar la geometría de Muralla continua en el borde inferior ($Y=344..383$) con HP global.
-  - [ ] Adaptar el spawn a marea continua frontal de xenos (Zerglings y Scourges) cruzando de pantalla superior a inferior.
-  - [ ] Implementar el control manual táctil inicial (`1 tap = 1 disparo`) y acumulación de Chatarra por baja.
-  - [ ] Implementar la primera mejora de automatización: Gatillo Continuo (`Hold stylus = ráfaga continua`).
-  - [ ] Implementar la segunda mejora de automatización: Auto-target al más cercano con override táctil a mano.
-  - [ ] Panel de tienda con pausa activa de combate.
+- [x] **Especificación Maestra y Contrato de Fase 1:** Documento `docs/PHASE_1_SPEC.md` consolidado con el alcance completo del prototipo jugable.
+- [ ] **Desarrollo de Fase 1 en 3 Sesiones Atómicas:**
+  - [ ] **Sesión 1: Muralla, Sockets y Balística Táctil:**
+    - [ ] Geometría de muralla única en $Y=344..383$ con barra de salud integrada (`wall_hp`).
+    - [ ] Ranuras físicas (Socket central activo para el jugador, sockets laterales bloqueados).
+    - [ ] Motor balístico de impacto y pirotecnia: `1 Tap = 1 Disparo`, trazadoras luminosas, chispas de impacto (`combat_sparks`), eyección de casquillos y micro-screen shake.
+    - [ ] Escenario y build de validación en DeSmuME.
+  - [ ] **Sesión 2: Marea Continua y Picos de Alerta:**
+    - [ ] Spawner de flujo frontal continuo (pantalla superior $Y=0$ a inferior $Y=192$).
+    - [ ] Sistema de picos de horda compacta con temporizador en HUD superior (`ALERTA EN 0:XX`).
+    - [ ] Telemetría superior (bajas, chatarra, supervivencia) y daño por contacto en muralla.
+    - [ ] Escenario y build de validación en DeSmuME.
+  - [ ] **Sesión 3: Árbol Visual de Mejoras y Balance Incremental:**
+    - [ ] Interfaz visual del Árbol de Tecnologías (nodos interconectados, estados y pausa táctica total).
+    - [ ] 6 Ramas: Automatización (Hold + Auto-target), Daño, Cadencia, Sockets, Economía e Integridad.
+    - [ ] Bucle de Game Over con estadísticas y reintento instantáneo en 1 tap.
+    - [ ] Balance de progresión incremental, test en DeSmuME y subida a Nintendo DS real (`towerdefense.nds`).
 
 
