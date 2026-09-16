@@ -26,3 +26,17 @@
 - [x] Catálogo y versionado de assets gráficos en `assets/` (sprites, propuestas de 12 torretas, animaciones y filmstrips).
 - [x] Compilación limpia y validación de escenarios en DeSmuME (`combat_sparks_test`).
 
+## Fase Actual: Hito 3 (Transición a Arcade Incremental: Muralla Modular, Marea Continua y Fricción de Disparo) - EN PROGRESO
+
+- [x] Consolidación de visión canónica en `DESIGN.md` (unificación de documentos, muralla modular en $Y=344$, hoja de ruta de fases y archivo de legacy docs).
+- [x] Limpieza de assets canónicos: exclusivamente 8 especies del enjambre StarCraft visibles en `assets/sprites/enemies/`.
+- [x] Resolución de `[OQ-01]` a `[OQ-04]` (Muralla unificada, marea continua pautada, escalera de automatización del disparo y economía limpia Chatarra + Núcleos sin energía pasiva).
+- [ ] **Prototipo Jugable Fase 1 (Siguiente Sesión):**
+  - [ ] Implementar la geometría de Muralla continua en el borde inferior ($Y=344..383$) con HP global.
+  - [ ] Adaptar el spawn a marea continua frontal de xenos (Zerglings y Scourges) cruzando de pantalla superior a inferior.
+  - [ ] Implementar el control manual táctil inicial (`1 tap = 1 disparo`) y acumulación de Chatarra por baja.
+  - [ ] Implementar la primera mejora de automatización: Gatillo Continuo (`Hold stylus = ráfaga continua`).
+  - [ ] Implementar la segunda mejora de automatización: Auto-target al más cercano con override táctil a mano.
+  - [ ] Panel de tienda con pausa activa de combate.
+
+
