@@ -1,4 +1,4 @@
-# DESIGN.md - Especificación de Diseño Canónico: TowerDS (Nintendo DS)
+﻿# DESIGN.md - Especificación de Diseño Canónico: TowerDS (Nintendo DS)
 
 Documento canónico vivo de visión de juego, arquitectura de simulación balística, economía incremental, sistema de muralla modular y registro de decisiones para **TowerDS** en Nintendo DS.
 
@@ -13,7 +13,8 @@ Documento canónico vivo de visión de juego, arquitectura de simulación balís
 6. [Economía y Trinidad de Recursos](#6-economía-y-trinidad-de-recursos)
 7. [Plantel Canónico de Amenazas Xenos](#7-plantel-canónico-de-amenazas-xenos)
 8. [Sistema de Calibración en Hardware (`[CALIB]`)](#8-sistema-de-calibración-en-hardware-calib)
-9. [Registro Vivo de Preguntas Abiertas (Open Questions)](#9-registro-vivo-de-preguntas-abiertas-open-questions)
+9. [Hoja de Ruta de Fases de Desarrollo (De la Fricción al Megaproyecto)](#9-hoja-de-ruta-de-fases-de-desarrollo-de-la-fricción-al-megaproyecto)
+10. [Registro Vivo de Preguntas Abiertas (Open Questions)](#10-registro-vivo-de-preguntas-abiertas-open-questions)
 
 ---
 
@@ -91,21 +92,21 @@ graph LR
 
 ## 6. Economía y Trinidad de Recursos
 
-Para garantizar profundidad estratégica sin sobrecargar la pantalla ni la memoria de la DS, la economía se sostiene en tres pilares:
+Para garantizar profundidad estratégica sin sobrecargar la pantalla ni la memoria de la DS, la economía se sostiene en dos pilares de combate más el progreso de escape:
 
 ```mermaid
 graph TD
     Kill[Bajas Xenos] -->|Drop Constante| Scrap[1. Chatarra / Scraps]
     Elites[Élites / Picos de Marea] -->|Drop Raro| Cores[2. Núcleos de Biomasa]
-    Reactor[3. Reactor / Energía MW] -.->|Limita| BaseUpgrades[Sistemas Activos de Muralla]
+    Slots[Ranuras de Muralla] -.->|Limita Armas Activas| BaseUpgrades[Sistemas de Muralla]
 
     Scrap -->|Inversión| BaseUpgrades
-    Scrap -->|Expansión| Reactor
+    Scrap -->|Desbloqueo| Slots
     Cores -->|Construcción| Project[Megaproyecto de Escape]
 ```
 
 1. **Chatarra (Scrap - Moneda Táctica):** Gasto recurrente. Compra mejoras de muralla, cadencia, imanes de loot y consumibles.
-2. **Energía (Grid / MW - Factor de Minmaxing):** Límite pasivo de capacidad del reactor del búnker. Cada arma o sistema activo consume megavatios. Exceder la capacidad penaliza la cadencia o sobrecalienta el sistema, obligando a balancear armamento vs. generadores.
+2. **Ranuras de Muralla (Sockets Físicos):** Limitador tangible de armas activas simultáneas en lugar de energía abstracta.
 3. **Núcleos de Biomasa (Cores - Moneda de Victoria):** Se obtienen exclusivamente de amenazas pesadas/jefes. Se invierten en la construcción de las fases del Megaproyecto y en tecnologías permanentes entre runs.
 
 ---
@@ -139,7 +140,41 @@ Ocho especies canónicas con siluetas, comportamientos y paletas estrictas:
 
 ---
 
-## 9. Registro Vivo de Preguntas Abiertas (Open Questions)
+## 9. Hoja de Ruta de Fases de Desarrollo (De la Fricción al Megaproyecto)
+
+Siguiendo el principio de desarrollo ágil e incremental (*"Find the fun first"*), el proyecto se estructura en tres fases evolutivas bien definidas. Nos centramos en clavar la jugabilidad de la **Fase 1** antes de programar la complejidad de las siguientes:
+
+### A. Fase 1: "La Crisis del Gatillo" (Enfoque Inmediato - Prototipo Jugable)
+* **Objetivo de Diseño:** Clavar las sensaciones del stylus, el impacto balístico y la primera gran victoria de automatización en Nintendo DS.
+* **Mecánica Core:**
+  1. **Muralla Modular en $Y=344$:** Bastión blindado único en el borde inferior con barra de vida propia (`wall_hp`).
+  2. **Marea Continua:** Descenso frontal incesante desde la pantalla superior a la inferior (Zerglings y Scourges).
+  3. **Disparo Manual Inicial:** `1 Tap = 1 Disparo` (fatiga física real con el stylus para defender la muralla).
+  4. **Economía Base:** Cada baja otorga **Chatarra (Scrap)**.
+  5. **La Escalera de Disparo:**
+     - *Nivel 1:* Desbloqueo de **Gatillo Continuo (`Hold`)** para barrer la calzada a máxima cadencia.
+     - *Nivel 2:* Desbloqueo de **Cogitador de Tiro (Auto-target)** al más cercano con override táctil a mano.
+  6. **Tienda con Pausa Activa:** Al abrir el panel de mejoras, la simulación se congela para pensar, gastar chatarra y descansar la mano con calma.
+
+### B. Fase 2: "La Crisis del Suelo y el Megaproyecto" (Diseño Consolidado para Siguiente Iteración)
+* **Objetivo de Diseño:** Gestionar la consecuencia del éxito balístico a escala masiva y fijar la condición de victoria.
+* **Mecánicas Planificadas:**
+  1. **La Crisis del Botín:** Al matar a 100 bichos/minuto, el suelo se satura de chatarra y núcleos que desaparecen en 6 segundos si no se tocan con el stylus.
+  2. **Automatización Logística:** Desbloqueo del **Recolector Magnético / Servocráneos barredores** de radio creciente.
+  3. **Aparición de Élites y Núcleos de Biomasa:** Bichos acorazados pesados (Hydralisk, Lurker) que sueltan **Núcleos**.
+  4. **El Megaproyecto de Escape:** La barra del Megaproyecto (0% $\to$ 100%) se financia exclusivamente con Núcleos. Cada fase alcanzada desata un pico de alarma ("¡BRECHA!").
+
+### C. Fase 3: "La Crisis de Integridad y la Purga Titán" (Diseño Consolidado para Futura Iteración)
+* **Objetivo de Diseño:** Tensión de asedio extremo, mantenimiento de brechas bajo fuego y el clímax de la run.
+* **Mecánicas Planificadas:**
+  1. **La Crisis de Mantenimiento:** Los golpes de bestias pesadas generan brechas e incendios en la muralla que drenan vida continua si no se reparan frotando con el stylus.
+  2. **Automatización de Mantenimiento:** Servomantenimiento y soldadura pasiva de HP/segundo.
+  3. **Consumibles de Emergencia ("Oh Shit!" buttons):** Bombardeo orbital, pulso PEM y sobrecarga de emergencia.
+  4. **Disparo Titán:** Al alcanzar el 100% del Megaproyecto, se activa la superarma final, purga el sector y otorga la pantalla de victoria.
+
+---
+
+## 10. Registro Vivo de Preguntas Abiertas (Open Questions)
 
 Este registro sustituye el debate efímero en el chat. Cada pregunta se actualiza aquí con su estado y consenso.
 
@@ -170,11 +205,8 @@ Leyenda de Estados:
   3. **Pausa Táctica en Tienda / Mejoras:** Al abrir el panel de mejoras o investigación, la simulación de combate se pausa por completo. Esto elimina la ansiedad de ser devorado mientras se analiza el árbol técnico y otorga al jugador un descanso físico natural para la mano y el stylus.
 
 ### `[OQ-04]` Mecánica del Recurso de Energía (Grid / Reactor)
-- **Estado:** `[ABIERTO]`
-- **Dilema:** ¿Qué ocurre exactamente cuando el consumo de la muralla supera la capacidad del reactor?
-  - *Alternativa 1:* Las armas reducen proporcionalmente su cadencia de fuego (brownout).
-  - *Alternativa 2:* Se apagan los subsistemas de menor prioridad (ej. primero se apagan los imanes de loot, luego las armas secundarias).
-  - *Alternativa 3:* Hard Cap limpio (no se permite comprar ni activar una mejora si no hay MW libres en el reactor).
+- **Estado:** `[DECIDIDO]`
+- **Decisión (Opción 1 - Sin Energía Pasiva):** Se descarta la mecánica de energía/megavatios pasivos para evitar impuestos burocráticos y saturación de la UI en la Nintendo DS. El juego opera con solo 2 recursos (**Chatarra** para mejoras y **Núcleos** para el Megaproyecto). El límite de armamento pesado instalado se gestiona de forma visual mediante **Ranuras (Sockets) en la Muralla**, expandibles con Chatarra.
 
 ### `[OQ-05]` Adquisición y Activación de Consumibles ("Botones de Emergencia")
 - **Estado:** `[ABIERTO]`
