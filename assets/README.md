@@ -1,57 +1,55 @@
-# TowerDS - Catálogo de Assets y Sprites
+# TowerDS - Catálogo Canónico de Assets y Sprites
 
-Este directorio contiene los sprites, animaciones y capturas oficiales de `towerds`, diseñados a resolución nativa de Nintendo DS y optimizados para el hardware de la consola.
+Este directorio contiene los sprites, animaciones y tilesets canónicos de `towerds`, diseñados a resolución nativa de Nintendo DS y optimizados para el hardware físico y emulación determinista.
 
 ---
 
-## 1. Estructura de Archivos
+## 1. Estructura Canónica de Sprites
 
 ```
-assets/
-├── sprites/
-│   ├── turrets/
-│   │   ├── heavy_bolter_recoil.gif          # Animación oficial del Twin Heavy Bolter con retroceso y chispas
-│   │   ├── heavy_bolter_recoil_strip.png    # Tira de fotogramas (filmstrip) del Heavy Bolter
-│   │   ├── lascannon_recoil.gif             # Animación oficial del Lascannon v2 con carga térmica
-│   │   ├── lascannon_recoil_strip.png       # Tira de fotogramas (filmstrip) del Lascannon
-│   │   ├── ds_turrets_12_proposals_1x.png   # 12 propuestas de torretas a resolución nativa DS 1:1
-│   │   └── ds_turrets_12_proposals_8x.png   # 12 propuestas escaladas a 8x con Nearest Neighbor
-│   │
-│   ├── particles/
-│   │   ├── bolter_particle_sparks.gif       # Opción 3 (Seleccionada): Chispas de tungsteno por fricción
-│   │   ├── bolter_particle_sparks_strip.png
-│   │   ├── bolter_particle_clean.gif        # Opción 1: Puro mecánico sin partículas
-│   │   ├── bolter_particle_clean_strip.png
-│   │   ├── bolter_particle_smoke.gif        # Opción 2: Bocanadas de gas caliente
-│   │   ├── bolter_particle_smoke_strip.png
-│   │   ├── bolter_particle_casing_spin.gif  # Opción 4: Casquillo giratorio eyectado
-│   │   └── bolter_particle_casing_spin_strip.png
-│   │
-│   └── enemies/
-│       ├── enemy_animated_roster.gif        # Catálogo maestro animado con todas las 18 propuestas en movimiento
-│       ├── enemy_trench_battle.gif          # Simulación animada de combate en trinchera de 32px (Nintendo DS)
-│       ├── enemy_proposals_sheet.png        # Hoja estática de propuestas con telemetría y stats
-│       ├── t0_a_anim.gif ... t5_c_anim.gif  # GIFs animados individuales de cada propuesta (4 frames)
-│       ├── t0_a_1x.png ... t5_c_1x.png      # Sprites estáticos nativos 1:1
-│       └── t0_a_8x.png ... t5_c_8x.png      # Sprites escalados 8x Nearest Neighbor
+assets/sprites/
+├── turrets/
+│   ├── heavy_bolter_mars_red_strip_master_1x.png  # [CANÓNICO] Cinta de 5 ángulos (220x44 px) para muralla
+│   ├── heavy_bolter_mars_red_preview_4x.png       # Preview 4x de la torreta canónica
+│   ├── wall_turrets_patrol.gif                    # GIF de demostración de los 5 ángulos
+│   ├── README.md                                  # Especificaciones de pivote y ángulos
+│   └── archive/                                   # Archivo histórico
+│       └── classic_td_32x32/                      # Sprites 32x32 de libre colocación (modo clásico)
 │
-└── screenshots/
-    ├── wide_prep.png                        # Pantalla de preparación con trinchera continua de 32px
-    ├── wide_placed.png                      # Despliegue de torreta táctica en pasarela central
-    ├── wide_combat.png                      # Combate en trinchera ancha contra la horda
-    ├── massive_bolter_combat.png            # Combate con cañones masivos y retroceso balístico
-    ├── ds_ingame_mockup_1x.png              # Mockup conceptual a 1x nativo (pantalla doble DS)
-    └── ds_ingame_mockup_4x.png              # Mockup conceptual a 4x
+├── wall/
+│   ├── bunker_wall_master_1x.png                  # [CANÓNICO] Muralla modular 256x48 px con transparencia
+│   ├── bunker_wall_preview_4x.png                 # Preview 4x del muro del bastión
+│   ├── ammo_crate_master_1x.png                   # [CANÓNICO] Cajón de munición 26x16 px en X=128, Y=166
+│   ├── ammo_crate_preview_4x.png                  # Preview 4x del cajón de suministros
+│   └── README.md                                  # Coordenadas de los 4 sockets y especificaciones
+│
+├── enemies/
+│   ├── t1_zergling_walk_strip_master_1x.png       # [CANÓNICO] Zergling enjambre terrestre
+│   ├── t1_zergling_attack_strip_master_1x.png
+│   ├── t3_scourge_fly_strip_master_1x.png         # [CANÓNICO] Scourge kamikaze aéreo
+│   ├── t2_hydralisk_walk_strip_master_1x.png      # [CANÓNICO] Hydralisk infantería pesada
+│   ├── t2_hydralisk_attack_strip_master_1x.png
+│   ├── sc_mutalisk_fly_strip_master_1x.png        # [CANÓNICO] Mutalisk cazador aéreo
+│   ├── sc_defiler_walk_strip_master_1x.png        # [CANÓNICO] Defiler caster de miasma
+│   ├── sc_lurker_walk_strip_master_1x.png         # [CANÓNICO] Lurker ariete acorazado
+│   ├── sc_guardian_fly_strip_master_1x.png        # [CANÓNICO] Guardian asedio pesado
+│   ├── t4_ultralisk_walk_strip_master_1x.png      # [CANÓNICO] Ultralisk coloso
+│   ├── t4_ultralisk_attack_strip_master_1x.png
+│   ├── README.md                                  # Dimensiones y stats base de las 8 especies
+│   └── archive/                                   # Histórico de propuestas previas
+│
+└── particles/
+    ├── bolter_particle_sparks.gif                 # Chispas de tungsteno por impacto/cerrojo
+    ├── bolter_particle_casing_spin.gif            # Casquillos dorados eyectados
+    └── ...
 ```
 
 ---
 
-## 2. Especificaciones Técnicas
+## 2. Especificaciones Técnicas y Reglas Canónicas
 
-- **Resolución por pantalla:** 256 x 192 píxeles (pantalla inferior táctil y superior de telemetría).
-- **Profundidad de color:** BGR555 (15 bits por píxel, `RGB15(r,g,b)` con 0 <= r,g,b <= 31).
-- **Tilesets:** Formato cuadrícula de 16 x 16 píxeles.
-- **Trinchera balística:** Canal continuo de 32 píxeles de anchura interior con balizas de peligro perimetrales.
-- **Micro-sprites del enjambre:** 5 x 5 píxeles con pata/garra animada y vectores direccionales (Norte, Sur, Este, Oeste).
-- **Curva balística del Twin Heavy Bolter:** Impulso explosivo instantáneo en 1 fotograma (-4px), retención de pico de cerrojo (-4px) y retorno amortiguado por muelle (-2px -> -1px -> 0px).
-- **Sistema de partículas activo:** Opción 3 (Chispas de tungsteno al abrirse la recámara en cada ciclo de disparo).
+- **Resolución nativa por pantalla:** 256 x 192 píxeles (doble pantalla DS).
+- **Formato de color en hardware:** BGR555 (`RGB15(r,g,b)`).
+- **Muralla Modular:** Renderizada en `Y = 144..191` con oclusión 3D sobre los enemigos atacantes y borde superior transparente (`0x0000`).
+- **Torretas de Muralla:** `Twin Heavy Bolter Mars Red` montada sobre sockets físicos (`X = 28, 93, 162, 227`) con rotación en 5 ángulos discretos.
+- **Exclusividad Cromática Xenos:** La gama púrpura / magenta está reservada exclusivamente para el enjambre biológico. El bastión imperial utiliza tonos acero, latón, rojo Marte y verde oliva.
