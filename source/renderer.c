@@ -321,8 +321,8 @@ void renderer_draw_range_perimeter(void) {
     int r = g_wall.range;
     int r_sq = r * r;
 
-    // Stenciled tactical range line across the road
-    for (int x = 40; x < 216; x++) {
+    // High-visibility military hazard range perimeter across road (x: 32..224)
+    for (int x = 32; x < 224; x++) {
         int min_y = 999;
         for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
             if (!(active_mask & (1 << s))) continue;
@@ -337,15 +337,22 @@ void renderer_draw_range_perimeter(void) {
             }
         }
 
-        if (min_y > 20 && min_y < g_wall.screen_y) {
-            // Dashed military line: 4 px line, 4 px gap
-            if ((x / 4) % 2 == 0) {
-                g_backbuffer[(min_y + 1) * SCREEN_W + x] = RGB15(6, 6, 8) | BIT(15);
-                g_backbuffer[min_y * SCREEN_W + x] = RGB15(26, 20, 5) | BIT(15);
-                if ((x % 16) == 0) {
-                    g_backbuffer[(min_y + 2) * SCREEN_W + x] = RGB15(28, 22, 6) | BIT(15);
-                    g_backbuffer[(min_y + 3) * SCREEN_W + x] = RGB15(22, 16, 4) | BIT(15);
-                }
+        if (min_y >= 20 && min_y < g_wall.screen_y) {
+            // Hazard striping: alternating amber gold & dark steel
+            int is_amber = ((x / 4) % 2 == 0);
+            uint16_t stripe_col = is_amber ? (RGB15(31, 22, 2) | BIT(15)) : (RGB15(6, 6, 8) | BIT(15));
+            uint16_t shadow_col = RGB15(2, 2, 4) | BIT(15);
+            uint16_t hi_col     = is_amber ? (RGB15(31, 28, 12) | BIT(15)) : (RGB15(12, 14, 16) | BIT(15));
+
+            // 2 px thick band
+            g_backbuffer[(min_y - 1) * SCREEN_W + x] = shadow_col;
+            g_backbuffer[min_y * SCREEN_W + x]       = hi_col;
+            g_backbuffer[(min_y + 1) * SCREEN_W + x] = stripe_col;
+
+            // Inward hazard tick marks every 16 px
+            if ((x % 16) == 0) {
+                g_backbuffer[(min_y + 2) * SCREEN_W + x] = RGB15(31, 20, 0) | BIT(15);
+                g_backbuffer[(min_y + 3) * SCREEN_W + x] = RGB15(24, 14, 0) | BIT(15);
             }
         }
     }
@@ -353,7 +360,7 @@ void renderer_draw_range_perimeter(void) {
 
 void renderer_draw_battlefield_bottom(void) {
     tiles_render_urban_ground(g_backbuffer, 192);
-    // Sanctum bunker placed at bottom center (128, 172)
+    renderer_draw_range_perimeter();
     renderer_draw_wall();
 }
 

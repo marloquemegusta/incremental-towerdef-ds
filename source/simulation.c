@@ -220,7 +220,7 @@ static int enemy_direction_from_delta(int dx, int dy) {
     return (dy < 0) ? 7 : 5;
 }
 
-static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
+static void spawn_enemy_ex(int variant, uint64_t hp, int base_spd, int initial_y) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) {
             g_enemies[i].active = 1;
@@ -228,10 +228,10 @@ static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
             g_enemies[i].hp = hp;
             g_enemies[i].max_hp = hp;
 
-            // Spawn at top edge (y = 0) with random x spread (16..240)
-            int sx = 16 + (rand() % 224);
+            // Spawn with random x spread (32..224) within road
+            int sx = 32 + (rand() % 192);
             g_enemies[i].x = TO_FP(sx);
-            g_enemies[i].y = 0;
+            g_enemies[i].y = TO_FP(initial_y);
 
             int spd = base_spd + ((rand() % 5) - 2);
             if (spd < 10) spd = 10;
@@ -250,6 +250,10 @@ static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
             break;
         }
     }
+}
+
+static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
+    spawn_enemy_ex(variant, hp, base_spd, 0);
 }
 
 #define BULLET_SPEED 12
@@ -657,7 +661,7 @@ void game_init(void) {
     g_game.upgrades.firerate_lvl = 0;
     g_game.upgrades.range_lvl = 0;
     g_game.upgrades.mag_size_lvl = 0;
-    g_game.upgrades.auto_target = 0; // Starts requiring stylus targeting!
+    g_game.upgrades.auto_target = 1; // Core automated battery active by default!
     g_game.upgrades.conveyor_lvl = 0; // Starts requiring manual ammo drag!
     g_game.upgrades.extra_turrets = 0;
 
@@ -714,29 +718,24 @@ void game_start_wave(void) {
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_death_particles, 0, sizeof(g_death_particles));
 
-    // Showcase swarm with all 8 distinct StarCraft species:
-    // 0: Scourge (Fast Kamikaze flyer with ground shadow)
-    spawn_enemy(0, 18, 48);
-    spawn_enemy(0, 18, 46);
-    // 1: Zergling (Agile vanguard swarmer, dual claw attack)
-    spawn_enemy(1, 25, 40);
-    spawn_enemy(1, 25, 38);
-    // 2: Hydralisk (Upright needle spitter assault)
-    spawn_enemy(2, 75, 32);
-    spawn_enemy(2, 75, 34);
-    // 3: Mutalisk (Bat-winged hunter flyer with ground shadow)
-    spawn_enemy(3, 160, 36);
-    spawn_enemy(3, 160, 34);
-    // 4: Defiler (Creeping bio-caster)
-    spawn_enemy(4, 320, 26);
-    spawn_enemy(4, 320, 25);
-    // 5: Lurker (Armored quadruped ram with spines)
-    spawn_enemy(5, 500, 28);
-    spawn_enemy(5, 500, 30);
-    // 6: Guardian (Heavy manta bomber flyer with ground shadow)
-    spawn_enemy(6, 1100, 22);
-    // 7: Ultralisk (Titanic colossus boss, massive Kaiser blades)
-    spawn_enemy(7, 2600, 20);
+    // Showcase swarm: Staggered across battlefield for immediate tactical engagement!
+    // Vanguard entering bottom screen (Y = 200..215, approaching hazard line at Y=257)
+    spawn_enemy_ex(0, 18, 48, 200);
+    spawn_enemy_ex(0, 18, 46, 205);
+    spawn_enemy_ex(1, 25, 40, 210);
+    spawn_enemy_ex(1, 25, 38, 215);
+    // Midguard advancing down top screen (Y = 110..140)
+    spawn_enemy_ex(2, 75, 32, 130);
+    spawn_enemy_ex(2, 75, 34, 140);
+    spawn_enemy_ex(3, 160, 36, 110);
+    spawn_enemy_ex(3, 160, 34, 120);
+    // Rearguard colossi (Y = 0..70)
+    spawn_enemy_ex(4, 320, 26, 60);
+    spawn_enemy_ex(4, 320, 25, 70);
+    spawn_enemy_ex(5, 500, 28, 30);
+    spawn_enemy_ex(5, 500, 30, 40);
+    spawn_enemy_ex(6, 1100, 22, 10);
+    spawn_enemy_ex(7, 2600, 20, 0);
 
     // Reset locked targets
     for (int t = 0; t < MAX_TURRETS; t++) {
@@ -1351,10 +1350,30 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     int touch_press = ((keys_down & KEY_TOUCH) || (is_touch && !s_wave_touching));
     s_wave_touching = is_touch;
 
-    // Touch down: Clicker attack on enemies, start ammo drag, or toggle pause
-    // Stylus tap or continuous hold fire on battlefield!
-    if (is_touch && touch.px > 0 && touch.py > 14 && touch.py < g_wall.screen_y) {
-        wall_fire_at(touch.px, touch.py);
+    // Touch down: Stylus manual targeting - only fires if an enemy is in the area or tapped!
+    if (touch_press && touch.px > 0 && touch.py > 14 && touch.py < g_wall.screen_y) {
+        int clicked_enemy = -1;
+        int best_dist_sq = 28 * 28;
+        for (int e = 0; e < MAX_ENEMIES; e++) {
+            if (!g_enemies[e].active) continue;
+            int gy = FROM_FP(g_enemies[e].y);
+            if (gy < 192) continue;
+            int local_y = gy - 192;
+            int gx = FROM_FP(g_enemies[e].x);
+            int ddx = touch.px - gx;
+            int ddy = touch.py - local_y;
+            int dsq = ddx * ddx + ddy * ddy;
+            if (dsq <= best_dist_sq) {
+                best_dist_sq = dsq;
+                clicked_enemy = e;
+            }
+        }
+        if (clicked_enemy >= 0) {
+            g_wall.locked_enemy_idx = clicked_enemy;
+            int ex = FROM_FP(g_enemies[clicked_enemy].x);
+            int ey = FROM_FP(g_enemies[clicked_enemy].y) - 192;
+            wall_fire_at(ex, ey);
+        }
     }
 
     if (touch_press) {

@@ -11,7 +11,7 @@
         "x": 220,
         "y": 170
       },
-      "frames": 4,
+      "frames": 5,
       "capture_sequence": "f600"
     },
     {
@@ -20,68 +20,8 @@
       "capture_sequence": "f600"
     },
     {
-      "frames": 45,
-      "capture_sequence": "f600"
-    },
-    {
-      "tap": {
-        "x": 80,
-        "y": 60
-      },
-      "frames": 80,
-      "capture_sequence": "f600"
-    },
-    {
-      "tap": {
-        "x": 105,
-        "y": 50
-      },
-      "frames": 80,
-      "capture_sequence": "f600"
-    },
-    {
-      "tap": {
-        "x": 150,
-        "y": 45
-      },
-      "frames": 80,
-      "capture_sequence": "f600"
-    },
-    {
-      "tap": {
-        "x": 190,
-        "y": 60
-      },
-      "frames": 80,
-      "capture_sequence": "f600"
-    },
-    {
-      "tap": {
-        "x": 128,
-        "y": 80
-      },
-      "frames": 100,
-      "capture_sequence": "f600"
-    },
-    {
-      "tap": {
-        "x": 60,
-        "y": 70
-      },
-      "frames": 40,
-      "capture_sequence": "f600"
-    },
-    {
-      "tap": {
-        "x": 180,
-        "y": 70
-      },
-      "frames": 40,
-      "capture_sequence": "f600"
-    },
-    {
       "release": true,
-      "frames": 21,
+      "frames": 565,
       "capture_sequence": "f600",
       "capture": "combat_end"
     }
