@@ -37,13 +37,7 @@ int main(void) {
                 } else if (g_game.mode != MODE_GAME_OVER) {
                     g_game.previous_mode = g_game.mode;
                     g_game.mode = MODE_DEBUG_SANDBOX;
-                    if (!g_turrets[0].placed) {
-                        g_turrets[0].placed = 1;
-                        g_turrets[0].x = 128;
-                        g_turrets[0].y = 104;
-                        g_turrets[0].ammo = 50;
-                        g_turrets[0].max_ammo = 50;
-                    }
+                    // g_turrets deprecated
                 }
             }
         } else {
@@ -105,13 +99,7 @@ int main(void) {
             renderer_draw_bullets();
             renderer_draw_death_particles_bottom();
 
-            // Render all placed turrets with animated recoil and sparks
-            for (int t = 0; t < MAX_TURRETS; t++) {
-                if (g_turrets[t].placed) {
-                    int is_sel = (g_game.selected_turret == t);
-                    renderer_draw_turret(&g_turrets[t], is_sel);
-                }
-            }
+            // Legacy placed turrets removed - WallPlatform is unified defense
 
             if (g_game.mode == MODE_PREPARATION) {
                 renderer_draw_ui_prep();

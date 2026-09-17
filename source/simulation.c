@@ -633,23 +633,7 @@ void game_init(void) {
     g_game.sandbox.run_sim = 1;
     g_game.sandbox.edit_row = 0;
 
-    // Initial Turret #0: Deployed right in front of the Sanctum
-    g_turrets[0].id = 0;
-    g_turrets[0].type = TURRET_TYPE_BOLTER;
-    g_turrets[0].x = 128;
-    g_turrets[0].y = 124; // Local y on bottom screen
-    g_turrets[0].current_angle = 192; // Aiming North (towards oncoming swarm)
-    g_turrets[0].target_angle = 192;
-    g_turrets[0].range = 65;
-    g_turrets[0].placed = 1;
-    g_turrets[0].active = 1;
-    g_turrets[0].hp = 50;
-    g_turrets[0].max_hp = 50;
-    g_turrets[0].ammo = 20;
-    g_turrets[0].max_ammo = 20;
-    g_turrets[0].fire_interval = 18; // ~3 shots per second
-    g_turrets[0].fire_cooldown = 0;
-    g_turrets[0].locked_enemy_idx = -1;
+    // WallPlatform handles all defenses; g_turrets[0].placed = 0;
 
     for (int t = 1; t < MAX_TURRETS; t++) {
         g_turrets[t].id = t;
@@ -1291,13 +1275,7 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
         if (touch.px >= 146 && touch.px <= 188 && touch.py >= 144 && touch.py <= 191) {
             g_game.previous_mode = g_game.mode;
             g_game.mode = MODE_DEBUG_SANDBOX;
-            if (!g_turrets[0].placed) {
-                g_turrets[0].placed = 1;
-                g_turrets[0].x = 128;
-                g_turrets[0].y = 104;
-                g_turrets[0].ammo = 50;
-                g_turrets[0].max_ammo = 50;
-            }
+            // g_turrets deprecated
             return;
         }
 
