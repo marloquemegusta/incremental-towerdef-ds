@@ -1,3 +1,92 @@
+
+void renderer_draw_wall(void) {
+    // 1. Draw Wall Base
+    wall_draw_base(g_backbuffer, g_wall.screen_y, g_wall.hp, g_wall.max_hp);
+
+    // 2. Draw Active Turrets on Sockets
+    int active_mask = 0;
+    if (g_wall.active_turrets == 1) active_mask = (1 << 1);
+    else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
+    else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
+    else active_mask = 0x0F;
+
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        if (!(active_mask & (1 << s))) continue;
+        int sx = c_wall_sockets[s].x;
+        int sy = g_wall.screen_y + c_wall_sockets[s].y;
+        int angle = g_wall.turret_angles[s];
+
+        int dest_x = sx - TURRET_PIVOT_X;
+        int dest_y = sy - TURRET_PIVOT_Y;
+        wall_draw_turret_sprite(g_backbuffer, dest_x, dest_y, angle);
+
+        // Muzzle Flash
+        if (g_wall.muzzle_flash_timer[s] > 0) {
+            int alt = g_wall.muzzle_flash_barrel[s];
+            const TurretCalibratedPoints *pts = &c_turret_points[angle];
+            int mx = dest_x + (alt == 0 ? pts->ml_x : pts->mr_x);
+            int my = dest_y + (alt == 0 ? pts->ml_y : pts->mr_y);
+
+            if (mx >= 1 && mx < SCREEN_W - 1 && my >= 1 && my < SCREEN_H - 1) {
+                // Bright white core
+                g_backbuffer[my * SCREEN_W + mx] = COLOR_WHITE;
+                // Hazard orange/yellow flame points
+                g_backbuffer[(my - 1) * SCREEN_W + mx] = COLOR_MUZZLE_FLASH;
+                g_backbuffer[(my + 1) * SCREEN_W + mx] = COLOR_MUZZLE_FLASH;
+                g_backbuffer[my * SCREEN_W + (mx - 1)] = COLOR_MUZZLE_FLASH;
+                g_backbuffer[my * SCREEN_W + (mx + 1)] = COLOR_MUZZLE_FLASH;
+            }
+        }
+    }
+
+    // 3. Draw Casings (Tumbling Brass Particles)
+    for (int i = 0; i < MAX_CASINGS; i++) {
+        if (!g_casings[i].active) continue;
+        int cx = FROM_FP(g_casings[i].x);
+        int cz = FROM_FP(g_casings[i].z);
+        int cy = FROM_FP(g_casings[i].y) - cz;
+
+        if (cx >= 1 && cx < SCREEN_W - 2 && cy >= 1 && cy < SCREEN_H - 2) {
+            uint16_t col = (cz > 1) ? RGB15(31, 28, 10) : RGB15(24, 18, 5); // Bright glint in air
+            // Draw 2-px brass segment oriented
+            int ang_idx = ((g_casings[i].angle % 360) / 45) % 4;
+            if (ang_idx == 0) { // Horizontal
+                g_backbuffer[cy * SCREEN_W + cx] = col | BIT(15);
+                g_backbuffer[cy * SCREEN_W + cx + 1] = RGB15(16, 12, 3) | BIT(15);
+            } else if (ang_idx == 1) { // Diagonal 1
+                g_backbuffer[cy * SCREEN_W + cx] = col | BIT(15);
+                g_backbuffer[(cy + 1) * SCREEN_W + cx + 1] = RGB15(16, 12, 3) | BIT(15);
+            } else if (ang_idx == 2) { // Vertical
+                g_backbuffer[cy * SCREEN_W + cx] = col | BIT(15);
+                g_backbuffer[(cy + 1) * SCREEN_W + cx] = RGB15(16, 12, 3) | BIT(15);
+            } else { // Diagonal 2
+                g_backbuffer[cy * SCREEN_W + cx] = col | BIT(15);
+                g_backbuffer[(cy + 1) * SCREEN_W + cx - 1] = RGB15(16, 12, 3) | BIT(15);
+            }
+        }
+    }
+
+    // 4. Draw Bullet Darts (Hypersonic Tracer Slugs)
+    for (int i = 0; i < MAX_BULLET_DARTS; i++) {
+        if (!g_bullet_darts[i].active) continue;
+        int bx = FROM_FP(g_bullet_darts[i].x);
+        int by = FROM_FP(g_bullet_darts[i].y);
+
+        if (bx >= 1 && bx < SCREEN_W - 1 && by >= 1 && by < SCREEN_H - 1) {
+            // White incandescent head
+            g_backbuffer[by * SCREEN_W + bx] = COLOR_WHITE;
+            // Amber/Orange tracer tail (1 px back)
+            int vx_sign = (g_bullet_darts[i].vx > 0) ? 1 : ((g_bullet_darts[i].vx < 0) ? -1 : 0);
+            int vy_sign = (g_bullet_darts[i].vy > 0) ? 1 : -1;
+            int tx = bx - vx_sign;
+            int ty = by - vy_sign;
+            if (tx >= 0 && tx < SCREEN_W && ty >= 0 && ty < SCREEN_H) {
+                g_backbuffer[ty * SCREEN_W + tx] = COLOR_BOLTER_TRACER;
+            }
+        }
+    }
+}
+
 #include "game.h"
 #include "tiles.h"
 #include "enemy_data.h"
@@ -230,7 +319,7 @@ void renderer_draw_battlefield_top(void) {
 void renderer_draw_battlefield_bottom(void) {
     tiles_render_urban_ground(g_backbuffer, 192);
     // Sanctum bunker placed at bottom center (128, 172)
-    tiles_draw_central_bunker(g_backbuffer, 128, 172, g_game.bunker_hp, g_game.bunker_max_hp);
+    renderer_draw_wall();
 }
 
 void renderer_draw_turret(const Turret *t, int is_selected) {

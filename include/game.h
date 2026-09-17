@@ -2,6 +2,7 @@
 #define GAME_H
 
 #include <nds.h>
+#include "wall_data.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -16,6 +17,8 @@
 #define MAX_SPLATTERS 256
 #define MAX_DEATH_PARTICLES 256
 #define MAX_TURRETS 4
+#define MAX_CASINGS 64
+#define MAX_BULLET_DARTS 64
 
 // Fixed point math: Q8 (256 = 1.0)
 #define FP_SHIFT 8
@@ -141,6 +144,39 @@ typedef struct {
     int active;
     uint16_t color;
 } DeathParticle;
+
+typedef struct {
+    int x, y, z;       // Q8 local bottom screen coordinates (z = height above ground)
+    int vx, vy, vz;    // Q8 velocities
+    int angle;         // 0..360 deg
+    int spin_speed;    // deg per frame
+    int bounces;
+    int life;
+    int active;
+} CasingParticle;
+
+typedef struct {
+    int x, y;          // Q8 local bottom screen coordinates
+    int vx, vy;        // Q8 velocities
+    int target_x, target_y;
+    int dist_remaining;// Q8 distance remaining
+    int damage;
+    int active;
+} BulletDart;
+
+typedef struct {
+    int screen_y;        // Local screen Y (default 144)
+    uint64_t hp;
+    uint64_t max_hp;
+    int active_turrets;  // 1..4 (number of active turrets / sockets)
+    int turret_angles[4];// Angle (0..4) for each socket
+    int barrel_alt[4];   // 0 or 1 for left/right muzzle
+    int muzzle_flash_timer[4];
+    int muzzle_flash_barrel[4];
+    int fire_cooldown;
+    int fire_interval;
+    int damage;
+} WallPlatform;
 
 typedef enum {
     MODE_PREPARATION = 0,
@@ -282,6 +318,16 @@ extern Enemy g_enemies[MAX_ENEMIES];
 extern Bullet g_bullets[MAX_BULLETS];
 extern Splatter g_splatters[MAX_SPLATTERS];
 extern DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
+extern WallPlatform g_wall;
+extern CasingParticle g_casings[MAX_CASINGS];
+extern BulletDart g_bullet_darts[MAX_BULLET_DARTS];
+
+void wall_init(void);
+void wall_update(void);
+void wall_fire_at(int target_x, int target_y);
+int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_y);
+void wall_spawn_casing(int x, int y, int dir_sign);
+void wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y);
 extern uint16_t g_backbuffer[SCREEN_W * SCREEN_H];
 extern uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H];
 
