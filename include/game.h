@@ -82,10 +82,11 @@ typedef struct {
     int biting_target;   // -1=None/Marching, 0..3=Turret ID, 99=Bunker Sanctum
     int bite_timer;
 
-    // 60fps Dirty Rects tracking
-    int prev_draw_x, prev_draw_y;
-    int prev_drawn_w, prev_drawn_h;
-    int prev_drawn_screen; // 0=none, 1=top, 2=bottom
+    // 60fps Dirty Rects tracking: independent for top and bottom screens
+    int prev_top_active;
+    int prev_top_x, prev_top_y, prev_top_w, prev_top_h;
+    int prev_bot_active;
+    int prev_bot_x, prev_bot_y, prev_bot_w, prev_bot_h;
 } Enemy;
 
 typedef struct {
@@ -154,8 +155,11 @@ typedef struct {
     int active;
     uint16_t color;
 
-    int prev_x, prev_y;
-    int prev_screen; // 0=none, 1=top, 2=bottom
+    int prev_top_active;
+    int prev_top_x, prev_top_y;
+    int prev_bot_active;
+    int prev_bot_x, prev_bot_y;
+    int prev_bot_has_shadow, prev_bot_sy;
 } DeathParticle;
 
 typedef struct {
@@ -166,6 +170,9 @@ typedef struct {
     int bounces;
     int life;
     int active;
+
+    int prev_cx, prev_cy;
+    int prev_active;
 } CasingParticle;
 
 typedef struct {
@@ -177,6 +184,9 @@ typedef struct {
     int range;           // Maximum ballistic reach in px
     int active;
     int target_enemy_idx; // Tracked enemy index (-1 if none)
+
+    int prev_bx, prev_by;
+    int prev_active;
 } BulletDart;
 
 typedef struct {
@@ -329,6 +339,8 @@ typedef struct {
     int is_dragging_turret;
     int drag_turret_slot;
     int drag_x, drag_y;
+    int prev_drag_x, prev_drag_y;
+    int prev_drag_active;
     int selected_turret;
     int upgrade_flash_timer;
     int upgrade_flash_idx;
