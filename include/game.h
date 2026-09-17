@@ -169,13 +169,18 @@ typedef struct {
     uint64_t hp;
     uint64_t max_hp;
     int active_turrets;  // 1..4 (number of active turrets / sockets)
-    int turret_angles[4];// Angle (0..4) for each socket
+    int turret_angles[4];// Current display angle (0..4) for each socket
+    int target_angles[4];// Target angle (0..4) each turret wants to face
+    int turret_cooldown[4]; // Independent cooldown for each turret socket
     int barrel_alt[4];   // 0 or 1 for left/right muzzle
     int muzzle_flash_timer[4];
     int muzzle_flash_barrel[4];
-    int fire_cooldown;
+    int target_enemy_idx[4]; // Enemy currently tracked by each socket (-1 if none)
+    int traverse_timer[4];   // Sub-frame timer for smooth mechanical rotation
+    int fire_cooldown;   // Global tap throttle
     int fire_interval;
     int damage;
+    int locked_enemy_idx;// Player-designated priority target (-1 if none)
 } WallPlatform;
 
 typedef enum {
@@ -325,6 +330,7 @@ extern BulletDart g_bullet_darts[MAX_BULLET_DARTS];
 void wall_init(void);
 void wall_update(void);
 void wall_fire_at(int target_x, int target_y);
+void wall_fire_socket(int socket_idx, int target_x, int target_y);
 int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_y);
 void wall_spawn_casing(int x, int y, int dir_sign);
 void wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y);

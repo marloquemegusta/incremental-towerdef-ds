@@ -3,7 +3,7 @@
   "steps": [
     {
       "frames": 30,
-      "capture": "01_boot_prep"
+      "capture": "01_prep_idle"
     },
     {
       "tap": {
@@ -14,61 +14,46 @@
     },
     {
       "release": true,
-      "frames": 15
+      "frames": 25,
+      "capture": "02_wave_started"
     },
     {
-      "tap": {
-        "x": 85,
-        "y": 50
-      },
-      "frames": 6
-    },
-    {
-      "release": true,
-      "frames": 6
-    },
-    {
-      "tap": {
-        "x": 165,
-        "y": 45
-      },
-      "frames": 6
-    },
-    {
-      "release": true,
-      "frames": 6
-    },
-    {
-      "tap": {
-        "x": 128,
-        "y": 35
-      },
-      "frames": 6
-    },
-    {
-      "release": true,
-      "frames": 6
+      "frames": 80,
+      "capture": "03_enemies_advancing"
     },
     {
       "touch": {
         "x": 100,
-        "y": 60
+        "y": 70
       },
-      "frames": 30,
-      "capture_sequence": "wall_combat",
+      "frames": 15,
+      "capture_sequence": "04_engaging_lane1",
       "capture_every": 3
     },
     {
       "release": true,
-      "frames": 60,
-      "capture": "02_combat_end"
+      "frames": 15
+    },
+    {
+      "touch": {
+        "x": 160,
+        "y": 80
+      },
+      "frames": 15,
+      "capture_sequence": "05_engaging_lane2",
+      "capture_every": 3
+    },
+    {
+      "release": true,
+      "frames": 40,
+      "capture": "06_battle_aftermath"
     }
   ],
   "assertions": {
     "screen_changed": {
-      "from": "01_boot_prep",
-      "to": "02_combat_end",
-      "min_changed_pixels": 150
+      "from": "01_prep_idle",
+      "to": "06_battle_aftermath",
+      "min_changed_pixels": 250
     }
   }
 }
