@@ -521,33 +521,14 @@ void renderer_draw_ui_prep(void) {
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
     top_draw_text(160, 4, buf, COLOR_PHOSPHOR_GREEN);
 
-    // Bottom UI: Ammo depot & control buttons
-    // Bunker Scrap / Depot dock on left
-    renderer_fill_rect(6, 150, 44, 36, COLOR_IRON_PANEL);
-    renderer_draw_rect(6, 150, 44, 36, COLOR_IRON_BORDER);
-    renderer_draw_text(12, 156, "AMMO", COLOR_AMBER);
-    renderer_draw_text(10, 168, "DEPOT", COLOR_WHITE);
-
-    // Start wave button
+    // Sleek, unobtrusive prep buttons on battlefield floor (y=112..136, above the wall)
+    // Start wave button (clean green prompt)
     renderer_fill_rect(190, 150, 60, 36, COLOR_LED_GREEN);
     renderer_draw_rect(190, 150, 60, 36, COLOR_WHITE);
     renderer_draw_text(198, 164, "START", COLOR_BLACK);
 
-    // Upgrade button
-    renderer_fill_rect(54, 156, 48, 24, COLOR_IRON_PANEL);
-    renderer_draw_rect(54, 156, 48, 24, COLOR_AMBER);
-    // Calibration button
-    renderer_fill_rect(108, 156, 36, 24, COLOR_IRON_PANEL);
-    renderer_draw_rect(108, 156, 36, 24, COLOR_PHOSPHOR_GREEN);
-    renderer_draw_text(112, 164, "CALIB", COLOR_PHOSPHOR_GREEN);
-
-    // Sandbox test button
-    renderer_fill_rect(148, 156, 36, 24, COLOR_IRON_PANEL);
-    renderer_draw_rect(148, 156, 36, 24, COLOR_AMBER);
-    renderer_draw_text(152, 164, "SANDB", COLOR_AMBER);
-
-    // Instruction banner
-    renderer_draw_text(50, 138, "DRAG AMMO TO RELOAD / TAP ENEMY", COLOR_WHITE);
+    // Instruction banner on highway
+    renderer_draw_text(35, 126, "PULSA [A / START] PARA COMBATE", COLOR_AMBER);
 }
 
 void renderer_draw_ui_wave(void) {
@@ -566,11 +547,7 @@ void renderer_draw_ui_wave(void) {
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
     top_draw_text(170, 4, buf, COLOR_PHOSPHOR_GREEN);
 
-    // Bottom UI: Ammo crate dock for quick tactile reload
-    renderer_fill_rect(6, 156, 40, 30, COLOR_IRON_PANEL);
-    renderer_draw_rect(6, 156, 40, 30, COLOR_IRON_BORDER);
-    renderer_draw_text(10, 162, "AMMO", COLOR_AMBER);
-    renderer_draw_text(10, 172, "DRAG", COLOR_WHITE);
+    // Ammo drag box removed - WallPlatform has unlimited heavy bolter reserves
 
     // If currently dragging ammo
     if (g_game.is_dragging_ammo) {
