@@ -808,7 +808,7 @@ void game_init(void) {
     g_game.upgrades.firerate_lvl = 0;
     g_game.upgrades.range_lvl = 0;
     g_game.upgrades.mag_size_lvl = 0;
-    g_game.upgrades.auto_target = 1; // Core automated battery active by default!
+    g_game.upgrades.auto_target = 0; // Starts requiring manual touch-targeting until upgrade purchased!
     g_game.upgrades.conveyor_lvl = 0; // Starts requiring manual ammo drag!
     g_game.upgrades.extra_turrets = 0;
 
