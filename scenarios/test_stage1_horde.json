@@ -1,0 +1,11 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    { "frames": 10, "capture": "01_prep" },
+    { "tap": { "x": 220, "y": 170 }, "frames": 5 },
+    { "release": true, "frames": 500, "capture": "02_zerglings_marching" }
+  ],
+  "assertions": {
+    "screen_changed": { "from": "01_prep", "to": "02_zerglings_marching", "min_changed_pixels": 100 }
+  }
+}

@@ -16,54 +16,57 @@ DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
 GameBalanceConfig g_balance;
 
 static const GameBalanceConfig s_default_balance = {
-    .waves = {
-        // W1: 12 Larvae (delay 90f, speed 30, hp 2), 0 Rippers, 0 Hormagaunts (Phase 1 incremental start)
-        { .tiers = { { 12, 90, 30, 2 }, { 0, 120, 40, 6 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
-        // W2: 25 Larvae (delay 60f, speed 32, hp 3), 0 Rippers, 0 Hormagaunts
-        { .tiers = { { 25, 60, 32, 3 }, { 0, 120, 40, 8 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
-        // W3: 40 Larvae (delay 45f, speed 34, hp 3), 2 Rippers (delay 180f, speed 38, hp 8), 0 Hormagaunts
-        { .tiers = { { 40, 45, 34, 3 }, { 2, 180, 38, 8 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
-        // W4: 60 Larvae (delay 35f, speed 35, hp 8), 4 Rippers (delay 140f, speed 40, hp 28), 0 Hormagaunts
-        { .tiers = { { 60, 35, 35, 8 }, { 4, 140, 40, 28 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
-        // W5: 100 Larvae (delay 24f, speed 35, hp 8), 8 Rippers (delay 100f, speed 42, hp 30), 1 Hormagaunt (delay 300f, speed 50, hp 50)
-        { .tiers = { { 100, 24, 35, 8 }, { 8, 100, 42, 30 }, { 1, 300, 50, 50 } }, .scrap_base = 3 },
-        // W6: 140 Larvae (delay 20f, speed 36, hp 8), 12 Rippers (delay 80f, speed 42, hp 32), 2 Hormagaunts (delay 240f, speed 50, hp 50)
-        { .tiers = { { 140, 20, 36, 8 }, { 12, 80, 42, 32 }, { 2, 240, 50, 50 } }, .scrap_base = 3 },
-        // W7: 180 Larvae (delay 16f, speed 38, hp 9), 16 Rippers (delay 70f, speed 44, hp 34), 4 Hormagaunts (delay 200f, speed 52, hp 55)
-        { .tiers = { { 180, 16, 38, 9 }, { 16, 70, 44, 34 }, { 4, 200, 52, 55 } }, .scrap_base = 3 },
-        // W8: 220 Larvae (delay 14f, speed 38, hp 10), 20 Rippers (delay 60f, speed 44, hp 36), 6 Hormagaunts (delay 160f, speed 52, hp 60)
-        { .tiers = { { 220, 14, 38, 10 }, { 20, 60, 44, 36 }, { 6, 160, 52, 60 } }, .scrap_base = 4 },
-        // W9: 260 Larvae (delay 12f, speed 40, hp 10), 25 Rippers (delay 50f, speed 45, hp 38), 8 Hormagaunts (delay 140f, speed 55, hp 65)
-        { .tiers = { { 260, 12, 40, 10 }, { 25, 50, 45, 38 }, { 8, 140, 55, 65 } }, .scrap_base = 4 },
-        // W10: 300 Larvae (delay 10f, speed 40, hp 12), 30 Rippers (delay 40f, speed 46, hp 40), 12 Hormagaunts (delay 120f, speed 55, hp 70)
-        { .tiers = { { 300, 10, 40, 12 }, { 30, 40, 46, 40 }, { 12, 120, 55, 70 } }, .scrap_base = 5 },
+    .stages = {
+        // Etapa 1 (Min 0:00 - 2:00): Zergling base=180f (~3s), peak=30f (0.5s), no scourges, no hydras, reward=300
+        { .zergling_delay_base = 180, .scourge_delay_base = 0,   .hydralisk_delay_base = 0,
+          .zergling_delay_peak = 30,  .scourge_delay_peak = 0,   .hydralisk_delay_peak = 0,
+          .stage_reward_scrap = 300 },
 
-        // Sector 2 (W11..W20):
-        { .tiers = { { 60, 18, 42, 14 }, { 35, 36, 48, 45 }, { 15, 90, 58, 80 } }, .scrap_base = 6 },
-        { .tiers = { { 80, 15, 42, 15 }, { 40, 32, 48, 48 }, { 20, 80, 58, 90 } }, .scrap_base = 8 },
-        { .tiers = { { 100, 14, 44, 16 }, { 50, 28, 50, 50 }, { 25, 70, 60, 100 } }, .scrap_base = 10 },
-        { .tiers = { { 120, 12, 44, 18 }, { 60, 25, 50, 55 }, { 30, 60, 60, 110 } }, .scrap_base = 12 },
-        { .tiers = { { 150, 10, 45, 20 }, { 70, 22, 52, 60 }, { 40, 50, 62, 120 } }, .scrap_base = 15 },
-        { .tiers = { { 160, 10, 46, 22 }, { 80, 20, 52, 65 }, { 50, 45, 62, 130 } }, .scrap_base = 20 },
-        { .tiers = { { 180,  9, 46, 25 }, { 90, 18, 54, 70 }, { 60, 40, 64, 140 } }, .scrap_base = 25 },
-        { .tiers = { { 200,  8, 48, 28 }, { 100, 16, 54, 75 }, { 70, 35, 64, 150 } }, .scrap_base = 30 },
-        { .tiers = { { 220,  8, 48, 30 }, { 110, 15, 55, 80 }, { 80, 30, 65, 160 } }, .scrap_base = 40 },
-        { .tiers = { { 250,  6, 50, 35 }, { 130, 12, 56, 90 }, { 100, 25, 66, 180 } }, .scrap_base = 50 }
+        // Etapa 2 (Min 2:00 - 4:00): Zerglings base=90f + Scourge base=180f; peak: Zerg=20f, Scourge=45f, reward=600
+        { .zergling_delay_base = 90,  .scourge_delay_base = 180, .hydralisk_delay_base = 0,
+          .zergling_delay_peak = 20,  .scourge_delay_peak = 45,  .hydralisk_delay_peak = 0,
+          .stage_reward_scrap = 600 },
+
+        // Etapa 3 (Min 4:00 - 6:00): Zerglings base=45f + Scourge base=90f; peak: Zerg=12f, Scourge=25f, reward=1200
+        { .zergling_delay_base = 45,  .scourge_delay_base = 90,  .hydralisk_delay_base = 0,
+          .zergling_delay_peak = 12,  .scourge_delay_peak = 25,  .hydralisk_delay_peak = 0,
+          .stage_reward_scrap = 1200 },
+
+        // Etapa 4 (Min 6:00 - 8:00): Zerglings base=25f + Scourge base=50f + Hydra base=300f; peak: Zerg=8f, Scourge=15f, Hydra=60f, reward=2500
+        { .zergling_delay_base = 25,  .scourge_delay_base = 50,  .hydralisk_delay_base = 300,
+          .zergling_delay_peak = 8,   .scourge_delay_peak = 15,  .hydralisk_delay_peak = 60,
+          .stage_reward_scrap = 2500 },
+
+        // Etapa 5 (Min 8:00 - 10:00): Marea final! Zerg base=12f + Scourge base=25f + Hydra base=120f; peak: Zerg=3f, Scourge=8f, Hydra=25f, reward=5000
+        { .zergling_delay_base = 12,  .scourge_delay_base = 25,  .hydralisk_delay_base = 120,
+          .zergling_delay_peak = 3,   .scourge_delay_peak = 8,   .hydralisk_delay_peak = 25,
+          .stage_reward_scrap = 5000 },
     },
-    .enemy_hp = { 18, 25, 75, 160, 320, 500, 1100, 2600 },
-    .enemy_scrap = { 4, 5, 15, 35, 70, 120, 250, 600 },
-    .upgrade_costs = { {15,25,40,65,100}, {20,30,45,70,110}, {15,25,35,55,85}, {25,40,65,105,170}, {50,90,160,0,0}, {80,0,0,0,0}, {200,400,800,1600,0} },
+    // Enemy stats (Constant across all stages):
+    // 0: Scourge, 1: Zergling, 2: Hydralisk, 3: Mutalisk, 4: Defiler, 5: Lurker, 6: Guardian, 7: Ultralisk
+    .enemy_hp = { 1, 3, 15, 40, 80, 120, 300, 800 },
+    .enemy_speed = { 70, 36, 24, 45, 22, 26, 18, 16 },
+    .enemy_scrap = { 2, 1, 8, 20, 45, 75, 180, 500 },
+    .enemy_bite_damage = { 12, 6, 10, 10, 15, 20, 30, 50 },
+    .enemy_bite_interval = { 1, 25, 30, 25, 35, 30, 45, 40 },
+
+    .upgrade_costs = {
+        { 60, 200, 450, 1000, 0 },  // 0: Caliber Lv1..4
+        { 90, 250, 600, 1400, 0 },  // 1: Cadence Lv1..4
+        { 40, 120, 300, 700, 0 },   // 2: Mag Size Lv1..4
+        { 150, 600, 0, 0, 0 },      // 3: Bio Harvest Lv1..2
+        { 120, 350, 800, 1800, 0 }, // 4: Supply Conveyor Lv1..4
+        { 350, 0, 0, 0, 0 },        // 5: Auto Target
+        { 600, 1800, 0, 0, 0 },     // 6: Extra Turrets (Socket 2, Socket 3)
+    },
     .turret_damage = { 1, 2, 3, 5, 8 },
-    .turret_fire_interval = { 18, 14, 10, 7, 5 },
-    .turret_range = { 65, 80, 100, 125, 150 },
-    .turret_magazine = { 20, 35, 50, 70, 100, 150 },
-    .bunker_start_hp = 100, .wave_duration_frames = 1800,
-    .wave_bonus_base = 10, .wave_bonus_per_wave = 5,
-    .enemy_bite_damage = { 8, 2, 4, 6, 10, 14, 20, 35 },
-    .enemy_bite_interval = { 30, 40, 45, 40, 50, 45, 60, 50 },
-    .conveyor_reload_interval = { 9999, 60, 20, 10 },
-    .range_upgrade_costs = { 30, 60, 120, 240, 480 },
-    .magic = 0x544F5744 // "TOWD"
+    .turret_fire_interval = { 12, 10, 8, 5, 3 },
+    .turret_range = { 64, 48, 32, 16, 0 },
+    .turret_magazine = { 10, 16, 25, 40, 60 },
+    .bunker_start_hp = 100,
+    .conveyor_reload_interval = { 9999, 60, 25, 12, 6 },
+    .range_upgrade_costs = { 40, 100, 250, 600, 0 },
+    .magic = 0x544F5732 // "TOW2"
 };
 
 static int s_fat_available = 0;
@@ -92,32 +95,8 @@ void balance_config_load(void) {
         if (n == sizeof(GameBalanceConfig)) {
             GameBalanceConfig loaded;
             memcpy(&loaded, raw, sizeof(loaded));
-            if (loaded.magic == 0x544F5744) memcpy(&g_balance, &loaded, sizeof(g_balance));
-        } else if (n == 2576) {
-            uint32_t old_magic;
-            memcpy(&old_magic, raw + 2572, sizeof(old_magic));
-            if (old_magic == 0x544F5744) {
-                memcpy(&g_balance, raw, 2572);
-                memcpy(&g_balance.range_upgrade_costs[0], (uint64_t[5]){30,60,120,240,480}, sizeof(g_balance.range_upgrade_costs));
-                g_balance.magic = 0x544F5744;
-            }
-        } else if (n == 1576) {
-            /* Migrate the previous 6-upgrade format without losing user tuning. */
-            uint32_t old_magic;
-            memcpy(&old_magic, raw + 1572, sizeof(old_magic));
-            if (old_magic == 0x544F5744) {
-                memcpy(&g_balance.waves[0], raw, 1120);
-                memcpy(&g_balance.enemy_hp[0], raw + 1120, 24);
-                memcpy(&g_balance.enemy_scrap[0], raw + 1144, 24);
-                memcpy(&g_balance.upgrade_costs[0][0], raw + 1168, 240);
-                memcpy(&g_balance.turret_damage[0], raw + 1408, 20);
-                memcpy(&g_balance.turret_fire_interval[0], raw + 1428, 20);
-                memcpy(&g_balance.turret_range[0], raw + 1448, 20);
-                memcpy(&g_balance.turret_magazine[0], raw + 1468, 24);
-                memcpy(&g_balance.bunker_start_hp, raw + 1492, 16);
-                memcpy(&g_balance.enemy_bite_damage[0], raw + 1508, 24);
-                memcpy(&g_balance.enemy_bite_interval[0], raw + 1532, 24);
-                memcpy(&g_balance.conveyor_reload_interval[0], raw + 1556, 16);
+            if (loaded.magic == 0x544F5732) {
+                memcpy(&g_balance, &loaded, sizeof(g_balance));
             }
         }
         fclose(f);
@@ -320,6 +299,37 @@ WallPlatform g_wall;
 CasingParticle g_casings[MAX_CASINGS];
 BulletDart g_bullet_darts[MAX_BULLET_DARTS];
 
+void wall_apply_balance_and_upgrades(void) {
+    int act = 1 + g_game.upgrades.extra_turrets;
+    if (act < 1) act = 1;
+    if (act > 3) act = 3;
+    g_wall.active_turrets = act;
+
+    int dmg_lvl = g_game.upgrades.caliber_lvl;
+    if (dmg_lvl < 0) dmg_lvl = 0;
+    if (dmg_lvl > 4) dmg_lvl = 4;
+    g_wall.damage = g_balance.turret_damage[dmg_lvl];
+
+    int rof_lvl = g_game.upgrades.firerate_lvl;
+    if (rof_lvl < 0) rof_lvl = 0;
+    if (rof_lvl > 4) rof_lvl = 4;
+    g_wall.fire_interval = g_balance.turret_fire_interval[rof_lvl];
+
+    int rng_lvl = g_game.upgrades.range_lvl;
+    if (rng_lvl < 0) rng_lvl = 0;
+    if (rng_lvl > 4) rng_lvl = 4;
+    g_wall.range_line_y = g_balance.turret_range[rng_lvl];
+    g_wall.range = g_wall.screen_y - g_wall.range_line_y;
+
+    int mag_lvl = g_game.upgrades.mag_size_lvl;
+    if (mag_lvl < 0) mag_lvl = 0;
+    if (mag_lvl > 4) mag_lvl = 4;
+    int mag_cap = g_balance.turret_magazine[mag_lvl];
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        g_wall.max_ammo[s] = mag_cap;
+    }
+}
+
 void wall_init(void) {
     memset(&g_wall, 0, sizeof(g_wall));
     memset(g_casings, 0, sizeof(g_casings));
@@ -328,27 +338,24 @@ void wall_init(void) {
     g_wall.screen_y = WALL_DEFAULT_Y; // 144
     g_wall.hp = 100;
     g_wall.max_hp = 100;
-    g_wall.active_turrets = 1; // Phase 1: exactly 1 active turret in Socket 1
     g_wall.turret_angles[0] = 0; // NW
     g_wall.turret_angles[1] = 2; // N (forward facing)
     g_wall.turret_angles[2] = 2; // N
     g_wall.turret_angles[3] = 4; // NE
     g_wall.reload_time = 90;
-    g_wall.range_line_y = 64;   // Straight horizontal range perimeter line
-    g_wall.range = 80;
-    g_wall.damage = 1;          // Base damage = 1
-    g_wall.fire_interval = 12;  // Base cadence (5 shots/sec)
     g_wall.fire_cooldown = 0;
     g_wall.battery_fire_step = 0;
     g_wall.locked_enemy_idx = -1;
+    g_wall.conveyor_timer = 0;
+
+    wall_apply_balance_and_upgrades();
 
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
         g_wall.target_angles[s] = g_wall.turret_angles[s];
         g_wall.target_enemy_idx[s] = -1;
         g_wall.turret_cooldown[s] = 0;
         g_wall.traverse_timer[s] = 0;
-        g_wall.max_ammo[s] = 10; // Phase 1 drum capacity = 10 rounds
-        g_wall.ammo[s] = 10;
+        g_wall.ammo[s] = g_wall.max_ammo[s];
         g_wall.reload_timer[s] = 0;
         g_wall.is_reloading[s] = 0;
         g_wall.barrel_alt[s] = 0;
@@ -540,6 +547,33 @@ void wall_update(void) {
         }
     }
 
+    // Auto-supply conveyor (passive ammo feeding per frame interval)
+    int c_lvl = g_game.upgrades.conveyor_lvl;
+    if (c_lvl > 0 && c_lvl <= 4) {
+        int interval = g_balance.conveyor_reload_interval[c_lvl];
+        if (interval > 0 && interval < 9000) {
+            g_wall.conveyor_timer++;
+            if (g_wall.conveyor_timer >= interval) {
+                g_wall.conveyor_timer = 0;
+                int num_act = g_wall.active_turrets;
+                static const int s_active_sockets[4][4] = {
+                    { 1, -1, -1, -1 }, { 1, 2, -1, -1 }, { 0, 1, 2, -1 }, { 0, 1, 2, 3 }
+                };
+                for (int i = 0; i < num_act; i++) {
+                    int s = s_active_sockets[num_act - 1][i];
+                    if (s >= 0 && g_wall.ammo[s] < g_wall.max_ammo[s]) {
+                        g_wall.ammo[s]++;
+                        if (g_wall.is_reloading[s] && g_wall.ammo[s] > 0) {
+                            g_wall.is_reloading[s] = 0;
+                            g_wall.reload_timer[s] = 0;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     int active_mask = 0;
     if (g_wall.active_turrets == 1) active_mask = (1 << 1);
     else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
@@ -691,9 +725,13 @@ void wall_update(void) {
             } else {
                 g_enemies[hit_e_idx].hp = 0;
                 g_enemies[hit_e_idx].active = 0;
-                g_enemies[hit_e_idx].incoming_damage = 0;
                 g_game.enemies_killed++;
-                g_game.scrap += (5 * (g_enemies[hit_e_idx].variant + 1));
+                int v = g_enemies[hit_e_idx].variant;
+                if (v < 0) v = 0;
+                if (v >= ENEMY_VARIANT_COUNT) v = ENEMY_VARIANT_COUNT - 1;
+                uint64_t base_scrap = g_balance.enemy_scrap[v];
+                uint64_t reward = base_scrap * (1 + g_game.upgrades.bio_harvest_lvl);
+                g_game.scrap += reward;
                 game_spawn_death_gore(hit_x, hit_y, g_bullet_darts[i].vx, g_bullet_darts[i].vy, g_enemies[hit_e_idx].variant);
             }
             g_bullet_darts[i].active = 0;
@@ -759,7 +797,7 @@ void game_init(void) {
     wall_init();
     g_game.mode = MODE_PREPARATION;
     g_game.wave_number = 1;
-    g_game.total_waves = 20;
+    g_game.total_waves = STAGE_COUNT;
     g_game.bunker_hp = g_balance.bunker_start_hp;
     g_game.bunker_max_hp = g_balance.bunker_start_hp;
     g_game.scrap = 10;
@@ -805,46 +843,17 @@ void game_init(void) {
 
 void game_start_wave(void) {
     g_game.mode = MODE_WAVE;
-    g_game.wave_timer = g_balance.wave_duration_frames;
+    g_game.wave_timer = STAGE_DURATION_FRAMES;
     g_game.enemies_spawned = 0;
     g_game.enemies_alive = 0;
     g_game.spawn_timer = 0;
-
-    int w_idx = g_game.wave_number - 1;
-    if (w_idx < 0) w_idx = 0;
-    if (w_idx >= 20) w_idx = 19;
-    const WaveDef *wdef = &g_balance.waves[w_idx];
-
-    g_game.enemies_to_spawn = 0;
-    for (int t = 0; t < 8; t++) {
-        const WaveTierConfig *tier_cfg = (t < 3) ? &wdef->tiers[t] : &g_balance.advanced_waves[w_idx][t - 3];
-        g_game.enemies_to_spawn += tier_cfg->count;
-        g_game.wave_spawned_tier[t] = 0;
-        g_game.wave_spawn_timer_tier[t] = 0;
-    }
+    g_game.spawn_timer_zergling = 0;
+    g_game.spawn_timer_scourge = 0;
+    g_game.spawn_timer_hydra = 0;
 
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_death_particles, 0, sizeof(g_death_particles));
-
-    // Showcase swarm: Staggered across battlefield for immediate tactical engagement!
-    // Vanguard entering bottom screen (Y = 200..215, approaching hazard line at Y=257)
-    spawn_enemy_ex(0, 18, 48, 200);
-    spawn_enemy_ex(0, 18, 46, 205);
-    spawn_enemy_ex(1, 25, 40, 210);
-    spawn_enemy_ex(1, 25, 38, 215);
-    // Midguard advancing down top screen (Y = 110..140)
-    spawn_enemy_ex(2, 75, 32, 130);
-    spawn_enemy_ex(2, 75, 34, 140);
-    spawn_enemy_ex(3, 160, 36, 110);
-    spawn_enemy_ex(3, 160, 34, 120);
-    // Rearguard colossi (Y = 0..70)
-    spawn_enemy_ex(4, 320, 26, 60);
-    spawn_enemy_ex(4, 320, 25, 70);
-    spawn_enemy_ex(5, 500, 28, 30);
-    spawn_enemy_ex(5, 500, 30, 40);
-    spawn_enemy_ex(6, 1100, 22, 10);
-    spawn_enemy_ex(7, 2600, 20, 0);
 
     // Reset locked targets
     for (int t = 0; t < MAX_TURRETS; t++) {
@@ -864,6 +873,11 @@ void game_reset_to_prep(void) {
     // Repair turrets back to full between waves
     for (int t = 0; t < MAX_TURRETS; t++) {
         g_turrets[t].hp = g_turrets[t].max_hp;
+        g_turrets[t].ammo = g_turrets[t].max_ammo;
+        g_turrets[t].fire_cooldown = 0;
+        g_turrets[t].flash_timer = 0;
+        g_turrets[t].barrel_recoil_l = 0;
+        g_turrets[t].barrel_recoil_r = 0;
         g_turrets[t].locked_enemy_idx = -1;
     }
 }
@@ -875,27 +889,40 @@ void game_update_simulation(void) {
     wall_update();
     if (g_game.wave_timer > 0) g_game.wave_timer--;
 
-    int w_idx = g_game.wave_number - 1;
-    if (w_idx < 0) w_idx = 0;
-    if (w_idx >= 20) w_idx = 19;
-    const WaveDef *wdef = &g_balance.waves[w_idx];
+    int stage_idx = g_game.wave_number - 1;
+    if (stage_idx < 0) stage_idx = 0;
+    if (stage_idx >= STAGE_COUNT) stage_idx = STAGE_COUNT - 1;
+    const StageConfig *st = &g_balance.stages[stage_idx];
 
-    // 1. Spawning per tier (all 8 enemy variants in roster)
-    for (int t = 0; t < ENEMY_VARIANT_COUNT; t++) {
-        // Map variant to wave config slots
-        const WaveTierConfig *tier_cfg = (t < 3) ? &wdef->tiers[t] : &g_balance.advanced_waves[w_idx][t - 3];
-        if (g_game.wave_spawned_tier[t] < tier_cfg->count) {
-            g_game.wave_spawn_timer_tier[t]++;
-            int interval = tier_cfg->delay;
-            if (interval < 1) interval = 1;
-            if (g_game.wave_spawn_timer_tier[t] >= interval) {
-                g_game.wave_spawn_timer_tier[t] = 0;
-                g_game.wave_spawned_tier[t]++;
-                /* Base enemy HP is constant; waves tune composition and timing. */
-                int hp = (int)g_balance.enemy_hp[t];
-                if (hp < 1) hp = 1;
-                spawn_enemy(t, hp, tier_cfg->speed);
-            }
+    // Check if in Base phase (> 1800f, first 90s) or Peak phase (<= 1800f, last 30s)
+    int is_base = (g_game.wave_timer > 1800);
+    int z_delay = is_base ? st->zergling_delay_base : st->zergling_delay_peak;
+    int s_delay = is_base ? st->scourge_delay_base : st->scourge_delay_peak;
+    int h_delay = is_base ? st->hydralisk_delay_base : st->hydralisk_delay_peak;
+
+    // 1. Spawning per species
+    // Zergling (Variant 1)
+    if (z_delay > 0) {
+        g_game.spawn_timer_zergling++;
+        if (g_game.spawn_timer_zergling >= z_delay) {
+            g_game.spawn_timer_zergling = 0;
+            spawn_enemy(1, g_balance.enemy_hp[1], g_balance.enemy_speed[1]);
+        }
+    }
+    // Scourge (Variant 0)
+    if (s_delay > 0) {
+        g_game.spawn_timer_scourge++;
+        if (g_game.spawn_timer_scourge >= s_delay) {
+            g_game.spawn_timer_scourge = 0;
+            spawn_enemy(0, g_balance.enemy_hp[0], g_balance.enemy_speed[0]);
+        }
+    }
+    // Hydralisk (Variant 2)
+    if (h_delay > 0) {
+        g_game.spawn_timer_hydra++;
+        if (g_game.spawn_timer_hydra >= h_delay) {
+            g_game.spawn_timer_hydra = 0;
+            spawn_enemy(2, g_balance.enemy_hp[2], g_balance.enemy_speed[2]);
         }
     }
 
@@ -1016,6 +1043,37 @@ void game_update_simulation(void) {
         // 3D Depth: Enemies press against the wall parapet at Y=144; their head/mouth
         // tucks behind the sandbag bulwark, leaving only their rear/hind legs visible on the road.
         if (py >= 336) {
+            int b_variant = g_enemies[i].variant;
+            if (b_variant < 0) b_variant = 0;
+            if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
+
+            if (b_variant == 0) {
+                // Scourge (Variant 0): Aerial kamikaze suicide detonation on wall impact!
+                int bpx = FROM_FP(g_enemies[i].x);
+                int bpy = 138;
+                uint64_t kamikaze_dmg = g_balance.enemy_bite_damage[0];
+                if (g_game.mode != MODE_DEBUG_SANDBOX) {
+                    if (g_wall.hp > kamikaze_dmg) {
+                        g_wall.hp -= kamikaze_dmg;
+                    } else {
+                        g_wall.hp = 0;
+                        g_game.bunker_hp = 0;
+                        g_game.mode = MODE_GAME_OVER;
+                        return;
+                    }
+                    g_game.bunker_hp = g_wall.hp;
+                    g_wall.damage_flash_timer = 8; // Trauma flash on wall
+                }
+                // Massive splatter & debris explosion
+                game_spawn_death_gore(bpx, 336, 0, 0, 0);
+                for (int s = 0; s < 4; s++) {
+                    game_add_splatter_ex(bpx + ((rand() % 13) - 6), bpy + ((rand() % 7) - 3), COLOR_LED_RED, 1, 12);
+                }
+                g_enemies[i].active = 0;
+                g_game.enemies_alive--;
+                continue;
+            }
+
             g_enemies[i].y = TO_FP(336);
             g_enemies[i].vy = 0;
             g_enemies[i].vx = 0;
@@ -1029,14 +1087,13 @@ void game_update_simulation(void) {
                 g_enemies[i].anim_frame = (g_enemies[i].bite_timer / 6) % type->attack_frame_count;
             }
 
-            // Attack cycle every 25 frames (~2.4 attacks/sec per breaching xenos)
-            if (g_enemies[i].bite_timer >= 25) {
+            // Attack cycle for wall biting
+            int b_interval = g_balance.enemy_bite_interval[b_variant];
+            if (b_interval < 1) b_interval = 25;
+            if (g_enemies[i].bite_timer >= b_interval) {
                 g_enemies[i].bite_timer = 0;
-                int b_variant = g_enemies[i].variant;
-                if (b_variant < 0) b_variant = 0;
-                if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
                 uint64_t bite_dmg = g_balance.enemy_bite_damage[b_variant];
-                if (bite_dmg < 6) bite_dmg = 6; // Guaranteed visible chunk (~2 bulbs per bite)
+                if (bite_dmg < 1) bite_dmg = 1;
                 if (g_game.mode != MODE_DEBUG_SANDBOX) {
                     if (g_wall.hp > bite_dmg) {
                         g_wall.hp -= bite_dmg;
@@ -1073,14 +1130,19 @@ void game_update_simulation(void) {
         int move_distance = move_ax + move_ay;
         if (move_dir >= 0) g_enemies[i].dir = move_dir;
 
-        // Walk animation is distance-based: one pose per four pixels moved.
-        // This keeps slow and fast enemy tiers visually synchronized.
-        if (move_distance > 0) {
+        // Animation: Scourge flaps continuously in flight; terrestrial walk is distance-synchronized.
+        if (g_enemies[i].variant == 0) {
+            int fly_frames = g_enemy_types[0].frame_count;
+            if (fly_frames < 1) fly_frames = 5;
+            g_enemies[i].anim_frame = (g_game.sim_ticks_elapsed / 4) % fly_frames;
+        } else if (move_distance > 0) {
             g_enemies[i].anim_distance += move_distance;
             int walk_frames = g_enemy_types[g_enemies[i].variant].frame_count;
             if (walk_frames < 1) walk_frames = 4;
-            while (g_enemies[i].anim_distance >= (4 * FP_ONE)) {
-                g_enemies[i].anim_distance -= (4 * FP_ONE);
+            // Zergling stride: 2.5 px/frame perfectly coordinates 7-frame cycle to 17.5 px stride
+            int step_thresh = (g_enemies[i].variant == 1) ? ((5 * FP_ONE) / 2) : (4 * FP_ONE);
+            while (g_enemies[i].anim_distance >= step_thresh) {
+                g_enemies[i].anim_distance -= step_thresh;
                 g_enemies[i].anim_frame++;
                 if (g_enemies[i].anim_frame >= walk_frames) {
                     g_enemies[i].anim_frame = 0;
@@ -1335,15 +1397,17 @@ void game_update_simulation(void) {
         }
     }
 
-    // 7. Wave Completion
-    if (g_game.enemies_spawned >= g_game.enemies_to_spawn && g_game.enemies_alive == 0) {
-        // Wave clear bonus scrap (+10 in W1, +15 in W2, etc.)
-        uint64_t wave_bonus = g_balance.wave_bonus_base + (g_game.wave_number * g_balance.wave_bonus_per_wave);
-        g_game.scrap += wave_bonus;
+    // 7. Stage Completion (survived 2 minutes)
+    if (g_game.wave_timer <= 0) {
+        int st_idx = g_game.wave_number - 1;
+        if (st_idx < 0) st_idx = 0;
+        if (st_idx >= STAGE_COUNT) st_idx = STAGE_COUNT - 1;
+        uint64_t stage_bonus = g_balance.stages[st_idx].stage_reward_scrap;
+        g_game.scrap += stage_bonus;
 
         g_game.wave_number++;
         if (g_game.wave_number > g_game.total_waves) {
-            // Victory loop
+            // Victory loop: all 5 stages survived (10 minutes completed)!
             g_game.wave_number = g_game.total_waves;
         }
         game_reset_to_prep();
@@ -1558,57 +1622,36 @@ void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_he
 }
 
 uint64_t upgrade_get_cost(int idx) {
-    /* Costs are part of the persisted balance so calibration can tune them. */
     if (idx == 7) {
         int level = g_game.upgrades.range_lvl;
-        return (level >= 0 && level < 5) ? g_balance.range_upgrade_costs[level] : 999999;
+        return (level >= 0 && level < 4) ? g_balance.range_upgrade_costs[level] : 999999;
     }
     if (idx >= 0 && idx < 7) {
-        int levels[7] = { g_game.upgrades.caliber_lvl, g_game.upgrades.firerate_lvl,
-            g_game.upgrades.mag_size_lvl, g_game.upgrades.bio_harvest_lvl,
-            g_game.upgrades.conveyor_lvl, g_game.upgrades.auto_target,
-            g_game.upgrades.extra_turrets };
+        int levels[7] = {
+            g_game.upgrades.caliber_lvl,
+            g_game.upgrades.firerate_lvl,
+            g_game.upgrades.mag_size_lvl,
+            g_game.upgrades.bio_harvest_lvl,
+            g_game.upgrades.conveyor_lvl,
+            g_game.upgrades.auto_target,
+            g_game.upgrades.extra_turrets
+        };
         int level = levels[idx];
-        if (level >= 0 && level < 5 && g_balance.upgrade_costs[idx][level] > 0)
+        int max_l = (idx == 3 || idx == 6) ? 2 : (idx == 5 ? 1 : 4);
+        if (level >= 0 && level < max_l && g_balance.upgrade_costs[idx][level] > 0)
             return g_balance.upgrade_costs[idx][level];
         return 999999;
     }
-    /* Legacy switch retained only as a defensive fallback for invalid callers. */
-    switch (idx) {
-        case 0: { // Caliber: 15, 25, 40, 65, 100
-            static const uint64_t c[6] = { 15, 25, 40, 65, 100, 999999 };
-            int lvl = g_game.upgrades.caliber_lvl;
-            return (lvl < 5) ? c[lvl] : 999999;
-        }
-        case 1: { // Fire rate: 20, 30, 45, 70, 110
-            static const uint64_t c[6] = { 20, 30, 45, 70, 110, 999999 };
-            int lvl = g_game.upgrades.firerate_lvl;
-            return (lvl < 5) ? c[lvl] : 999999;
-        }
-        case 2: { // Mag size: 15, 25, 35, 55, 85
-            static const uint64_t c[6] = { 15, 25, 35, 55, 85, 999999 };
-            int lvl = g_game.upgrades.mag_size_lvl;
-            return (lvl < 5) ? c[lvl] : 999999;
-        }
-        case 3: { // Bio Harvest: 25, 40, 65, 105, 170
-            static const uint64_t c[6] = { 25, 40, 65, 105, 170, 999999 };
-            int lvl = g_game.upgrades.bio_harvest_lvl;
-            return (lvl < 5) ? c[lvl] : 999999;
-        }
-        case 4: { // Supply Conveyor: 50, 90, 160
-            static const uint64_t c[4] = { 50, 90, 160, 999999 };
-            int lvl = g_game.upgrades.conveyor_lvl;
-            return (lvl < 3) ? c[lvl] : 999999;
-        }
-        case 5: { // Auto Target Cogitator: 80
-            return g_game.upgrades.auto_target ? 999999 : 80;
-        }
-        default:
-            return 999999;
-    }
+    return 999999;
 }
 
 int upgrade_can_afford(int idx) {
+    if (idx == 6) {
+        int lvl = g_game.upgrades.extra_turrets;
+        if (lvl == 0 && g_game.upgrades.firerate_lvl < 2) return 0; // Gated by Cadencia Lv2
+        if (lvl == 1 && g_game.upgrades.firerate_lvl < 4) return 0; // Gated by Cadencia Lv4
+        if (lvl >= 2) return 0;
+    }
     uint64_t cost = upgrade_get_cost(idx);
     return (cost < 999999 && g_game.scrap >= cost);
 }
@@ -1623,37 +1666,24 @@ void upgrade_purchase(int idx) {
     switch (idx) {
         case 0: g_game.upgrades.caliber_lvl++; break;
         case 1: g_game.upgrades.firerate_lvl++; break;
-        case 2: {
-            g_game.upgrades.mag_size_lvl++;
-            // Update all turrets max ammo
-            for (int t = 0; t < MAX_TURRETS; t++) {
-                int m = (g_game.upgrades.mag_size_lvl < 6) ? g_balance.turret_magazine[g_game.upgrades.mag_size_lvl] : g_balance.turret_magazine[5];
-                g_turrets[t].max_ammo = m;
-            }
-            break;
-        }
+        case 2: g_game.upgrades.mag_size_lvl++; break;
         case 3: g_game.upgrades.bio_harvest_lvl++; break;
         case 4: g_game.upgrades.conveyor_lvl++; break;
         case 5: g_game.upgrades.auto_target = 1; break;
         case 6:
             g_game.upgrades.extra_turrets++;
-            if (g_game.upgrades.extra_turrets > MAX_TURRETS - 1) g_game.upgrades.extra_turrets = MAX_TURRETS - 1;
-            for (int t = 1; t <= g_game.upgrades.extra_turrets && t < MAX_TURRETS; t++) {
-                if (!g_turrets[t].placed) {
-                    static const int sx[3] = { 82, 174, 128 };
-                    static const int sy[3] = { 110, 110, 86 };
-                    g_turrets[t].id = t; g_turrets[t].type = TURRET_TYPE_BOLTER;
-                    g_turrets[t].x = sx[t - 1]; g_turrets[t].y = sy[t - 1];
-                    g_turrets[t].current_angle = 192; g_turrets[t].target_angle = 192;
-                    g_turrets[t].range = g_balance.turret_range[g_game.upgrades.range_lvl < 5 ? g_game.upgrades.range_lvl : 4];
-                    g_turrets[t].placed = 1; g_turrets[t].active = 1; g_turrets[t].hp = 50; g_turrets[t].max_hp = 50;
-                    g_turrets[t].ammo = g_balance.turret_magazine[g_game.upgrades.mag_size_lvl < 6 ? g_game.upgrades.mag_size_lvl : 5];
-                    g_turrets[t].max_ammo = g_turrets[t].ammo; g_turrets[t].fire_interval = g_balance.turret_fire_interval[0];
-                    g_turrets[t].locked_enemy_idx = -1;
-                }
-            }
+            if (g_game.upgrades.extra_turrets > 2) g_game.upgrades.extra_turrets = 2;
             break;
         case 7: g_game.upgrades.range_lvl++; break;
+    }
+
+    wall_apply_balance_and_upgrades();
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        if (g_wall.ammo[s] > g_wall.max_ammo[s]) g_wall.ammo[s] = g_wall.max_ammo[s];
+        if (idx == 6 && s == g_game.upgrades.extra_turrets) {
+            g_wall.ammo[s] = g_wall.max_ammo[s];
+            g_wall.is_reloading[s] = 0;
+        }
     }
 }
 
@@ -1705,178 +1735,103 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
 }
 
 static void calib_modify_val(int delta) {
+    if (g_game.calib_page == 0) {
+        // ETAPAS (1..5): exactly 7 parameters per stage
+        int s = g_game.calib_stage_idx;
+        if (s < 0) s = 0;
+        if (s >= STAGE_COUNT) s = STAGE_COUNT - 1;
+        StageConfig *st = &g_balance.stages[s];
+
+        switch (g_game.calib_row) {
+            case 0: st->zergling_delay_base += delta; if (st->zergling_delay_base < 0) st->zergling_delay_base = 0; break;
+            case 1: st->scourge_delay_base += delta; if (st->scourge_delay_base < 0) st->scourge_delay_base = 0; break;
+            case 2: st->hydralisk_delay_base += delta; if (st->hydralisk_delay_base < 0) st->hydralisk_delay_base = 0; break;
+            case 3: st->zergling_delay_peak += delta; if (st->zergling_delay_peak < 0) st->zergling_delay_peak = 0; break;
+            case 4: st->scourge_delay_peak += delta; if (st->scourge_delay_peak < 0) st->scourge_delay_peak = 0; break;
+            case 5: st->hydralisk_delay_peak += delta; if (st->hydralisk_delay_peak < 0) st->hydralisk_delay_peak = 0; break;
+            case 6: st->stage_reward_scrap += delta; if (st->stage_reward_scrap < 0) st->stage_reward_scrap = 0; break;
+        }
+        g_game.calib_saved_timer = 20; balance_config_save(); return;
+    }
     if (g_game.calib_page == 1) {
-        int enemy = g_game.calib_row / 4, field = g_game.calib_row % 4;
+        // ENEMY STATS: Constant across all stages (5 fields per enemy: HP, Speed, Scrap, Bite Dmg, Bite Int)
+        int enemy = g_game.calib_row / 5;
+        int field = g_game.calib_row % 5;
         if (enemy < 0) enemy = 0;
         if (enemy >= ENEMY_VARIANT_COUNT) enemy = ENEMY_VARIANT_COUNT - 1;
-        if (field == 0) { int n = (int)g_balance.enemy_hp[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_hp[enemy] = (uint32_t)n; }
-        else if (field == 1) { int n = (int)g_balance.enemy_scrap[enemy] + delta; if (n < 0) n = 0; g_balance.enemy_scrap[enemy] = (uint32_t)n; }
-        else if (field == 2) { g_balance.enemy_bite_damage[enemy] += delta; if (g_balance.enemy_bite_damage[enemy] < 1) g_balance.enemy_bite_damage[enemy] = 1; }
-        else { g_balance.enemy_bite_interval[enemy] += delta; if (g_balance.enemy_bite_interval[enemy] < 1) g_balance.enemy_bite_interval[enemy] = 1; }
+        switch (field) {
+            case 0: { int n = (int)g_balance.enemy_hp[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_hp[enemy] = (uint32_t)n; break; }
+            case 1: { int n = g_balance.enemy_speed[enemy] + delta; if (n < 5) n = 5; g_balance.enemy_speed[enemy] = n; break; }
+            case 2: { int n = (int)g_balance.enemy_scrap[enemy] + delta; if (n < 0) n = 0; g_balance.enemy_scrap[enemy] = (uint32_t)n; break; }
+            case 3: { int n = g_balance.enemy_bite_damage[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_bite_damage[enemy] = n; break; }
+            case 4: { int n = g_balance.enemy_bite_interval[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_bite_interval[enemy] = n; break; }
+        }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
     }
     if (g_game.calib_page == 2) {
         int r = g_game.calib_row;
-        if (r < 4) { int *p[4] = { &g_balance.bunker_start_hp, &g_balance.wave_duration_frames, &g_balance.wave_bonus_base, &g_balance.wave_bonus_per_wave }; *p[r] += delta; if (*p[r] < 0) *p[r] = 0; }
-        else if (r < 9) { int i = r - 4; g_balance.turret_damage[i] += delta; if (g_balance.turret_damage[i] < 1) g_balance.turret_damage[i] = 1; }
-        else if (r < 14) { int i = r - 9; g_balance.turret_range[i] += delta * 2; if (g_balance.turret_range[i] < 1) g_balance.turret_range[i] = 1; }
-        else if (r < 18) { int i = r - 14; g_balance.conveyor_reload_interval[i] += delta * 5; if (g_balance.conveyor_reload_interval[i] < 1) g_balance.conveyor_reload_interval[i] = 1; }
-        else { int i = r - 18; g_balance.turret_magazine[i] += delta; if (g_balance.turret_magazine[i] < 1) g_balance.turret_magazine[i] = 1; }
-        g_game.calib_saved_timer = 20; balance_config_save(); return;
-    }
-    if (g_game.calib_page == 3) {
-        int *v = 0;
-        switch (g_game.calib_row) {
-            case 0: v = &g_balance.bunker_start_hp; break;
-            case 1: v = &g_balance.wave_duration_frames; break;
-            case 2: v = &g_balance.wave_bonus_base; break;
-            case 3: v = &g_balance.wave_bonus_per_wave; break;
-        }
-        if (v) { *v += delta; if (*v < 0) *v = 0; if (*v > 999999) *v = 999999; }
-        else if (g_game.calib_row >= 4 && g_game.calib_row < 9) {
-            int i = g_game.calib_row - 4;
+        if (r == 0) {
+            g_balance.bunker_start_hp += delta * 10;
+            if (g_balance.bunker_start_hp < 10) g_balance.bunker_start_hp = 10;
+        } else if (r >= 1 && r <= 5) {
+            int i = r - 1;
             g_balance.turret_damage[i] += delta;
             if (g_balance.turret_damage[i] < 1) g_balance.turret_damage[i] = 1;
-        }
-        else if (g_game.calib_row >= 9 && g_game.calib_row < 14) {
-            int i = g_game.calib_row - 9;
+        } else if (r >= 6 && r <= 10) {
+            int i = r - 6;
+            g_balance.turret_fire_interval[i] += delta;
+            if (g_balance.turret_fire_interval[i] < 1) g_balance.turret_fire_interval[i] = 1;
+        } else if (r >= 11 && r <= 15) {
+            int i = r - 11;
             g_balance.turret_range[i] += delta * 2;
-            if (g_balance.turret_range[i] < 1) g_balance.turret_range[i] = 1;
-        }
-        else if (g_game.calib_row >= 14 && g_game.calib_row < 20) {
-            int i = g_game.calib_row - 14;
-            int n = (int)g_balance.enemy_hp[i] + delta;
-            if (n < 1) n = 1;
-            if (n > 999999) n = 999999;
-            g_balance.enemy_hp[i] = (uint32_t)n;
-        }
-        else if (g_game.calib_row >= 20 && g_game.calib_row < 26) {
-            int i = g_game.calib_row - 20;
-            int n = (int)g_balance.enemy_scrap[i] + delta;
-            if (n < 0) n = 0;
-            if (n > 999999) n = 999999;
-            g_balance.enemy_scrap[i] = (uint32_t)n;
-        }
-        else if (g_game.calib_row >= 26 && g_game.calib_row < 32) {
-            int i = g_game.calib_row - 26;
-            g_balance.enemy_bite_damage[i] += delta;
-            if (g_balance.enemy_bite_damage[i] < 1) g_balance.enemy_bite_damage[i] = 1;
-        }
-        else if (g_game.calib_row >= 32 && g_game.calib_row < 36) {
-            int i = g_game.calib_row - 32;
-            g_balance.conveyor_reload_interval[i] += delta * 5;
+            if (g_balance.turret_range[i] < 0) g_balance.turret_range[i] = 0;
+            if (g_balance.turret_range[i] > 140) g_balance.turret_range[i] = 140;
+        } else if (r >= 16 && r <= 20) {
+            int i = r - 16;
+            g_balance.conveyor_reload_interval[i] += delta;
             if (g_balance.conveyor_reload_interval[i] < 1) g_balance.conveyor_reload_interval[i] = 1;
-        }
-        else if (g_game.calib_row >= 36 && g_game.calib_row < 42) {
-            int i = g_game.calib_row - 36;
-            g_balance.enemy_bite_interval[i] += delta;
-            if (g_balance.enemy_bite_interval[i] < 1) g_balance.enemy_bite_interval[i] = 1;
-        }
-        else if (g_game.calib_row >= 42 && g_game.calib_row < 48) {
-            int i = g_game.calib_row - 42;
+        } else if (r >= 21 && r <= 25) {
+            int i = r - 21;
             g_balance.turret_magazine[i] += delta;
             if (g_balance.turret_magazine[i] < 1) g_balance.turret_magazine[i] = 1;
         }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
     }
     if (g_game.calib_page == 3) {
-        if (g_game.calib_row >= 35 && g_game.calib_row < 40) {
-            int level = g_game.calib_row - 35;
-            int64_t n = (int64_t)g_balance.range_upgrade_costs[level] + delta;
-            if (n < 0) n = 0;
-            if (n > 999999) n = 999999;
-            g_balance.range_upgrade_costs[level] = (uint64_t)n;
-            g_game.calib_saved_timer = 20; balance_config_save(); return;
+        int r = g_game.calib_row;
+        int64_t *val_ptr = NULL;
+        if (r >= 0 && r <= 3) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[0][r];
+        } else if (r >= 4 && r <= 7) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[1][r - 4];
+        } else if (r >= 8 && r <= 11) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[2][r - 8];
+        } else if (r >= 12 && r <= 13) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[3][r - 12];
+        } else if (r >= 14 && r <= 17) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[4][r - 14];
+        } else if (r == 18) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[5][0];
+        } else if (r >= 19 && r <= 20) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[6][r - 19];
+        } else if (r >= 21 && r <= 24) {
+            val_ptr = (int64_t *)&g_balance.range_upgrade_costs[r - 21];
         }
-        int up = g_game.calib_row / 5, level = g_game.calib_row % 5;
-        if (up >= 0 && up < 7) {
-            int64_t n = (int64_t)g_balance.upgrade_costs[up][level] + delta;
+        if (val_ptr) {
+            int64_t n = *val_ptr + delta;
             if (n < 0) n = 0;
             if (n > 999999) n = 999999;
-            g_balance.upgrade_costs[up][level] = (uint64_t)n;
+            *val_ptr = n;
         }
         g_game.calib_saved_timer = 20; balance_config_save(); return;
     }
-    int w = g_game.calib_wave_idx;
-    if (w < 0) w = 0;
-    if (w >= 20) w = 19;
-    WaveDef *wd = &g_balance.waves[w];
-
-    int row = g_game.calib_row;
-    if (row < 0) row = 0;
-    if (row >= 32) row = 31;
-
-    if (row == 11) {
-        wd->scrap_base += delta;
-        if (wd->scrap_base < 0) wd->scrap_base = 0;
-        if (wd->scrap_base > 999999) wd->scrap_base = 999999;
-        g_game.calib_saved_timer = 20;
-        balance_config_save();
-        return;
-    }
-    if (row >= 12 && row < 32) {
-        int tier = 3 + ((row - 12) / 4), param = (row - 12) % 4;
-        if (tier >= 8) tier = 7;
-        WaveTierConfig *tc = &g_balance.advanced_waves[w][tier - 3];
-        if (param == 3) {
-            int hp = (int)g_balance.enemy_hp[tier] + delta;
-            if (hp < 1) hp = 1;
-            if (hp > 999999) hp = 999999;
-            g_balance.enemy_hp[tier] = (uint32_t)hp;
-        } else {
-            int *v = (param == 0) ? &tc->count : (param == 1) ? &tc->delay : &tc->speed;
-            *v += delta;
-            if (*v < 0) *v = (param == 0) ? 0 : 1;
-            if (*v > 999999) *v = 999999;
-        }
-        g_game.calib_saved_timer = 20; balance_config_save(); return;
-    }
-    if ((row % 4) == 3) {
-        int tier_hp = row / 4;
-        g_balance.enemy_hp[tier_hp] += delta;
-        if (g_balance.enemy_hp[tier_hp] < 1) g_balance.enemy_hp[tier_hp] = 1;
-        if (g_balance.enemy_hp[tier_hp] > 999999) g_balance.enemy_hp[tier_hp] = 999999;
-        g_game.calib_saved_timer = 20;
-        balance_config_save();
-        return;
-    }
-
-    int tier = row / 4;
-    int param = row % 4;
-    WaveTierConfig *tc = &wd->tiers[tier];
-
-    switch (param) {
-        case 0: // Total enemies count (0..200)
-            tc->count += delta;
-            if (tc->count < 0) tc->count = 0;
-            if (tc->count > 200) tc->count = 200;
-            break;
-        case 1: // Spawn delay in frames (5..300)
-            tc->delay += delta;
-            if (tc->delay < 5) tc->delay = 5;
-            if (tc->delay > 300) tc->delay = 300;
-            break;
-        case 2: // Speed in px/s (10..150)
-            tc->speed += delta;
-            if (tc->speed < 10) tc->speed = 10;
-            if (tc->speed > 150) tc->speed = 150;
-            break;
-        case 3: // HP (1..999999)
-            tc->hp += delta;
-            if (tc->hp < 1) tc->hp = 1;
-            if (tc->hp > 999999) tc->hp = 999999;
-            break;
-    }
-
-    g_game.calib_saved_timer = 20;
-    balance_config_save();
 }
 
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held) {
     // B exits calibration back to preparation
     if (keys_down & KEY_B) {
         wall_init();
-    g_game.mode = MODE_PREPARATION;
+        g_game.mode = MODE_PREPARATION;
         return;
     }
 
@@ -1890,16 +1845,18 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         g_game.calib_row = 0;
     }
 
-    // L / R cycle wave index (0..19)
-    if (keys_down & KEY_L) {
-        g_game.calib_wave_idx = (g_game.calib_wave_idx + 19) % 20;
-    }
-    if (keys_down & KEY_R) {
-        g_game.calib_wave_idx = (g_game.calib_wave_idx + 1) % 20;
+    // L / R cycle stage index (0..4) in Page 0
+    if (g_game.calib_page == 0) {
+        if (keys_down & KEY_L) {
+            g_game.calib_stage_idx = (g_game.calib_stage_idx + STAGE_COUNT - 1) % STAGE_COUNT;
+        }
+        if (keys_down & KEY_R) {
+            g_game.calib_stage_idx = (g_game.calib_stage_idx + 1) % STAGE_COUNT;
+        }
     }
 
     // Up / Down: select parameter row. Held buttons repeat, then accelerate.
-    int max_rows = (g_game.calib_page == 0) ? 32 : ((g_game.calib_page == 1) ? 32 : ((g_game.calib_page == 2) ? 24 : 40));
+    int max_rows = (g_game.calib_page == 0) ? 7 : ((g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 25));
     int nav_dir = 0;
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
@@ -1922,14 +1879,18 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         }
     }
 
-    // Left / Right with continuous autorepeat
+    // Left / Right step size
     int step = 1;
-    int param = (g_game.calib_page == 0) ? (g_game.calib_row % 4) : 0;
-    if (param == 0) step = 1; // count
-    else if (param == 1) step = 5; // delay
-    else if (param == 2) step = 2; // speed
-    else if (param == 3) step = 1; // hp
-    if (g_game.calib_page != 0 || g_game.calib_row == 11) step = 1;
+    if (g_game.calib_page == 0) {
+        step = (g_game.calib_row == 6) ? 50 : 5;
+    } else if (g_game.calib_page == 1) {
+        int f = g_game.calib_row % 5;
+        step = (f == 1) ? 2 : 1;
+    } else if (g_game.calib_page == 2) {
+        step = (g_game.calib_row == 0) ? 10 : ((g_game.calib_row >= 11 && g_game.calib_row <= 15) ? 2 : 1);
+    } else if (g_game.calib_page == 3) {
+        step = (g_game.calib_row >= 19 && g_game.calib_row <= 20) ? 50 : 10;
+    }
 
     if (keys_down & KEY_LEFT) {
         calib_modify_val(-step);
@@ -1960,51 +1921,64 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
             g_game.calib_row = 0;
             return;
         }
-        // Navigation buttons [<] (10..40, 18..34) and [>] (215..245, 18..34) for Wave
-        if (touch.py >= 16 && touch.py <= 34) {
-            if (touch.px >= 8 && touch.px <= 42) { // [<]
-                g_game.calib_wave_idx = (g_game.calib_wave_idx + 19) % 20;
+        // Stage Selector buttons [<] (8..42, 16..34) and [>] (214..248, 16..34)
+        if (g_game.calib_page == 0 && touch.py >= 16 && touch.py <= 34) {
+            if (touch.px >= 8 && touch.px <= 42) {
+                g_game.calib_stage_idx = (g_game.calib_stage_idx + STAGE_COUNT - 1) % STAGE_COUNT;
                 return;
-            } else if (touch.px >= 214 && touch.px <= 248) { // [>]
-                g_game.calib_wave_idx = (g_game.calib_wave_idx + 1) % 20;
+            } else if (touch.px >= 214 && touch.px <= 248) {
+                g_game.calib_stage_idx = (g_game.calib_stage_idx + 1) % STAGE_COUNT;
                 return;
             }
         }
 
-        // Parameter rows touch hitboxes (12 rows)
-        int visible_first = (g_game.calib_page == 0) ? (g_game.calib_row / 10) * 10 : 0;
-        int visible_count = (g_game.calib_page == 0) ? 10 : 12;
-        for (int r = 0; r < visible_count; r++) {
-            int actual = visible_first + r;
-            int ry = 31 + r * 10;
-            if (touch.py >= ry && touch.py <= ry + 9) {
-                g_game.calib_row = actual;
-                int rparam = actual % 4;
-                int rstep = (r == 11 || rparam == 0 || rparam == 3) ? 1 : ((rparam == 1) ? 5 : 2);
-                // Tap on [-] box (175..205) or [+] box (212..242)
-                if (touch.px >= 175 && touch.px <= 205) {
-                    calib_modify_val(-rstep);
-                } else if (touch.px >= 212 && touch.px <= 242) {
-                    calib_modify_val(+rstep);
+        // Parameter rows touch hitboxes
+        if (g_game.calib_page == 0) {
+            for (int r = 0; r < 7; r++) {
+                int ry = 36 + r * 15;
+                if (touch.py >= ry && touch.py <= ry + 13) {
+                    g_game.calib_row = r;
+                    int rstep = (r == 6) ? 50 : 5;
+                    if (touch.px >= 175 && touch.px <= 205) {
+                        calib_modify_val(-rstep);
+                    } else if (touch.px >= 212 && touch.px <= 242) {
+                        calib_modify_val(+rstep);
+                    }
+                    return;
                 }
-                return;
+            }
+        } else {
+            int visible_first = (g_game.calib_row / 10) * 10;
+            int visible_count = (visible_first + 10 < max_rows) ? 10 : (max_rows - visible_first);
+            for (int r = 0; r < visible_count; r++) {
+                int actual = visible_first + r;
+                int ry = 32 + r * 13;
+                if (touch.py >= ry && touch.py <= ry + 12) {
+                    g_game.calib_row = actual;
+                    if (touch.px >= 175 && touch.px <= 205) {
+                        calib_modify_val(-1);
+                    } else if (touch.px >= 212 && touch.px <= 242) {
+                        calib_modify_val(+1);
+                    }
+                    return;
+                }
             }
         }
 
         // Bottom action buttons:
-        // [RESTART W1] (8..85, 160..186)
+        // [RESTART W1] (8..85, 158..186)
         if (touch.px >= 8 && touch.px <= 85 && touch.py >= 158 && touch.py <= 186) {
             game_init();
             return;
         }
-        // [DEFAULTS] (95..165, 160..186)
+        // [DEFAULTS] (95..165, 158..186)
         if (touch.px >= 95 && touch.px <= 165 && touch.py >= 158 && touch.py <= 186) {
             balance_config_reset_defaults();
             balance_config_save();
             g_game.calib_saved_timer = 30;
             return;
         }
-        // [BACK / RESUME] (175..248, 160..186)
+        // [BACK / RESUME] (175..248, 158..186)
         if (touch.px >= 175 && touch.px <= 248 && touch.py >= 158 && touch.py <= 186) {
             g_game.mode = g_game.previous_mode;
             return;
