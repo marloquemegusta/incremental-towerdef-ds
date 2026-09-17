@@ -9,6 +9,73 @@ uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 static u16 *s_top_vram = NULL;
 static int s_top_bg = 0;
 
+static void renderer_enemy_bounds(const Enemy *enemy, int cx, int cy,
+                                  int is_attacking, int *x, int *y,
+                                  int *w, int *h) {
+    int variant = enemy->variant;
+    if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
+    const EnemyTypeDef *type = &g_enemy_types[variant];
+    int dir = enemy->dir & 7;
+    int source_dir = 0;
+    int flip_h = 0;
+
+    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
+        if (dir > 4) {
+            flip_h = 1;
+            source_dir = (dir == 5) ? 3 : ((dir == 6) ? 2 : 1);
+        } else {
+            source_dir = dir;
+        }
+    }
+
+    const EnemyFrameDef *frame = NULL;
+    int frame_count = is_attacking ? type->attack_frame_count : type->frame_count;
+    if (is_attacking && frame_count > 0) {
+        int frame_idx = enemy->anim_frame % frame_count;
+        if (frame_idx < 0) frame_idx += frame_count;
+        frame = &type->attack_frames[source_dir][frame_idx];
+    } else if (type->frame_count > 0) {
+        int frame_idx = enemy->anim_frame % type->frame_count;
+        if (frame_idx < 0) frame_idx += type->frame_count;
+        frame = &type->frames[source_dir][frame_idx];
+    }
+
+    if (!frame || frame->w == 0 || frame->h == 0) {
+        *x = cx - 1; *y = cy - 1; *w = 2; *h = 2;
+        return;
+    }
+
+    int min_x, min_y, max_x, max_y;
+    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
+        int ox = cx + (flip_h ? frame->flip_ox : frame->offset_x);
+        int oy = cy + frame->offset_y;
+        min_x = ox;
+        min_y = oy;
+        max_x = ox + frame->w - 1;
+        max_y = oy + frame->h - 1;
+    } else {
+        int size = frame->w + frame->h;
+        int draw_cy = cy - ((type->is_flying) ? type->flight_altitude : 0);
+        min_x = cx - size / 2;
+        min_y = draw_cy - size / 2;
+        max_x = min_x + size - 1;
+        max_y = min_y + size - 1;
+    }
+
+    // Flying sprites also draw a ground shadow around the unshifted center.
+    if (type->is_flying && type->flight_altitude > 0) {
+        if (cx - 10 < min_x) min_x = cx - 10;
+        if (cy - 4 < min_y) min_y = cy - 4;
+        if (cx + 10 > max_x) max_x = cx + 10;
+        if (cy + 4 > max_y) max_y = cy + 4;
+    }
+
+    *x = min_x;
+    *y = min_y;
+    *w = max_x - min_x + 1;
+    *h = max_y - min_y + 1;
+}
+
 #include "turret_data.h"
 
 void format_number_compact(char *buf, size_t buf_size, uint64_t val) {
@@ -238,14 +305,6 @@ void renderer_draw_battlefield_top(void) {
             tiles_restore_ground_rect(g_top_backbuffer,
                                      g_death_particles[i].prev_top_x - 1, g_death_particles[i].prev_top_y - 1, 4, 4, 0);
             g_death_particles[i].prev_top_active = 0;
-        }
-    }
-    for (int i = 0; i < MAX_SPLATTERS; i++) {
-        if (g_splatters[i].prev_top_active) {
-            int r = g_splatters[i].prev_top_r;
-            tiles_restore_ground_rect(g_top_backbuffer, g_splatters[i].prev_top_x - r,
-                                      g_splatters[i].prev_top_y - r, r * 2 + 1, r * 2 + 1, 0);
-            g_splatters[i].prev_top_active = 0;
         }
     }
 }
@@ -517,14 +576,6 @@ void renderer_draw_battlefield_bottom(void) {
             g_bullets[i].prev_active = 0;
         }
     }
-    for (int i = 0; i < MAX_SPLATTERS; i++) {
-        if (g_splatters[i].prev_bot_active) {
-            int r = g_splatters[i].prev_bot_r;
-            tiles_restore_ground_rect(g_backbuffer, g_splatters[i].prev_bot_x - r,
-                                      g_splatters[i].prev_bot_y - r, r * 2 + 1, r * 2 + 1, 1);
-            g_splatters[i].prev_bot_active = 0;
-        }
-    }
     if (g_game.prev_drag_active) {
         tiles_restore_ground_rect(g_backbuffer, g_game.prev_drag_x - AMMO_CRATE_W / 2 - 1, g_game.prev_drag_y - AMMO_CRATE_H / 2 - 1, AMMO_CRATE_W + 2, AMMO_CRATE_H + 2, 1);
         g_game.prev_drag_active = 0;
@@ -566,29 +617,28 @@ void renderer_draw_turret(const Turret *t, int is_selected) {
     }
 }
 
-void renderer_draw_enemies_top(void) {
-    // Collect visible enemies on top screen
-    int visible_indices[MAX_ENEMIES];
-    int count = 0;
+static int renderer_collect_sorted_enemies(int *out, int bottom_screen) {
+    int heads[SCREEN_H];
+    int next[MAX_ENEMIES];
+    for (int y = 0; y < SCREEN_H; y++) heads[y] = -1;
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
-        int gy = FROM_FP(g_enemies[i].y);
-        if (gy >= -32 && gy < 192) {
-            visible_indices[count++] = i;
-        }
+        int local_y = FROM_FP(g_enemies[i].y) - (bottom_screen ? 192 : 0);
+        if (local_y < -32 || local_y >= SCREEN_H) continue;
+        int bucket = (local_y < 0) ? 0 : local_y;
+        next[i] = heads[bucket];
+        heads[bucket] = i;
     }
+    int count = 0;
+    for (int y = 0; y < SCREEN_H; y++) {
+        for (int i = heads[y]; i >= 0; i = next[i]) out[count++] = i;
+    }
+    return count;
+}
 
-    // Insertion sort by Y (typically < 40 enemies on screen, takes negligible cycles)
-    for (int i = 1; i < count; i++) {
-        int key = visible_indices[i];
-        int key_y = g_enemies[key].y;
-        int j = i - 1;
-        while (j >= 0 && g_enemies[visible_indices[j]].y > key_y) {
-            visible_indices[j + 1] = visible_indices[j];
-            j--;
-        }
-        visible_indices[j + 1] = key;
-    }
+void renderer_draw_enemies_top(void) {
+    int visible_indices[MAX_ENEMIES];
+    int count = renderer_collect_sorted_enemies(visible_indices, 0);
 
     // Render sorted back-to-front (smaller Y first, larger Y drawn on top)
     for (int idx = 0; idx < count; idx++) {
@@ -610,12 +660,11 @@ void renderer_draw_enemies_top(void) {
             }
         }
 
-        // Tight bounding box tailored to enemy variant
-        // Include flying shadows, altitude offsets and rotated animation canvases.
-        int ew = 96;
-        int eh = 96;
-        g_enemies[i].prev_top_x = gx - ew / 2;
-        g_enemies[i].prev_top_y = gy - eh / 2;
+        int ew, eh;
+        renderer_enemy_bounds(&g_enemies[i], gx, gy,
+                              g_enemies[i].biting_target == 99,
+                              &g_enemies[i].prev_top_x, &g_enemies[i].prev_top_y,
+                              &ew, &eh);
         g_enemies[i].prev_top_w = ew;
         g_enemies[i].prev_top_h = eh;
         g_enemies[i].prev_top_active = 1;
@@ -623,29 +672,8 @@ void renderer_draw_enemies_top(void) {
 }
 
 void renderer_draw_enemies_bottom(void) {
-    // Collect visible enemies on bottom screen (global Y in [192..383])
     int visible_indices[MAX_ENEMIES];
-    int count = 0;
-    for (int i = 0; i < MAX_ENEMIES; i++) {
-        if (!g_enemies[i].active) continue;
-        int gy = FROM_FP(g_enemies[i].y);
-        int ly = gy - 192;
-        if (ly >= -32 && ly < SCREEN_H) {
-            visible_indices[count++] = i;
-        }
-    }
-
-    // Insertion sort by Y
-    for (int i = 1; i < count; i++) {
-        int key = visible_indices[i];
-        int key_y = g_enemies[key].y;
-        int j = i - 1;
-        while (j >= 0 && g_enemies[visible_indices[j]].y > key_y) {
-            visible_indices[j + 1] = visible_indices[j];
-            j--;
-        }
-        visible_indices[j + 1] = key;
-    }
+    int count = renderer_collect_sorted_enemies(visible_indices, 1);
 
     // Render sorted back-to-front
     for (int idx = 0; idx < count; idx++) {
@@ -668,11 +696,11 @@ void renderer_draw_enemies_bottom(void) {
             }
         }
 
-        // Tight bounding box tailored to enemy variant
-        int ew = 96;
-        int eh = 96;
-        g_enemies[i].prev_bot_x = gx - ew / 2;
-        g_enemies[i].prev_bot_y = ly - eh / 2;
+        int ew, eh;
+        renderer_enemy_bounds(&g_enemies[i], gx, ly,
+                              g_enemies[i].biting_target == 99,
+                              &g_enemies[i].prev_bot_x, &g_enemies[i].prev_bot_y,
+                              &ew, &eh);
         g_enemies[i].prev_bot_w = ew;
         g_enemies[i].prev_bot_h = eh;
         g_enemies[i].prev_bot_active = 1;

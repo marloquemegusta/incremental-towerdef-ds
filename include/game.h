@@ -144,10 +144,6 @@ typedef struct {
     int max_life;
     int size;
     uint16_t color;
-    int prev_top_active;
-    int prev_top_x, prev_top_y, prev_top_r;
-    int prev_bot_active;
-    int prev_bot_x, prev_bot_y, prev_bot_r;
 } Splatter;
 
 typedef struct {
