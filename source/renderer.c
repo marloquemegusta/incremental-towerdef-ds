@@ -260,9 +260,6 @@ void renderer_draw_wall(void) {
         int dest_x = sx - TURRET_PIVOT_X;
         int dest_y = sy - TURRET_PIVOT_Y;
 
-        // Restore cupola background before drawing new angle
-        tiles_restore_ground_rect(g_backbuffer, dest_x - 2, dest_y - 2, TURRET_SPRITE_W + 4, TURRET_SPRITE_H + 18, 1);
-
         wall_draw_turret_sprite(g_backbuffer, dest_x, dest_y, angle);
 
         // Diegetic Ammo & Reload indicator beneath each turret cupola
@@ -456,6 +453,24 @@ void renderer_draw_range_perimeter(void) {
 
 void renderer_draw_battlefield_bottom(void) {
     // 60 FPS Dirty Rects: Erase previous frame's moving entities on bottom screen
+
+    // 1. Restore turret cupola backgrounds before enemies are drawn
+    int active_mask = 0;
+    if (g_wall.active_turrets == 1) active_mask = (1 << 1);
+    else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
+    else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
+    else active_mask = 0x0F;
+
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        if (!(active_mask & (1 << s))) continue;
+        int sx = c_wall_sockets[s].x;
+        int sy = g_wall.screen_y + c_wall_sockets[s].y;
+        int dest_x = sx - TURRET_PIVOT_X;
+        int dest_y = sy - TURRET_PIVOT_Y;
+        tiles_restore_ground_rect(g_backbuffer, dest_x - 2, dest_y - 2, TURRET_SPRITE_W + 4, TURRET_SPRITE_H + 18, 1);
+    }
+
+    // 2. Erase enemies
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (g_enemies[i].prev_bot_active) {
             tiles_restore_ground_rect(g_backbuffer,
@@ -579,11 +594,13 @@ void renderer_draw_enemies_top(void) {
             }
         }
 
-        // Record dirty rect bounding box for next frame (includes health bar area)
-        g_enemies[i].prev_top_x = gx - 24;
-        g_enemies[i].prev_top_y = gy - 20;
-        g_enemies[i].prev_top_w = 48;
-        g_enemies[i].prev_top_h = 48;
+        // Tight bounding box tailored to enemy variant
+        int ew = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 40 : 32);
+        int eh = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 44 : 32);
+        g_enemies[i].prev_top_x = gx - ew / 2;
+        g_enemies[i].prev_top_y = gy - 16;
+        g_enemies[i].prev_top_w = ew;
+        g_enemies[i].prev_top_h = eh;
         g_enemies[i].prev_top_active = 1;
     }
 }
@@ -634,11 +651,13 @@ void renderer_draw_enemies_bottom(void) {
             }
         }
 
-        // Record dirty rect bounding box for next frame (includes health bar area)
-        g_enemies[i].prev_bot_x = gx - 24;
-        g_enemies[i].prev_bot_y = ly - 20;
-        g_enemies[i].prev_bot_w = 48;
-        g_enemies[i].prev_bot_h = 48;
+        // Tight bounding box tailored to enemy variant
+        int ew = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 40 : 32);
+        int eh = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 44 : 32);
+        g_enemies[i].prev_bot_x = gx - ew / 2;
+        g_enemies[i].prev_bot_y = ly - 16;
+        g_enemies[i].prev_bot_w = ew;
+        g_enemies[i].prev_bot_h = eh;
         g_enemies[i].prev_bot_active = 1;
     }
 }
@@ -719,36 +738,34 @@ void renderer_draw_ui_wave(void) {
     top_fill_rect(0, 0, SCREEN_W, 28, COLOR_BLACK);
     char buf[64];
     snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
-    top_draw_text(6, 4, buf, COLOR_AMBER);
+    top_draw_text(6, 2, buf, COLOR_AMBER);
 
     int sec_left = g_game.wave_timer / 60;
     int m = sec_left / 60;
     int s = sec_left % 60;
     snprintf(buf, sizeof(buf), "TIME: %d:%02d", m, s);
-    top_draw_text(74, 4, buf, COLOR_WHITE);
+    top_draw_text(74, 2, buf, COLOR_WHITE);
 
     char scrap_buf[32];
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
-    top_draw_text(165, 4, buf, COLOR_PHOSPHOR_GREEN);
+    top_draw_text(165, 2, buf, COLOR_PHOSPHOR_GREEN);
 
-    // Profiler overlay (when no peak alert is active)
-    if (g_game.wave_timer > 2400 || g_game.wave_timer == 0) {
-        snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d",
-                 g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
-                 g_game.prof_pres_ticks, g_game.prof_sim_ticks);
-        top_draw_text(6, 16, buf, COLOR_WHITE);
-    }
+    // Profiler overlay (ALWAYS visible on row 2)
+    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d",
+             g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
+             g_game.prof_pres_ticks, g_game.prof_sim_ticks);
+    top_draw_text(6, 10, buf, COLOR_WHITE);
 
-    // Peak alert / telegraphing
+    // Peak alert / telegraphing on row 3 (does NOT cover profiler stats)
     if (g_game.wave_timer <= 2400 && g_game.wave_timer > 1800) {
         int peak_sec = (g_game.wave_timer - 1800) / 60;
         snprintf(buf, sizeof(buf), "! ALERTA PICO EN %ds !", peak_sec + 1);
         uint16_t col = (g_game.sim_ticks_elapsed & 8) ? COLOR_AMBER : COLOR_WHITE;
-        top_draw_text(68, 16, buf, col);
+        top_draw_text(68, 19, buf, col);
     } else if (g_game.wave_timer <= 1800 && g_game.wave_timer > 0) {
         uint16_t col = (g_game.sim_ticks_elapsed & 12) ? COLOR_LED_RED : COLOR_AMBER;
-        top_draw_text(58, 16, "!! PICO DE ETAPA ACTIVO !!", col);
+        top_draw_text(58, 19, "!! PICO DE ETAPA ACTIVO !!", col);
     }
 
     // If currently dragging ammo crate
