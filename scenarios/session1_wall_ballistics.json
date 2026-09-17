@@ -2,58 +2,100 @@
   "rom": "game.nds",
   "steps": [
     {
-      "frames": 30,
-      "capture": "01_prep_idle"
+      "frames": 25,
+      "capture": "combat_000"
     },
     {
       "tap": {
         "x": 220,
-        "y": 182
+        "y": 170
       },
-      "frames": 5
+      "frames": 4
     },
     {
       "release": true,
-      "frames": 25,
-      "capture": "02_wave_started"
+      "frames": 20,
+      "capture": "combat_001"
     },
     {
-      "frames": 80,
-      "capture": "03_enemies_advancing"
+      "frames": 60,
+      "capture": "combat_002"
     },
     {
       "touch": {
-        "x": 100,
-        "y": 70
+        "x": 80,
+        "y": 60
       },
-      "frames": 15,
-      "capture_sequence": "04_engaging_lane1",
-      "capture_every": 3
+      "frames": 24,
+      "capture_sequence": "combat_seq1",
+      "capture_every": 2
     },
     {
       "release": true,
-      "frames": 15
+      "frames": 8,
+      "capture_sequence": "combat_seq1_rel",
+      "capture_every": 2
     },
     {
       "touch": {
         "x": 160,
-        "y": 80
+        "y": 55
       },
-      "frames": 15,
-      "capture_sequence": "05_engaging_lane2",
-      "capture_every": 3
+      "frames": 24,
+      "capture_sequence": "combat_seq2",
+      "capture_every": 2
     },
     {
       "release": true,
-      "frames": 40,
-      "capture": "06_battle_aftermath"
+      "frames": 8,
+      "capture_sequence": "combat_seq2_rel",
+      "capture_every": 2
+    },
+    {
+      "touch": {
+        "x": 125,
+        "y": 75
+      },
+      "frames": 30,
+      "capture_sequence": "combat_seq3",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 8,
+      "capture_sequence": "combat_seq3_rel",
+      "capture_every": 2
+    },
+    {
+      "touch": {
+        "x": 50,
+        "y": 65
+      },
+      "frames": 16,
+      "capture_sequence": "combat_seq4",
+      "capture_every": 2
+    },
+    {
+      "touch": {
+        "x": 200,
+        "y": 65
+      },
+      "frames": 16,
+      "capture_sequence": "combat_seq5",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 30,
+      "capture_sequence": "combat_seq6",
+      "capture_every": 3
     }
   ],
   "assertions": {
     "screen_changed": {
-      "from": "01_prep_idle",
-      "to": "06_battle_aftermath",
-      "min_changed_pixels": 250
+      "from": "combat_000",
+      "to": "combat_002",
+      "min_changed_pixels": 100
     }
   }
 }
