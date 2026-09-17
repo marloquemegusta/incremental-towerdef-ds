@@ -21,3 +21,16 @@
 - If the Hydralisk still walks backwards on the DS, the remaining suspect is
   the source sheet's front/back interpretation rather than the renderer's
   direction indexing.
+
+## In-Game Controls & Menus
+
+- **Pausa inaccesible en hardware:** Ningún botón activa el menú de pausa durante el combate/preparación; se requiere revisar la captura de input en hardware real (Start/Select/Lid).
+
+## Artefactos Visuales & Renderizado
+
+- **Estela de puntos marrones tras enemigos:** Aunque se eliminó la estela de sprites enteros mediante dirty rects robustos, los enemigos dejan tras de sí una traza de puntos marrones que no se restaura del todo del fondo original.
+- **Limpieza de pantalla en Game Over / Reinicio:** Al morir el muro y reiniciar partida, los búferes y la pantalla no se limpian/redibujan por completo: permanecen salpicaduras de sangre previas y artefactos rojizos/amarillentos en el centro de la pantalla superior.
+
+## Rendimiento en Picos de Oleada
+
+- **Caída a 30 FPS en pico máximo:** Durante la saturación máxima de enemigos en pantalla, el framerate cae a ~30 FPS (a pesar de la optimización de los bucles de blit y el recorte de dirty rects a 32x32). Requiere optimización en ensamblador ARM9 o procesamiento por franjas/DMA.
