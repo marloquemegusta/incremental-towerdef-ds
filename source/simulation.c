@@ -599,7 +599,7 @@ void wall_update(void) {
         int target_e = -1;
         if (g_wall.locked_enemy_idx >= 0) {
             target_e = g_wall.locked_enemy_idx;
-        } else {
+        } else if (auto_fire) {
             int best_score = -99999;
             for (int e = 0; e < MAX_ENEMIES; e++) {
                 if (!g_enemies[e].active) continue;

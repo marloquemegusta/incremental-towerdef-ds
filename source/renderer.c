@@ -226,18 +226,18 @@ void top_draw_text(int x, int y, const char *str, uint16_t color) {
 void renderer_draw_battlefield_top(void) {
     // 60 FPS Dirty Rects: Erase previous frame's moving entities on top screen
     for (int i = 0; i < MAX_ENEMIES; i++) {
-        if (g_enemies[i].prev_drawn_screen == 1) {
+        if (g_enemies[i].prev_top_active) {
             tiles_restore_ground_rect(g_top_backbuffer,
-                                     g_enemies[i].prev_draw_x, g_enemies[i].prev_draw_y,
-                                     g_enemies[i].prev_drawn_w, g_enemies[i].prev_drawn_h, 0);
-            g_enemies[i].prev_drawn_screen = 0;
+                                     g_enemies[i].prev_top_x, g_enemies[i].prev_top_y,
+                                     g_enemies[i].prev_top_w, g_enemies[i].prev_top_h, 0);
+            g_enemies[i].prev_top_active = 0;
         }
     }
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
-        if (g_death_particles[i].prev_screen == 1) {
+        if (g_death_particles[i].prev_top_active) {
             tiles_restore_ground_rect(g_top_backbuffer,
-                                     g_death_particles[i].prev_x - 1, g_death_particles[i].prev_y - 1, 4, 4, 0);
-            g_death_particles[i].prev_screen = 0;
+                                     g_death_particles[i].prev_top_x - 1, g_death_particles[i].prev_top_y - 1, 4, 4, 0);
+            g_death_particles[i].prev_top_active = 0;
         }
     }
 }
@@ -245,8 +245,13 @@ void renderer_draw_battlefield_top(void) {
 
 void renderer_draw_wall(void) {
     // 1. Draw Wall Base flash only when taking damage (base is pre-baked in ground cache)
+    static int s_wall_flashed = 0;
     if (g_wall.damage_flash_timer > 0) {
         wall_draw_base(g_backbuffer, g_wall.screen_y, g_wall.hp, g_wall.max_hp);
+        s_wall_flashed = 1;
+    } else if (s_wall_flashed) {
+        tiles_restore_ground_rect(g_backbuffer, 0, g_wall.screen_y, WALL_WIDTH, WALL_HEIGHT, 1);
+        s_wall_flashed = 0;
     }
 
     // 2. Bunker Ammo Depot Crate is static at (128, 166); drawn if dragging or damaged
@@ -439,6 +444,9 @@ void renderer_draw_wall(void) {
                 g_backbuffer[cy * SCREEN_W + cx] = col;
                 g_backbuffer[(cy + 1) * SCREEN_W + cx - 1] = RGB15(16, 12, 3) | BIT(15);
             }
+            g_casings[i].prev_cx = cx;
+            g_casings[i].prev_cy = cy;
+            g_casings[i].prev_active = 1;
         }
     }
 
@@ -457,6 +465,9 @@ void renderer_draw_wall(void) {
             if (tx >= 0 && tx < SCREEN_W && ty >= 0 && ty < SCREEN_H) {
                 g_backbuffer[ty * SCREEN_W + tx] = COLOR_BOLTER_TRACER;
             }
+            g_bullet_darts[i].prev_bx = bx;
+            g_bullet_darts[i].prev_by = by;
+            g_bullet_darts[i].prev_active = 1;
         }
     }
 }
@@ -488,19 +499,46 @@ void renderer_draw_range_perimeter(void) {
 void renderer_draw_battlefield_bottom(void) {
     // 60 FPS Dirty Rects: Erase previous frame's moving entities on bottom screen
     for (int i = 0; i < MAX_ENEMIES; i++) {
-        if (g_enemies[i].prev_drawn_screen == 2) {
+        if (g_enemies[i].prev_bot_active) {
             tiles_restore_ground_rect(g_backbuffer,
-                                     g_enemies[i].prev_draw_x, g_enemies[i].prev_draw_y,
-                                     g_enemies[i].prev_drawn_w, g_enemies[i].prev_drawn_h, 1);
-            g_enemies[i].prev_drawn_screen = 0;
+                                     g_enemies[i].prev_bot_x, g_enemies[i].prev_bot_y,
+                                     g_enemies[i].prev_bot_w, g_enemies[i].prev_bot_h, 1);
+            g_enemies[i].prev_bot_active = 0;
         }
     }
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
-        if (g_death_particles[i].prev_screen == 2) {
+        if (g_death_particles[i].prev_bot_active) {
             tiles_restore_ground_rect(g_backbuffer,
-                                     g_death_particles[i].prev_x - 1, g_death_particles[i].prev_y - 1, 4, 4, 1);
-            g_death_particles[i].prev_screen = 0;
+                                     g_death_particles[i].prev_bot_x - 1, g_death_particles[i].prev_bot_y - 1, 4, 4, 1);
+            if (g_death_particles[i].prev_bot_has_shadow) {
+                tiles_restore_ground_rect(g_backbuffer,
+                                         g_death_particles[i].prev_bot_x - 1, g_death_particles[i].prev_bot_sy - 1, 4, 4, 1);
+                g_death_particles[i].prev_bot_has_shadow = 0;
+            }
+            g_death_particles[i].prev_bot_active = 0;
         }
+    }
+    for (int i = 0; i < MAX_CASINGS; i++) {
+        if (g_casings[i].prev_active) {
+            tiles_restore_ground_rect(g_backbuffer, g_casings[i].prev_cx - 2, g_casings[i].prev_cy - 2, 6, 6, 1);
+            g_casings[i].prev_active = 0;
+        }
+    }
+    for (int i = 0; i < MAX_BULLET_DARTS; i++) {
+        if (g_bullet_darts[i].prev_active) {
+            tiles_restore_ground_rect(g_backbuffer, g_bullet_darts[i].prev_bx - 2, g_bullet_darts[i].prev_by - 2, 6, 6, 1);
+            g_bullet_darts[i].prev_active = 0;
+        }
+    }
+    for (int i = 0; i < MAX_BULLETS; i++) {
+        if (g_bullets[i].prev_active) {
+            tiles_restore_ground_rect(g_backbuffer, g_bullets[i].prev_x - 1, g_bullets[i].prev_y - 1, 4, 4, 1);
+            g_bullets[i].prev_active = 0;
+        }
+    }
+    if (g_game.prev_drag_active) {
+        tiles_restore_ground_rect(g_backbuffer, g_game.prev_drag_x - AMMO_CRATE_W / 2 - 1, g_game.prev_drag_y - AMMO_CRATE_H / 2 - 1, AMMO_CRATE_W + 2, AMMO_CRATE_H + 2, 1);
+        g_game.prev_drag_active = 0;
     }
 }
 
@@ -584,11 +622,11 @@ void renderer_draw_enemies_top(void) {
         }
 
         // Record dirty rect bounding box for next frame (includes health bar area)
-        g_enemies[i].prev_draw_x = gx - 18;
-        g_enemies[i].prev_draw_y = gy - 16;
-        g_enemies[i].prev_drawn_w = 36;
-        g_enemies[i].prev_drawn_h = 36;
-        g_enemies[i].prev_drawn_screen = 1;
+        g_enemies[i].prev_top_x = gx - 24;
+        g_enemies[i].prev_top_y = gy - 20;
+        g_enemies[i].prev_top_w = 48;
+        g_enemies[i].prev_top_h = 48;
+        g_enemies[i].prev_top_active = 1;
     }
 }
 
@@ -639,22 +677,16 @@ void renderer_draw_enemies_bottom(void) {
         }
 
         // Record dirty rect bounding box for next frame (includes health bar area)
-        g_enemies[i].prev_draw_x = gx - 18;
-        g_enemies[i].prev_draw_y = ly - 16;
-        g_enemies[i].prev_drawn_w = 36;
-        g_enemies[i].prev_drawn_h = 36;
-        g_enemies[i].prev_drawn_screen = 2;
+        g_enemies[i].prev_bot_x = gx - 24;
+        g_enemies[i].prev_bot_y = ly - 20;
+        g_enemies[i].prev_bot_w = 48;
+        g_enemies[i].prev_bot_h = 48;
+        g_enemies[i].prev_bot_active = 1;
     }
 }
 
 void renderer_draw_bullets(void) {
-    // 1. Erase previous frame's bullets
-    for (int i = 0; i < MAX_BULLETS; i++) {
-        if (g_bullets[i].prev_active) {
-            tiles_restore_ground_rect(g_backbuffer, g_bullets[i].prev_x - 1, g_bullets[i].prev_y - 1, 4, 4, 1);
-            g_bullets[i].prev_active = 0;
-        }
-    }
+    // Draw active bullets
 
     // 2. Draw active bullets
     for (int i = 0; i < MAX_BULLETS; i++) {
@@ -680,15 +712,6 @@ void renderer_draw_splatters_bottom(void) {
 }
 
 void renderer_draw_death_particles_top(void) {
-    // 1. Erase previous frame
-    for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
-        if (g_death_particles[i].prev_screen == 1) {
-            tiles_restore_ground_rect(g_top_backbuffer, g_death_particles[i].prev_x - 1, g_death_particles[i].prev_y - 1, 4, 4, 0);
-            g_death_particles[i].prev_screen = 0;
-        }
-    }
-
-    // 2. Draw active
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
         if (!g_death_particles[i].active) continue;
         int gx = FROM_FP(g_death_particles[i].x);
@@ -700,23 +723,14 @@ void renderer_draw_death_particles_top(void) {
             if (g_death_particles[i].size > 0 && gx + 1 < SCREEN_W) {
                 top_draw_pixel(gx + 1, draw_y, g_death_particles[i].color);
             }
-            g_death_particles[i].prev_x = gx;
-            g_death_particles[i].prev_y = draw_y;
-            g_death_particles[i].prev_screen = 1;
+            g_death_particles[i].prev_top_x = gx;
+            g_death_particles[i].prev_top_y = draw_y;
+            g_death_particles[i].prev_top_active = 1;
         }
     }
 }
 
 void renderer_draw_death_particles_bottom(void) {
-    // 1. Erase previous frame
-    for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
-        if (g_death_particles[i].prev_screen == 2) {
-            tiles_restore_ground_rect(g_backbuffer, g_death_particles[i].prev_x - 1, g_death_particles[i].prev_y - 1, 4, 4, 1);
-            g_death_particles[i].prev_screen = 0;
-        }
-    }
-
-    // 2. Draw active
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
         if (!g_death_particles[i].active) continue;
         int gx = FROM_FP(g_death_particles[i].x);
@@ -725,16 +739,19 @@ void renderer_draw_death_particles_bottom(void) {
         int draw_y = gy - gz; // Elevated 3D parabolic arc!
         if (draw_y >= 0 && draw_y < SCREEN_H && gx >= 0 && gx < SCREEN_W) {
             renderer_draw_pixel(gx, draw_y, g_death_particles[i].color);
+            g_death_particles[i].prev_bot_has_shadow = 0;
             if (g_death_particles[i].size > 0) {
                 if (gx + 1 < SCREEN_W) renderer_draw_pixel(gx + 1, draw_y, g_death_particles[i].color);
                 // Drop shadow on ground under flying chunks
                 if (gy >= 0 && gy < SCREEN_H && gz > 1) {
                     renderer_draw_pixel(gx, gy, RGB15(2, 2, 4) | BIT(15));
+                    g_death_particles[i].prev_bot_has_shadow = 1;
+                    g_death_particles[i].prev_bot_sy = gy;
                 }
             }
-            g_death_particles[i].prev_x = gx;
-            g_death_particles[i].prev_y = draw_y;
-            g_death_particles[i].prev_screen = 2;
+            g_death_particles[i].prev_bot_x = gx;
+            g_death_particles[i].prev_bot_y = draw_y;
+            g_death_particles[i].prev_bot_active = 1;
         }
     }
 }
@@ -792,6 +809,9 @@ void renderer_draw_ui_wave(void) {
                 }
             }
         }
+        g_game.prev_drag_x = g_game.drag_x;
+        g_game.prev_drag_y = g_game.drag_y;
+        g_game.prev_drag_active = 1;
     }
 }
 
