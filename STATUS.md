@@ -33,8 +33,28 @@
 - [x] Resolución de `[OQ-01]` a `[OQ-04]` (Muralla unificada, marea continua pautada, escalera de automatización del disparo y economía limpia Chatarra + Núcleos sin energía pasiva).
 - [x] **Especificación Maestra y Contrato de Fase 1:** Documento `docs/PHASE_1_SPEC.md` consolidado con el alcance completo del prototipo jugable.
 - [ ] **Desarrollo de Fase 1 (Detalle técnico en [docs/PHASE_1_SPEC.md](docs/PHASE_1_SPEC.md)):**
-  - [ ] **Sesión 1:** Diseño e implementación de Muralla, Sockets y Balística Táctil.
-  - [ ] **Sesión 2:** Marea continua y Picos de Alerta con HUD superior.
-  - [ ] **Sesión 3:** Árbol visual de mejoras, pausa táctica y balance incremental.
+  - [x] **Sesión 1: Muralla, Sockets y Balística Táctil [COMPLETADA - commit `fb6b1bf`]:**
+    - Muralla continua en borde inferior con parapeto 3D y descarte de transparencias (`0x0000`).
+    - Oclusión 3D: enemigos atacando el muro a $Y=144$ quedan cubiertos por el parapeto (solo asoman extremidades traseras).
+    - Metrónomo de muralla: alternancia de fuego entre torretas y cañones ($T_1 L \to T_2 L \to T_1 R \dots$).
+    - Salud virtual anti-overkill (`incoming_damage`) con proyectiles balísticos visuales directos a 16 px/f.
+    - Línea recta de alcance horizontal a $Y=64$ ($X \in [32..224]$).
+    - Filtro estricto de stylus: prohibido disparo sobre asfalto vacío; solo fuego a enemigos vivos en rango.
+    - Búnker diegético: indicador de vida con 32 lámparas catódicas verdes + trauma flash dorado y alerta roja al 25% HP.
+    - Logística táctil: cajón de munición canónico ($26 \times 16$ px) en $X=128, Y=166$, tambor de 10 balas y recarga manual arrastrando con stylus.
+    - Ataque de enemigos distribuido en todo el ancho del frente ($Y=144$), eliminando embudo hacia el socket.
+    - Validación determinista al 100% en DeSmuME (`test_phase1_complete`, `test_wall_frontline_damage`, `test_wall_hp_and_crate`).
+  - [ ] **Sesión 2: Marea Continua y Picos de Alerta [SIGUIENTE SESIÓN / PRÓXIMO CHAT]:**
+    - Spawner de marea incesante de Zerglings terrestres y Scourges aéreos cruzando de pantalla superior ($Y=0$) a inferior ($Y=192$).
+    - Temporizador y picos de alerta pautados ("¡BRECHA DETECTADA!") con hordas compactas.
+    - HUD y telemetría superior: contador de bajas, chatarra acumulada, tiempo de supervivencia y aviso de horda.
+    - Sincronización de daño de mordiscos de enjambre en tiempo real a las 32 lámparas catódicas del muro.
+  - [ ] **Sesión 3: Árbol Visual de Mejoras, Pausa Táctica y Balance [PENDIENTE]:**
+    - Pantalla de Árbol Tecnológico táctil con nodos interconectados y pistas de cobre.
+    - Pausa táctica total al abrir la tienda para pensar y relajar la mano.
+    - Escalera de automatización: Gatillo Continuo (`Hold`) y Cogitador de Tiro (`Auto-target` + override manual).
+    - Mejoras de daño, cadencia de muro, desbloqueo de 2º socket, reciclaje de chatarra y blindaje/reparación.
+    - Bucle de Game Over / Reset instantáneo con estadísticas de run.
+
 
 
