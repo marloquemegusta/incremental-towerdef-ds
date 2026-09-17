@@ -326,8 +326,8 @@ void wall_init(void) {
     memset(g_bullet_darts, 0, sizeof(g_bullet_darts));
 
     g_wall.screen_y = WALL_DEFAULT_Y; // 144
-    g_wall.hp = 1000;
-    g_wall.max_hp = 1000;
+    g_wall.hp = 100;
+    g_wall.max_hp = 100;
     g_wall.active_turrets = 1; // Phase 1: exactly 1 active turret in Socket 1
     g_wall.turret_angles[0] = 0; // NW
     g_wall.turret_angles[1] = 2; // N (forward facing)
@@ -853,6 +853,8 @@ void game_start_wave(void) {
 
 void game_reset_to_prep(void) {
     wall_init();
+    g_game.bunker_hp = g_wall.hp;
+    g_game.bunker_max_hp = g_wall.max_hp;
     g_game.mode = MODE_PREPARATION;
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
@@ -1049,13 +1051,21 @@ void game_update_simulation(void) {
                 if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
                 uint64_t bite_dmg = g_balance.enemy_bite_damage[b_variant];
                 if (g_game.mode != MODE_DEBUG_SANDBOX) {
-                    if (g_game.bunker_hp > bite_dmg) {
-                        g_game.bunker_hp -= bite_dmg;
+                    if (g_wall.hp > bite_dmg) {
+                        g_wall.hp -= bite_dmg;
                     } else {
+                        g_wall.hp = 0;
                         g_game.bunker_hp = 0;
                         g_game.mode = MODE_GAME_OVER;
                         return;
                     }
+                    g_game.bunker_hp = g_wall.hp;
+
+                    // Wall impact sparks and blood splatter feedback
+                    int bpx = FROM_FP(g_enemies[i].x);
+                    int bpy = FROM_FP(g_enemies[i].y) - 192;
+                    game_add_splatter_ex(bpx, bpy, COLOR_LED_RED, 1, 10);
+                    game_add_splatter_ex(bpx + ((rand() % 9) - 4), bpy + ((rand() % 5) - 2), COLOR_BOLTER_TRACER, 0, 6);
                 }
             }
             continue;
