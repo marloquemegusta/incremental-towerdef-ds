@@ -1,0 +1,107 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 30,
+      "capture": "01_menu_prep"
+    },
+    {
+      "button_down": "X",
+      "frames": 5
+    },
+    {
+      "button_up": "X",
+      "frames": 15,
+      "capture": "02_menu_upgrades"
+    },
+    {
+      "button_down": "B",
+      "frames": 5
+    },
+    {
+      "button_up": "B",
+      "frames": 15
+    },
+    {
+      "tap": {
+        "x": 120,
+        "y": 168
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 15,
+      "capture": "03_menu_calib_etapas"
+    },
+    {
+      "button_down": "Y",
+      "frames": 5
+    },
+    {
+      "button_up": "Y",
+      "frames": 15,
+      "capture": "04_menu_calib_enemy_stats"
+    },
+    {
+      "button_down": "Y",
+      "frames": 5
+    },
+    {
+      "button_up": "Y",
+      "frames": 15,
+      "capture": "05_menu_calib_base_stats"
+    },
+    {
+      "button_down": "DOWN",
+      "frames": 25
+    },
+    {
+      "button_up": "DOWN",
+      "frames": 10,
+      "capture": "06_menu_calib_base_stats_p2"
+    },
+    {
+      "button_down": "Y",
+      "frames": 5
+    },
+    {
+      "button_up": "Y",
+      "frames": 15,
+      "capture": "07_menu_calib_shop_costs"
+    },
+    {
+      "button_down": "DOWN",
+      "frames": 25
+    },
+    {
+      "button_up": "DOWN",
+      "frames": 10,
+      "capture": "08_menu_calib_shop_costs_p2"
+    },
+    {
+      "button_down": "B",
+      "frames": 5
+    },
+    {
+      "button_up": "B",
+      "frames": 15
+    },
+    {
+      "button_down": "A",
+      "frames": 5
+    },
+    {
+      "button_up": "A",
+      "frames": 180,
+      "capture": "09_wave_gameplay"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_menu_prep",
+      "to": "02_menu_upgrades",
+      "min_changed_pixels": 50
+    }
+  }
+}

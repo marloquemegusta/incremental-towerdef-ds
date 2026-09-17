@@ -197,6 +197,7 @@ typedef struct {
     int range;           // Effective ballistic radius in px (default 80, reach to Y=64)
     int range_line_y;    // Straight horizontal range perimeter line (default 64)
     int locked_enemy_idx;// Player-designated priority target (-1 if none)
+    int conveyor_timer;  // Auto-feed cadence counter
 } WallPlatform;
 
 #define AMMO_DEPOT_X 128
@@ -206,6 +207,7 @@ typedef struct {
 
 void wall_reload_socket(int socket_idx);
 void wall_fire_at_target(int target_x, int target_y, int enemy_idx);
+void wall_apply_balance_and_upgrades(void);
 
 typedef enum {
     MODE_PREPARATION = 0,
@@ -232,38 +234,37 @@ typedef struct {
 } DebugSandboxState;
 
 // Editable configuration per enemy tier inside each Wave
-typedef struct {
-    int count;       // Total enemies to spawn of this tier in this wave
-    int delay;       // Spawn interval (in frames) for this tier
-    int speed;       // Speed in px/s (e.g. 15..120)
-    int hp;          // Base HP for this tier in this wave
-} WaveTierConfig;
+#define STAGE_COUNT 5
+#define STAGE_DURATION_FRAMES (120 * 60) // 7200 frames = 2 minutes
+#define STAGE_PEAK_START_FRAME (90 * 60)  // 5400 frames = 1m 30s (when timer <= 1800)
 
-// Editable configuration per Wave
+// Configuration for each 2-minute Stage (7 parameters exposed in calibration)
 typedef struct {
-    WaveTierConfig tiers[3]; // Tier 0 (Larva), Tier 1 (Ripper), Tier 2 (Hormagaunt)
-    uint64_t scrap_base;
-} WaveDef;
+    int zergling_delay_base;   // 1. Zergling delay during 0:00 - 1:30 (frames, 0 = disabled)
+    int scourge_delay_base;    // 2. Scourge delay during 0:00 - 1:30
+    int hydralisk_delay_base;  // 3. Hydralisk delay during 0:00 - 1:30
+    int zergling_delay_peak;   // 4. Zergling delay during peak (1:30 - 2:00)
+    int scourge_delay_peak;    // 5. Scourge delay during peak
+    int hydralisk_delay_peak;  // 6. Hydralisk delay during peak
+    int stage_reward_scrap;    // 7. Scrap reward upon completing the stage
+} StageConfig;
 
 typedef struct {
-    WaveDef waves[20];
-    uint32_t enemy_hp[8];
-    uint32_t enemy_scrap[8];
+    StageConfig stages[STAGE_COUNT]; // 5 stages of 2 minutes each
+    uint32_t enemy_hp[8];            // Constant enemy stats across all stages
+    int enemy_speed[8];              // Constant enemy speed in px/s
+    uint32_t enemy_scrap[8];         // Constant scrap value
+    int enemy_bite_damage[8];        // Constant bite / impact damage to wall
+    int enemy_bite_interval[8];      // Constant bite cadence
     uint64_t upgrade_costs[7][5];
     int turret_damage[5];
     int turret_fire_interval[5];
     int turret_range[5];
-    int turret_magazine[6];
+    int turret_magazine[5];
     int bunker_start_hp;
-    int wave_duration_frames;
-    int wave_bonus_base;
-    int wave_bonus_per_wave;
-    int enemy_bite_damage[8];
-    int enemy_bite_interval[8];
-    int conveyor_reload_interval[4];
-    WaveTierConfig advanced_waves[20][5];
+    int conveyor_reload_interval[5];
     uint64_t range_upgrade_costs[5];
-    uint32_t magic;           // 0x544F5744 ("TOWD")
+    uint32_t magic;                  // 0x544F5732 ("TOW2")
 } GameBalanceConfig;
 
 extern GameBalanceConfig g_balance;
@@ -320,13 +321,15 @@ typedef struct {
     int upgrade_flash_timer;
     int upgrade_flash_idx;
 
-    int wave_spawned_tier[8];
-    int wave_spawn_timer_tier[8];
+    // Stage spawning timers
+    int spawn_timer_zergling;
+    int spawn_timer_scourge;
+    int spawn_timer_hydra;
 
     // Calibration UI navigation
-    int calib_row;               // 0..11 (per tier: Count, Delay, Speed, HP; wave scrap)
-    int calib_wave_idx;          // 0..19 (Wave 1..20)
-    int calib_page;              // 0 waves, 1 enemy stats, 2 base/turrets, 3 upgrades
+    int calib_row;               // Selected row within active page
+    int calib_stage_idx;         // 0..4 (Etapa 1..5)
+    int calib_page;              // 0: Etapas (1..5), 1: Enemy Stats, 2: Base/Turrets, 3: Upgrades
     int calib_hold_timer;        // For autorepeat continuous adjustment
     int calib_saved_timer;       // Feedback notification ("SAVED")
 

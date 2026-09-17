@@ -710,7 +710,7 @@ void renderer_draw_ui_prep(void) {
     // Top HUD banner
     top_fill_rect(0, 0, SCREEN_W, 14, COLOR_BLACK);
     char buf[64];
-    snprintf(buf, sizeof(buf), "WAVE %d/20", g_game.wave_number);
+    snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
     top_draw_text(6, 4, buf, COLOR_AMBER);
     
     char scrap_buf[32];
@@ -730,21 +730,32 @@ void renderer_draw_ui_prep(void) {
 
 void renderer_draw_ui_wave(void) {
     // Top HUD banner
-    top_fill_rect(0, 0, SCREEN_W, 14, COLOR_BLACK);
+    top_fill_rect(0, 0, SCREEN_W, 28, COLOR_BLACK);
     char buf[64];
-    snprintf(buf, sizeof(buf), "WAVE %d/20", g_game.wave_number);
+    snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
     top_draw_text(6, 4, buf, COLOR_AMBER);
 
     int sec_left = g_game.wave_timer / 60;
-    snprintf(buf, sizeof(buf), "TIME: %ds", sec_left);
-    top_draw_text(80, 4, buf, COLOR_WHITE);
+    int m = sec_left / 60;
+    int s = sec_left % 60;
+    snprintf(buf, sizeof(buf), "TIME: %d:%02d", m, s);
+    top_draw_text(74, 4, buf, COLOR_WHITE);
 
     char scrap_buf[32];
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
-    top_draw_text(170, 4, buf, COLOR_PHOSPHOR_GREEN);
+    top_draw_text(165, 4, buf, COLOR_PHOSPHOR_GREEN);
 
-    // Ammo drag box removed - WallPlatform has unlimited heavy bolter reserves
+    // Peak alert / telegraphing
+    if (g_game.wave_timer <= 2400 && g_game.wave_timer > 1800) {
+        int peak_sec = (g_game.wave_timer - 1800) / 60;
+        snprintf(buf, sizeof(buf), "! ALERTA PICO EN %ds !", peak_sec + 1);
+        uint16_t col = (g_game.sim_ticks_elapsed & 8) ? COLOR_AMBER : COLOR_WHITE;
+        top_draw_text(68, 16, buf, col);
+    } else if (g_game.wave_timer <= 1800 && g_game.wave_timer > 0) {
+        uint16_t col = (g_game.sim_ticks_elapsed & 12) ? COLOR_LED_RED : COLOR_AMBER;
+        top_draw_text(58, 16, "!! PICO DE ETAPA ACTIVO !!", col);
+    }
 
     // If currently dragging ammo crate
     if (g_game.is_dragging_ammo) {
@@ -870,15 +881,24 @@ void renderer_draw_ui_upgrades(void) {
             }
             renderer_draw_text(x + 4, y + 16, buf, cost_col);
         } else if (i == 6) {
-            snprintf(buf, sizeof(buf), "TURRETS +%d", g_game.upgrades.extra_turrets);
+            int ext = g_game.upgrades.extra_turrets;
+            snprintf(buf, sizeof(buf), "SOCKET %d", ext + 2);
             renderer_draw_text(x + 4, y + 4, buf, text_col);
-            snprintf(buf, sizeof(buf), "+1  %s$", cost_str);
-            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+            if (ext == 0 && g_game.upgrades.firerate_lvl < 2) {
+                renderer_draw_text(x + 4, y + 16, "REQ ROF 2", COLOR_AMBER);
+            } else if (ext == 1 && g_game.upgrades.firerate_lvl < 4) {
+                renderer_draw_text(x + 4, y + 16, "REQ ROF 4", COLOR_AMBER);
+            } else if (ext >= 2) {
+                renderer_draw_text(x + 4, y + 16, "MAXED", cost_col);
+            } else {
+                snprintf(buf, sizeof(buf), "+1  %s$", cost_str);
+                renderer_draw_text(x + 4, y + 16, buf, cost_col);
+            }
         } else if (i == 7) {
             int lv = g_game.upgrades.range_lvl;
             snprintf(buf, sizeof(buf), "RANGE LV%d", lv);
             renderer_draw_text(x + 4, y + 4, buf, text_col);
-            if (lv < 5) snprintf(buf, sizeof(buf), "%d>%d %s$", g_balance.turret_range[lv], g_balance.turret_range[lv + 1], cost_str);
+            if (lv < 4) snprintf(buf, sizeof(buf), "%d>%d %s$", g_balance.turret_range[lv], g_balance.turret_range[lv + 1], cost_str);
             else snprintf(buf, sizeof(buf), "MAXED");
             renderer_draw_text(x + 4, y + 16, buf, cost_col);
         }
@@ -907,44 +927,70 @@ void renderer_draw_ui_calibration(void) {
 
     if (g_game.calib_page != 0) {
         char buf[64];
-        static const char *page_titles[4] = { "WAVE SPAWNS", "ENEMY STATS", "BASE / TURRETS", "UPGRADES" };
+        static const char *page_titles[4] = { "ETAPAS (1..5)", "ENEMY STATS", "BASE / STATS MEJORAS", "COSTES TIENDA" };
         const char *title = page_titles[g_game.calib_page];
         renderer_draw_text(6, 18, title, COLOR_WHITE);
         snprintf(buf, sizeof(buf), "PAGE %d/4", g_game.calib_page + 1);
         renderer_draw_text(190, 18, buf, COLOR_AMBER);
         int first = (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 1) ? 32 : ((g_game.calib_page == 3) ? 40 : 24);
-        static const char *enemy_labels[32] = {
-            "SCOURGE HP", "SCOURGE SCRAP", "SCOURGE DMG", "SCOURGE FRM",
-            "ZERGLING HP", "ZERGLING SCRAP", "ZERGLING DMG", "ZERGLING FRM",
-            "HYDRA HP", "HYDRA SCRAP", "HYDRA DMG", "HYDRA FRM",
-            "MUTA HP", "MUTA SCRAP", "MUTA DMG", "MUTA FRM",
-            "DEFILER HP", "DEFILER SCRAP", "DEFILER DMG", "DEFILER FRM",
-            "LURKER HP", "LURKER SCRAP", "LURKER DMG", "LURKER FRM",
-            "GUARDIAN HP", "GUARDIAN SCRAP", "GUARDIAN DMG", "GUARDIAN FRM",
-            "ULTRA HP", "ULTRA SCRAP", "ULTRA DMG", "ULTRA FRM"
+        int last = (g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 25);
+        static const char *enemy_labels[40] = {
+            "SCOURGE HP", "SCOURGE SPD", "SCOURGE SCRAP", "SCOURGE DMG", "SCOURGE FRM",
+            "ZERGLING HP", "ZERGLING SPD", "ZERGLING SCRAP", "ZERGLING DMG", "ZERGLING FRM",
+            "HYDRA HP", "HYDRA SPD", "HYDRA SCRAP", "HYDRA DMG", "HYDRA FRM",
+            "MUTA HP", "MUTA SPD", "MUTA SCRAP", "MUTA DMG", "MUTA FRM",
+            "DEFILER HP", "DEFILER SPD", "DEFILER SCRAP", "DEFILER DMG", "DEFILER FRM",
+            "LURKER HP", "LURKER SPD", "LURKER SCRAP", "LURKER DMG", "LURKER FRM",
+            "GUARDIAN HP", "GUARDIAN SPD", "GUARDIAN SCRAP", "GUARDIAN DMG", "GUARDIAN FRM",
+            "ULTRA HP", "ULTRA SPD", "ULTRA SCRAP", "ULTRA DMG", "ULTRA FRM"
         };
-        static const char *base_labels[24] = { "BUNKER HP", "WAVE FRAMES", "BONUS BASE", "BONUS / WAVE", "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4", "RANGE LV0", "RANGE LV1", "RANGE LV2", "RANGE LV3", "RANGE LV4", "CONVEYOR LV0", "CONVEYOR LV1", "CONVEYOR LV2", "CONVEYOR LV3", "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4", "MAGAZINE LV5" };
+        static const char *base_labels[26] = {
+            "BUNKER START HP",
+            "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4",
+            "CADENCE LV0 (FRM)", "CADENCE LV1 (FRM)", "CADENCE LV2 (FRM)", "CADENCE LV3 (FRM)", "CADENCE LV4 (FRM)",
+            "RANGE LV0 (Y-LINE)", "RANGE LV1 (Y-LINE)", "RANGE LV2 (Y-LINE)", "RANGE LV3 (Y-LINE)", "RANGE LV4 (Y-LINE)",
+            "CONVEYOR LV0 (FRM)", "CONVEYOR LV1 (FRM)", "CONVEYOR LV2 (FRM)", "CONVEYOR LV3 (FRM)", "CONVEYOR LV4 (FRM)",
+            "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4"
+        };
+        static const char *cost_labels[25] = {
+            "CALIBER LV1 COST", "CALIBER LV2 COST", "CALIBER LV3 COST", "CALIBER LV4 COST",
+            "CADENCE LV1 COST", "CADENCE LV2 COST", "CADENCE LV3 COST", "CADENCE LV4 COST",
+            "MAGAZINE LV1 COST", "MAGAZINE LV2 COST", "MAGAZINE LV3 COST", "MAGAZINE LV4 COST",
+            "BIO HARVEST LV1", "BIO HARVEST LV2",
+            "AUTO SUPPLY LV1", "AUTO SUPPLY LV2", "AUTO SUPPLY LV3", "AUTO SUPPLY LV4",
+            "AUTO TARGET COST",
+            "SOCKET 2 (ROF>=2)", "SOCKET 3 (ROF>=4)",
+            "RANGE LV1 COST", "RANGE LV2 COST", "RANGE LV3 COST", "RANGE LV4 COST"
+        };
         for (int n = 0; n < 10 && first + n < last; n++) {
             int r = first + n, val = 0;
-            if (g_game.calib_page == 1) { int e=r/4, f=r%4; if (e>=8) e=7; val = f==0 ? g_balance.enemy_hp[e] : f==1 ? g_balance.enemy_scrap[e] : f==2 ? g_balance.enemy_bite_damage[e] : g_balance.enemy_bite_interval[e]; }
-            else if (g_game.calib_page == 2) {
-                if (r < 4) { int *p[4] = { &g_balance.bunker_start_hp, &g_balance.wave_duration_frames, &g_balance.wave_bonus_base, &g_balance.wave_bonus_per_wave }; val = *p[r]; }
-                else if (r < 9) val = g_balance.turret_damage[r-4]; else if (r < 14) val = g_balance.turret_range[r-9]; else if (r < 18) val = g_balance.conveyor_reload_interval[r-14]; else val = g_balance.turret_magazine[r-18];
+            if (g_game.calib_page == 1) {
+                int e = r / 5, f = r % 5;
+                if (e >= 8) e = 7;
+                val = (f == 0) ? g_balance.enemy_hp[e] : (f == 1) ? g_balance.enemy_speed[e] : (f == 2) ? g_balance.enemy_scrap[e] : (f == 3) ? g_balance.enemy_bite_damage[e] : g_balance.enemy_bite_interval[e];
+            } else if (g_game.calib_page == 2) {
+                if (r == 0) val = g_balance.bunker_start_hp;
+                else if (r <= 5) val = g_balance.turret_damage[r - 1];
+                else if (r <= 10) val = g_balance.turret_fire_interval[r - 6];
+                else if (r <= 15) val = g_balance.turret_range[r - 11];
+                else if (r <= 20) val = g_balance.conveyor_reload_interval[r - 16];
+                else val = g_balance.turret_magazine[r - 21];
             } else {
-                int u = r / 5, l = r % 5; val = (int)g_balance.upgrade_costs[u][l];
+                if (r >= 0 && r <= 3) val = (int)g_balance.upgrade_costs[0][r];
+                else if (r >= 4 && r <= 7) val = (int)g_balance.upgrade_costs[1][r - 4];
+                else if (r >= 8 && r <= 11) val = (int)g_balance.upgrade_costs[2][r - 8];
+                else if (r >= 12 && r <= 13) val = (int)g_balance.upgrade_costs[3][r - 12];
+                else if (r >= 14 && r <= 17) val = (int)g_balance.upgrade_costs[4][r - 14];
+                else if (r == 18) val = (int)g_balance.upgrade_costs[5][0];
+                else if (r >= 19 && r <= 20) val = (int)g_balance.upgrade_costs[6][r - 19];
+                else if (r >= 21 && r <= 24) val = (int)g_balance.range_upgrade_costs[r - 21];
             }
             int y = 32 + n * 13; int sel = (r == g_game.calib_row);
             renderer_fill_rect(6, y, 244, 12, sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL);
             renderer_draw_rect(6, y, 244, 12, sel ? COLOR_AMBER : COLOR_IRON_BORDER);
             if (g_game.calib_page == 1) renderer_draw_text(10, y + 2, enemy_labels[r], COLOR_WHITE);
             else if (g_game.calib_page == 2) renderer_draw_text(10, y + 2, base_labels[r], COLOR_WHITE);
-            else {
-                static const char *names[7] = { "CALIBER", "FIRE RATE", "MAG SIZE", "BIO HARVEST", "SUPPLY CONVEYOR", "AUTO TARGET", "EXTRA TURRETS" };
-                if (r < 35) snprintf(buf, sizeof(buf), "%s LV%d", names[r / 5], r % 5);
-                else snprintf(buf, sizeof(buf), "RANGE LV%d", r - 35);
-                renderer_draw_text(10, y + 2, buf, COLOR_WHITE);
-            }
+            else renderer_draw_text(10, y + 2, cost_labels[r], COLOR_WHITE);
             snprintf(buf, sizeof(buf), "%d  [-] [+]", val); renderer_draw_text(150, y + 2, buf, COLOR_PHOSPHOR_GREEN);
         }
         renderer_draw_text(8, 166, "X <TAB   TAB> Y   B BACK", COLOR_AMBER);
@@ -952,7 +998,7 @@ void renderer_draw_ui_calibration(void) {
         return;
     }
 
-    // Wave Selector Bar: [<] WAVE X/20 [>]
+    // Stage Selector Bar: [<] ETAPA X/5 [>]
     renderer_fill_rect(8, 16, 26, 16, COLOR_IRON_PANEL);
     renderer_draw_rect(8, 16, 26, 16, COLOR_AMBER);
     renderer_draw_text(18, 20, "<", COLOR_AMBER);
@@ -962,73 +1008,66 @@ void renderer_draw_ui_calibration(void) {
     renderer_draw_text(232, 20, ">", COLOR_AMBER);
 
     char buf[64];
-    snprintf(buf, sizeof(buf), "SELECT WAVE: %d/20 (L/R)", g_game.calib_wave_idx + 1);
+    snprintf(buf, sizeof(buf), "SELECT ETAPA: %d/5 (L/R)", g_game.calib_stage_idx + 1);
     renderer_draw_text(52, 20, buf, COLOR_WHITE);
     renderer_draw_text(190, 20, "TAB 1/4", COLOR_AMBER);
 
-    int w = g_game.calib_wave_idx;
-    const WaveDef *wd = &g_balance.waves[w];
+    int s = g_game.calib_stage_idx;
+    if (s < 0) s = 0;
+    if (s >= STAGE_COUNT) s = STAGE_COUNT - 1;
+    const StageConfig *st = &g_balance.stages[s];
 
-    // 33 rows (4 params per 8 species + wave scrap), shown ten at a time while scrolling with Up/Down
-    static const char *row_labels[33] = {
-        "SCOURGE COUNT", "SCOURGE DELAY", "SCOURGE SPEED", "SCOURGE HP",
-        "ZERGLING COUNT", "ZERGLING DELAY", "ZERGLING SPEED", "ZERGLING HP",
-        "HYDRA COUNT", "HYDRA DELAY", "HYDRA SPEED", "WAVE SCRAP",
-        "MUTA COUNT", "MUTA DELAY", "MUTA SPEED", "MUTA HP",
-        "DEFILER COUNT", "DEFILER DELAY", "DEFILER SPEED", "DEFILER HP",
-        "LURKER COUNT", "LURKER DELAY", "LURKER SPEED", "LURKER HP",
-        "GUARDIAN COUNT", "GUARDIAN DELAY", "GUARDIAN SPEED", "GUARDIAN HP",
-        "ULTRA COUNT", "ULTRA DELAY", "ULTRA SPEED", "ULTRA HP",
-        "EXTRA SLOT"
+    static const char *stage_row_labels[7] = {
+        "1. ZERG BASE DELAY",
+        "2. SCOURGE BASE DEL",
+        "3. HYDRA BASE DELAY",
+        "4. ZERG PEAK DELAY",
+        "5. SCOURGE PEAK DEL",
+        "6. HYDRA PEAK DELAY",
+        "7. STAGE REWARD $"
     };
 
-    int first_row = (g_game.calib_row / 10) * 10;
-    for (int n = 0; n < 10 && first_row + n < 32; n++) {
-        int r = first_row + n;
-        int tier = r / 4;
-        int param = r % 4;
+    for (int r = 0; r < 7; r++) {
         int val = 0;
-        if (r == 11) val = wd->scrap_base;
-        else if (tier < 3 && param == 0) val = wd->tiers[tier].count;
-        else if (tier < 3 && param == 1) val = wd->tiers[tier].delay;
-        else if (tier < 3 && param == 2) val = wd->tiers[tier].speed;
-        else if (param == 3) val = g_balance.enemy_hp[tier];
-        else if (tier >= 3 && tier < 8 && param == 0) val = g_balance.advanced_waves[w][tier - 3].count;
-        else if (tier >= 3 && tier < 8 && param == 1) val = g_balance.advanced_waves[w][tier - 3].delay;
-        else if (tier >= 3 && tier < 8 && param == 2) val = g_balance.advanced_waves[w][tier - 3].speed;
+        switch (r) {
+            case 0: val = st->zergling_delay_base; break;
+            case 1: val = st->scourge_delay_base; break;
+            case 2: val = st->hydralisk_delay_base; break;
+            case 3: val = st->zergling_delay_peak; break;
+            case 4: val = st->scourge_delay_peak; break;
+            case 5: val = st->hydralisk_delay_peak; break;
+            case 6: val = st->stage_reward_scrap; break;
+        }
 
-        int y = 31 + n * 10;
+        int y = 38 + r * 16;
         int is_sel = (g_game.calib_row == r);
         uint16_t row_bg = is_sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL;
         uint16_t row_border = is_sel ? COLOR_AMBER : COLOR_IRON_BORDER;
         uint16_t txt_col = is_sel ? COLOR_WHITE : RGB15(20, 20, 22) | BIT(15);
 
-        // Highlight header tier group with slightly warmer text
-        if (param == 0 && !is_sel) txt_col = COLOR_AMBER;
+        renderer_fill_rect(6, y, 244, 14, row_bg);
+        renderer_draw_rect(6, y, 244, 14, row_border);
 
-        renderer_fill_rect(6, y, 244, 10, row_bg);
-        renderer_draw_rect(6, y, 244, 10, row_border);
-
-        renderer_draw_text(10, y + 1, row_labels[r], txt_col);
+        renderer_draw_text(10, y + 3, stage_row_labels[r], txt_col);
 
         snprintf(buf, sizeof(buf), "%d", val);
-        renderer_draw_text(142, y + 1, buf, COLOR_PHOSPHOR_GREEN);
+        renderer_draw_text(144, y + 3, buf, COLOR_PHOSPHOR_GREEN);
 
         // [-] button
-        renderer_fill_rect(178, y + 1, 24, 10, COLOR_BLACK);
-        renderer_draw_rect(178, y + 1, 24, 10, COLOR_IRON_BORDER);
-        renderer_draw_text(187, y + 2, "-", COLOR_WHITE);
+        renderer_fill_rect(178, y + 2, 24, 10, COLOR_BLACK);
+        renderer_draw_rect(178, y + 2, 24, 10, COLOR_IRON_BORDER);
+        renderer_draw_text(187, y + 3, "-", COLOR_WHITE);
 
         // [+] button
-        renderer_fill_rect(214, y + 1, 24, 10, COLOR_BLACK);
-        renderer_draw_rect(214, y + 1, 24, 10, COLOR_IRON_BORDER);
-        renderer_draw_text(223, y + 2, "+", COLOR_WHITE);
+        renderer_fill_rect(214, y + 2, 24, 10, COLOR_BLACK);
+        renderer_draw_rect(214, y + 2, 24, 10, COLOR_IRON_BORDER);
+        renderer_draw_text(223, y + 3, "+", COLOR_WHITE);
     }
 
-    // Bottom action buttons: [RESTART W1] [RESET DEFAULTS] [RESUME]
+    // Bottom action buttons: [RESTART E1] [RESET DEFAULTS] [RESUME]
     renderer_fill_rect(8, 158, 76, 26, COLOR_LED_RED);
     renderer_draw_rect(8, 158, 76, 26, COLOR_WHITE);
-    renderer_draw_text(14, 166, "RESTART W1", COLOR_WHITE);
+    renderer_draw_text(14, 166, "RESTART E1", COLOR_WHITE);
 
     renderer_fill_rect(90, 158, 72, 26, COLOR_IRON_PANEL);
     renderer_draw_rect(90, 158, 72, 26, COLOR_AMBER);
