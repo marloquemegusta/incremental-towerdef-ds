@@ -179,10 +179,18 @@ typedef struct {
     int muzzle_flash_barrel[4];
     int target_enemy_idx[4]; // Enemy currently tracked by each socket (-1 if none)
     int traverse_timer[4];   // Sub-frame timer for smooth mechanical rotation
+
+    // Ammo, Magazine & Reload Logistics Schema
+    int ammo[4];         // Current rounds in magazine for each socket
+    int max_ammo[4];     // Drum capacity per socket (default 30)
+    int reload_timer[4]; // Frames remaining in active reload cycle
+    int reload_time;     // Base reload duration (default 90 frames = 1.5s)
+    int is_reloading[4]; // 1 if socket is currently reloading
+
     int fire_cooldown;   // Global tap throttle
-    int fire_interval;
-    int damage;
-    int range;           // Maximum ballistic reach in px
+    int fire_interval;   // Fire rate (frames between rounds, default 6)
+    int damage;          // Damage per bullet impact (default 10)
+    int range;           // Effective ballistic radius in px (default 96)
     int locked_enemy_idx;// Player-designated priority target (-1 if none)
 } WallPlatform;
 
@@ -336,7 +344,7 @@ void wall_fire_at(int target_x, int target_y);
 void wall_fire_socket(int socket_idx, int target_x, int target_y);
 int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_y);
 void wall_spawn_casing(int x, int y, int dir_sign);
-void wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y);
+int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y);
 extern uint16_t g_backbuffer[SCREEN_W * SCREEN_H];
 extern uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H];
 

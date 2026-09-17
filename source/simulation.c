@@ -333,11 +333,16 @@ void wall_init(void) {
     g_wall.turret_angles[1] = 1; // NNW
     g_wall.turret_angles[2] = 3; // NNE
     g_wall.turret_angles[3] = 4; // NE
+    g_wall.reload_time = 90; // 1.5 seconds at 60 FPS
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
         g_wall.target_angles[s] = g_wall.turret_angles[s];
         g_wall.target_enemy_idx[s] = -1;
         g_wall.turret_cooldown[s] = 0;
         g_wall.traverse_timer[s] = 0;
+        g_wall.max_ammo[s] = 30; // 30 rounds per heavy bolter drum
+        g_wall.ammo[s] = 30;
+        g_wall.reload_timer[s] = 0;
+        g_wall.is_reloading[s] = 0;
     }
     g_wall.fire_cooldown = 0;
     g_wall.fire_interval = 6; // ~10 shots/sec per turret
@@ -360,53 +365,92 @@ int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_
 }
 
 void wall_spawn_casing(int x, int y, int dir_sign) {
+    int slot = -1;
     for (int i = 0; i < MAX_CASINGS; i++) {
         if (!g_casings[i].active) {
-            g_casings[i].active = 1;
-            g_casings[i].x = TO_FP(x);
-            g_casings[i].y = TO_FP(y);
-            g_casings[i].z = TO_FP(4);
-            int base_vx = TO_FP(1) + (rand() % TO_FP(1));
-            g_casings[i].vx = dir_sign * base_vx;
-            g_casings[i].vy = TO_FP(1) + (rand() % TO_FP(1)); // pops toward bottom screen
-            g_casings[i].vz = TO_FP(3) + (rand() % TO_FP(2)); // pops upward
-            g_casings[i].angle = rand() % 360;
-            g_casings[i].spin_speed = dir_sign * (30 + (rand() % 20));
-            g_casings[i].bounces = 0;
-            g_casings[i].life = 60;
+            slot = i;
             break;
         }
     }
+    // Ring-buffer eviction: if pool is full, evict the oldest casing so EVERY bullet gets its casing!
+    if (slot < 0) {
+        int min_life = 99999;
+        for (int i = 0; i < MAX_CASINGS; i++) {
+            if (g_casings[i].life < min_life) {
+                min_life = g_casings[i].life;
+                slot = i;
+            }
+        }
+    }
+    if (slot < 0) return;
+
+    g_casings[slot].active = 1;
+    g_casings[slot].x = TO_FP(x);
+    g_casings[slot].y = TO_FP(y);
+    g_casings[slot].z = TO_FP(4);
+    int base_vx = TO_FP(1) + (rand() % (FP_ONE * 3 / 4));
+    g_casings[slot].vx = dir_sign * base_vx;
+    g_casings[slot].vy = TO_FP(1) + (rand() % (FP_ONE / 2)); // Eject toward bunker floor
+    g_casings[slot].vz = TO_FP(2) + (rand() % TO_FP(2));     // Eject upward
+    g_casings[slot].angle = rand() % 360;
+    g_casings[slot].spin_speed = dir_sign * (30 + (rand() % 20));
+    g_casings[slot].bounces = 0;
+    g_casings[slot].life = 60;
 }
 
-void wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y) {
+int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y) {
+    int slot = -1;
     for (int i = 0; i < MAX_BULLET_DARTS; i++) {
         if (!g_bullet_darts[i].active) {
-            g_bullet_darts[i].active = 1;
-            g_bullet_darts[i].x = TO_FP(start_x);
-            g_bullet_darts[i].y = TO_FP(start_y);
-            g_bullet_darts[i].target_x = target_x;
-            g_bullet_darts[i].target_y = target_y;
-            g_bullet_darts[i].damage = g_wall.damage;
-
-            int dx = target_x - start_x;
-            int dy = target_y - start_y;
-            int ax = (dx < 0) ? -dx : dx;
-            int ay = (dy < 0) ? -dy : dy;
-            int dist = (ax > ay) ? (ax + (ay >> 1)) : (ay + (ax >> 1));
-            if (dist < 1) dist = 1;
-            g_bullet_darts[i].dist_remaining = TO_FP(dist);
-
-            int speed = TO_FP(16); // 16 px/frame
-            g_bullet_darts[i].vx = (dx * speed) / dist;
-            g_bullet_darts[i].vy = (dy * speed) / dist;
+            slot = i;
             break;
         }
     }
+    // If pool is full, recycle the one with smallest dist_remaining
+    if (slot < 0) {
+        int min_dist = 999999;
+        for (int i = 0; i < MAX_BULLET_DARTS; i++) {
+            if (g_bullet_darts[i].dist_remaining < min_dist) {
+                min_dist = g_bullet_darts[i].dist_remaining;
+                slot = i;
+            }
+        }
+    }
+    if (slot < 0) return 0;
+
+    g_bullet_darts[slot].active = 1;
+    g_bullet_darts[slot].x = TO_FP(start_x);
+    g_bullet_darts[slot].y = TO_FP(start_y);
+    g_bullet_darts[slot].target_x = target_x;
+    g_bullet_darts[slot].target_y = target_y;
+    g_bullet_darts[slot].damage = g_wall.damage;
+
+    int dx = target_x - start_x;
+    int dy = target_y - start_y;
+    int ax = (dx < 0) ? -dx : dx;
+    int ay = (dy < 0) ? -dy : dy;
+    int dist = (ax > ay) ? (ax + (ay >> 1)) : (ay + (ax >> 1));
+    if (dist < 1) dist = 1;
+    g_bullet_darts[slot].dist_remaining = TO_FP(dist);
+
+    int speed = TO_FP(16); // 16 px/frame
+    g_bullet_darts[slot].vx = (dx * speed) / dist;
+    g_bullet_darts[slot].vy = (dy * speed) / dist;
+    return 1;
 }
 
 void wall_fire_socket(int s, int target_x, int target_y) {
     if (s < 0 || s >= WALL_SOCKET_COUNT) return;
+
+    // If socket is actively reloading, cannot fire
+    if (g_wall.is_reloading[s]) return;
+
+    // Out of ammo: trigger reload immediately
+    if (g_wall.ammo[s] <= 0) {
+        g_wall.is_reloading[s] = 1;
+        g_wall.reload_timer[s] = g_wall.reload_time;
+        return;
+    }
 
     int sx = c_wall_sockets[s].x;
     int sy = g_wall.screen_y + c_wall_sockets[s].y;
@@ -431,11 +475,20 @@ void wall_fire_socket(int s, int target_x, int target_y) {
     int dx = tx + (alt == 0 ? pts->dl_x : pts->dr_x);
     int dy = ty + (alt == 0 ? pts->dl_y : pts->dr_y);
 
-    g_wall.muzzle_flash_timer[s] = 2;
-    g_wall.muzzle_flash_barrel[s] = alt;
+    // Spawn bullet dart with guaranteed 1:1 casing match!
+    int spawned = wall_spawn_bullet_dart(mx, my, target_x, target_y);
+    if (spawned) {
+        g_wall.ammo[s]--;
+        wall_spawn_casing(dx, dy, (alt == 0 ? -1 : 1));
+        g_wall.muzzle_flash_timer[s] = 2;
+        g_wall.muzzle_flash_barrel[s] = alt;
 
-    wall_spawn_bullet_dart(mx, my, target_x, target_y);
-    wall_spawn_casing(dx, dy, (alt == 0 ? -1 : 1));
+        // If drum emptied on this shot, automatically start reload cycle
+        if (g_wall.ammo[s] <= 0) {
+            g_wall.is_reloading[s] = 1;
+            g_wall.reload_timer[s] = g_wall.reload_time;
+        }
+    }
 }
 
 void wall_fire_at(int target_x, int target_y) {
@@ -483,6 +536,14 @@ void wall_update(void) {
     if (g_wall.fire_cooldown > 0) g_wall.fire_cooldown--;
 
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        // Active reload progress
+        if (g_wall.is_reloading[s]) {
+            g_wall.reload_timer[s]--;
+            if (g_wall.reload_timer[s] <= 0) {
+                g_wall.ammo[s] = g_wall.max_ammo[s];
+                g_wall.is_reloading[s] = 0;
+            }
+        }
         if (g_wall.turret_cooldown[s] > 0) g_wall.turret_cooldown[s]--;
         if (g_wall.muzzle_flash_timer[s] > 0) {
             g_wall.muzzle_flash_timer[s]--;
@@ -1411,7 +1472,31 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
                 clicked_enemy = e;
             }
         }
-        if (clicked_enemy >= 0) {
+        // Check if touching an active turret socket directly to trigger manual tactical reload!
+        int clicked_turret = 0;
+        int active_mask = 0;
+        if (g_wall.active_turrets == 1) active_mask = (1 << 1);
+        else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
+        else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
+        else active_mask = 0x0F;
+
+        for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+            if (!(active_mask & (1 << s))) continue;
+            int sx = c_wall_sockets[s].x;
+            int sy = g_wall.screen_y + c_wall_sockets[s].y;
+            int ddx = touch.px - sx;
+            int ddy = touch.py - sy;
+            if (ddx * ddx + ddy * ddy <= 18 * 18) {
+                if (g_wall.ammo[s] < g_wall.max_ammo[s] && !g_wall.is_reloading[s]) {
+                    g_wall.is_reloading[s] = 1;
+                    g_wall.reload_timer[s] = g_wall.reload_time;
+                    clicked_turret = 1;
+                    break;
+                }
+            }
+        }
+
+        if (!clicked_turret && clicked_enemy >= 0) {
             g_wall.locked_enemy_idx = clicked_enemy;
             int ex = FROM_FP(g_enemies[clicked_enemy].x);
             int ey = FROM_FP(g_enemies[clicked_enemy].y) - 192;
