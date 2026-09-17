@@ -843,8 +843,9 @@ void game_init(void) {
         g_turrets[t].locked_enemy_idx = -1;
     }
 
-    // Reinitialization must restore the immutable ground layer after a run.
-    tiles_full_screen_refresh();
+    // Rebuild the immutable ground layer so persistent blood is cleared only
+    // when a new run starts, never as part of ordinary frame updates.
+    tiles_init();
 }
 
 void game_start_wave(void) {
