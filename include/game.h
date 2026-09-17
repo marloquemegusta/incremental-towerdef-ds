@@ -336,6 +336,13 @@ typedef struct {
 
     UpgradeTree upgrades;
     DebugSandboxState sandbox;
+
+    // Hardware Profiler Telemetry (in ticks, 33 ticks = 1ms, budget = 545 ticks/frame)
+    int prof_fps;
+    int prof_sim_ticks;
+    int prof_top_ticks;
+    int prof_bot_ticks;
+    int prof_pres_ticks;
 } GameContext;
 
 // Upgrades helper

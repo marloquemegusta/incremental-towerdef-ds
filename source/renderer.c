@@ -724,6 +724,14 @@ void renderer_draw_ui_wave(void) {
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
     top_draw_text(165, 4, buf, COLOR_PHOSPHOR_GREEN);
 
+    // Profiler overlay (when no peak alert is active)
+    if (g_game.wave_timer > 2400 || g_game.wave_timer == 0) {
+        snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d",
+                 g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
+                 g_game.prof_pres_ticks, g_game.prof_sim_ticks);
+        top_draw_text(6, 16, buf, COLOR_WHITE);
+    }
+
     // Peak alert / telegraphing
     if (g_game.wave_timer <= 2400 && g_game.wave_timer > 1800) {
         int peak_sec = (g_game.wave_timer - 1800) / 60;
@@ -760,7 +768,7 @@ void renderer_draw_ui_prep(void) {
 
 void renderer_draw_ui_pause(void) {
     // Top HUD banner
-    top_fill_rect(0, 0, SCREEN_W, 14, COLOR_BLACK);
+    top_fill_rect(0, 0, SCREEN_W, 28, COLOR_BLACK);
     char buf[64];
     snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
     top_draw_text(6, 4, buf, COLOR_AMBER);
@@ -770,6 +778,11 @@ void renderer_draw_ui_pause(void) {
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
     top_draw_text(160, 4, buf, COLOR_PHOSPHOR_GREEN);
+
+    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d",
+             g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
+             g_game.prof_pres_ticks, g_game.prof_sim_ticks);
+    top_draw_text(6, 16, buf, COLOR_WHITE);
 
     int is_fresh = (g_game.wave_timer >= STAGE_DURATION_FRAMES || g_game.enemies_spawned == 0);
 

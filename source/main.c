@@ -10,6 +10,10 @@ int main(void) {
     math_init();
     game_init();
 
+    // Hardware Telemetry Timers (Timer 0: subsystem profiler, Timer 1: 1-sec FPS interval)
+    timerStart(0, ClockDivider_1024, 0, NULL);
+    timerStart(1, ClockDivider_1024, 0, NULL);
+
     while (1) {
         swiWaitForVBlank();
 
@@ -37,7 +41,6 @@ int main(void) {
                 } else if (g_game.mode != MODE_GAME_OVER) {
                     g_game.previous_mode = g_game.mode;
                     g_game.mode = MODE_DEBUG_SANDBOX;
-                    // g_turrets deprecated
                 }
             }
         } else {
@@ -61,7 +64,10 @@ int main(void) {
             game_handle_input_victory(touch, keys_down, keys_held);
         }
 
-        // Simulation update (during active WAVE mode or live SANDBOX mode)
+        // --- SUB-SYSTEM PROFILER START ---
+        timerElapsed(0); // Reset timer 0 baseline
+
+        // 1. Simulation update
         if (g_game.mode == MODE_WAVE) {
             game_update_simulation();
             if (g_game.fast_forward == 2 && g_game.mode == MODE_WAVE) {
@@ -70,14 +76,16 @@ int main(void) {
         } else if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.run_sim) {
             game_update_simulation();
         }
+        uint16_t sim_t = timerElapsed(0);
 
-        // Visual render (Top Screen: Continuous Urban Ground + Inbound Swarm)
+        // 2. Visual render Top Screen
         renderer_draw_battlefield_top();
         renderer_draw_splatters_top();
         renderer_draw_enemies_top();
         renderer_draw_death_particles_top();
+        uint16_t top_t = timerElapsed(0);
 
-        // Visual render (Bottom Screen: Urban Ground + Bunker + Turrets + Inbound Swarm + UI)
+        // 3. Visual render Bottom Screen
         if (g_game.mode == MODE_UPGRADES) {
             renderer_draw_ui_upgrades();
         } else if (g_game.mode == MODE_CALIBRATION) {
@@ -89,8 +97,6 @@ int main(void) {
             renderer_draw_wall(); // 3D Depth: Wall parapet occludes enemy heads & front limbs
             renderer_draw_bullets();
             renderer_draw_death_particles_bottom();
-
-            // Legacy placed turrets removed - WallPlatform is unified defense
 
             if (g_game.mode == MODE_PREPARATION || g_game.mode == MODE_PAUSED) {
                 renderer_draw_ui_pause();
@@ -104,10 +110,41 @@ int main(void) {
                 renderer_draw_ui_sandbox();
             }
         }
+        uint16_t bot_t = timerElapsed(0);
 
-        // Synchronized presentation for both screens
+        // 4. Synchronized presentation for both screens
         renderer_present();
         top_screen_present();
+        uint16_t pres_t = timerElapsed(0);
+
+        // 5. Aggregate metrics
+        static int s_prof_frames = 0;
+        static uint32_t s_sum_sim = 0, s_sum_top = 0, s_sum_bot = 0, s_sum_pres = 0;
+        static uint32_t s_timer1_accum = 0;
+        static int s_fps_counter = 0;
+
+        s_sum_sim += sim_t;
+        s_sum_top += top_t;
+        s_sum_bot += bot_t;
+        s_sum_pres += pres_t;
+        s_prof_frames++;
+        s_fps_counter++;
+
+        uint16_t t1_delta = timerElapsed(1);
+        s_timer1_accum += t1_delta;
+        if (s_timer1_accum >= 32728) { // 1.0 real second elapsed
+            g_game.prof_fps = s_fps_counter;
+            s_fps_counter = 0;
+            s_timer1_accum -= 32728;
+            if (s_prof_frames > 0) {
+                g_game.prof_sim_ticks = s_sum_sim / s_prof_frames;
+                g_game.prof_top_ticks = s_sum_top / s_prof_frames;
+                g_game.prof_bot_ticks = s_sum_bot / s_prof_frames;
+                g_game.prof_pres_ticks = s_sum_pres / s_prof_frames;
+                s_sum_sim = s_sum_top = s_sum_bot = s_sum_pres = 0;
+                s_prof_frames = 0;
+            }
+        }
     }
 
     return 0;
