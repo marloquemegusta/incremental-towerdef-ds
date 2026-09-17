@@ -1,6 +1,9 @@
 #include "game.h"
 
 int main(void) {
+    // Adaptive simulation keeps real-time progression when rendering is saturated.
+    // It is intentionally capped at 3 total simulation ticks per displayed frame.
+    static int s_adaptive_steps = 1;
     // Both screens initialized in renderer_init:
     // Bottom Screen: Direct Framebuffer Mode FB0
     // Top Screen: Sub-engine 16-bit Bitmap BG3 Mode 5
@@ -69,8 +72,10 @@ int main(void) {
 
         // 1. Simulation update
         if (g_game.mode == MODE_WAVE) {
-            game_update_simulation();
-            if (g_game.fast_forward == 2 && g_game.mode == MODE_WAVE) {
+            int sim_steps = s_adaptive_steps;
+            if (g_game.fast_forward == 2) sim_steps *= 2;
+            if (sim_steps > 3) sim_steps = 3;
+            for (int step = 0; step < sim_steps && g_game.mode == MODE_WAVE; step++) {
                 game_update_simulation();
             }
         } else if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.run_sim) {
@@ -134,6 +139,16 @@ int main(void) {
         s_timer1_accum += t1_delta;
         if (s_timer1_accum >= 32728) { // 1.0 real second elapsed
             g_game.prof_fps = s_fps_counter;
+            // Choose the next-second simulation budget from measured display FPS.
+            // Hysteresis avoids oscillating at the threshold; the cap above keeps
+            // a saturated frame from recursively multiplying its own workload.
+            if (g_game.prof_fps <= 20) {
+                s_adaptive_steps = 3;
+            } else if (g_game.prof_fps <= 30) {
+                s_adaptive_steps = 2;
+            } else if (g_game.prof_fps >= 45) {
+                s_adaptive_steps = 1;
+            }
             s_fps_counter = 0;
             s_timer1_accum -= 32728;
             if (s_prof_frames > 0) {

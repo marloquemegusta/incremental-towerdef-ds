@@ -842,6 +842,9 @@ void game_init(void) {
         g_turrets[t].fire_interval = 18;
         g_turrets[t].locked_enemy_idx = -1;
     }
+
+    // Reinitialization must restore the immutable ground layer after a run.
+    tiles_full_screen_refresh();
 }
 
 void game_start_wave(void) {
