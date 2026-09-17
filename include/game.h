@@ -81,6 +81,11 @@ typedef struct {
     int anim_distance;   // Q8 distance accumulated for the next walk pose
     int biting_target;   // -1=None/Marching, 0..3=Turret ID, 99=Bunker Sanctum
     int bite_timer;
+
+    // 60fps Dirty Rects tracking
+    int prev_draw_x, prev_draw_y;
+    int prev_drawn_w, prev_drawn_h;
+    int prev_drawn_screen; // 0=none, 1=top, 2=bottom
 } Enemy;
 
 typedef struct {
@@ -127,6 +132,9 @@ typedef struct {
     int active;
     int turret_idx;
     uint64_t damage;
+
+    int prev_x, prev_y;
+    int prev_active;
 } Bullet;
 
 typedef struct {
@@ -145,6 +153,9 @@ typedef struct {
     int size;
     int active;
     uint16_t color;
+
+    int prev_x, prev_y;
+    int prev_screen; // 0=none, 1=top, 2=bottom
 } DeathParticle;
 
 typedef struct {
