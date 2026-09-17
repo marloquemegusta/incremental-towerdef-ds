@@ -19,6 +19,7 @@
 #define MAX_TURRETS 4
 #define MAX_CASINGS 64
 #define MAX_BULLET_DARTS 64
+#define WALL_TURRET_RANGE 96
 
 // Fixed point math: Q8 (256 = 1.0)
 #define FP_SHIFT 8
@@ -161,6 +162,7 @@ typedef struct {
     int target_x, target_y;
     int dist_remaining;// Q8 distance remaining
     int damage;
+    int range;           // Maximum ballistic reach in px
     int active;
 } BulletDart;
 
@@ -180,6 +182,7 @@ typedef struct {
     int fire_cooldown;   // Global tap throttle
     int fire_interval;
     int damage;
+    int range;           // Maximum ballistic reach in px
     int locked_enemy_idx;// Player-designated priority target (-1 if none)
 } WallPlatform;
 
@@ -376,6 +379,7 @@ void renderer_draw_text(int x, int y, const char *str, uint16_t color);
 
 void renderer_draw_battlefield_bottom(void);
 void renderer_draw_wall(void);
+void renderer_draw_range_perimeter(void);
 void renderer_draw_battlefield_top(void);
 void renderer_draw_turret(const Turret *t, int is_selected);
 void renderer_draw_enemies_bottom(void);

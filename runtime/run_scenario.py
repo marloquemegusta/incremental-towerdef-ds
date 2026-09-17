@@ -104,8 +104,8 @@ def main() -> int:
             if "button_up" in step:
                 keypad = set_button(lib, keypad, step["button_up"], False)
                 events.append({"step": index, "action": "button_up", "button": step["button_up"]})
-            if "tap" in step:
-                point = step["tap"]
+            if "tap" in step or "touch" in step:
+                point = step.get("tap") or step.get("touch")
                 lib.desmume_input_set_touch_pos(point["x"], point["y"])
                 events.append({"step": index, "action": "tap", "x": point["x"], "y": point["y"]})
             if "drag" in step:
@@ -127,13 +127,16 @@ def main() -> int:
             capture_seq = step.get("capture_sequence")
             capture_every = max(1, int(step.get("capture_every", 1)))
             frame_count = step.get("frames", 1)
-            seq_index = 0
+            if "seq_indices" not in locals():
+                seq_indices = {}
+            if capture_seq and capture_seq not in seq_indices:
+                seq_indices[capture_seq] = 0
             for f in range(frame_count):
                 lib.desmume_cycle(0)
                 if capture_seq and (f % capture_every == 0):
-                    cname = f"{capture_seq}_{seq_index:04d}"
+                    cname = f"{capture_seq}_{seq_indices[capture_seq]:04d}"
                     capture(lib, output / f"{cname}.png")
-                    seq_index += 1
+                    seq_indices[capture_seq] += 1
             events.append({"step": index, "action": "frame_advance", "frames": frame_count,
                            "keypad": int(lib.desmume_input_keypad_get())})
             if "capture" in step:

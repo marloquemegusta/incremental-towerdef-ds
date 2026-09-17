@@ -311,6 +311,46 @@ void renderer_draw_wall(void) {
     }
 }
 
+void renderer_draw_range_perimeter(void) {
+    int active_mask = 0;
+    if (g_wall.active_turrets == 1) active_mask = (1 << 1);
+    else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
+    else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
+    else active_mask = 0x0F;
+
+    int r = g_wall.range;
+    int r_sq = r * r;
+
+    // Stenciled tactical range line across the road
+    for (int x = 40; x < 216; x++) {
+        int min_y = 999;
+        for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+            if (!(active_mask & (1 << s))) continue;
+            int sx = c_wall_sockets[s].x;
+            int sy = g_wall.screen_y + c_wall_sockets[s].y;
+            int dx = x - sx;
+            if (dx * dx <= r_sq) {
+                int dy = 0;
+                while ((dy + 1) * (dy + 1) <= (r_sq - dx * dx)) dy++;
+                int y = sy - dy;
+                if (y < min_y) min_y = y;
+            }
+        }
+
+        if (min_y > 20 && min_y < g_wall.screen_y) {
+            // Dashed military line: 4 px line, 4 px gap
+            if ((x / 4) % 2 == 0) {
+                g_backbuffer[(min_y + 1) * SCREEN_W + x] = RGB15(6, 6, 8) | BIT(15);
+                g_backbuffer[min_y * SCREEN_W + x] = RGB15(26, 20, 5) | BIT(15);
+                if ((x % 16) == 0) {
+                    g_backbuffer[(min_y + 2) * SCREEN_W + x] = RGB15(28, 22, 6) | BIT(15);
+                    g_backbuffer[(min_y + 3) * SCREEN_W + x] = RGB15(22, 16, 4) | BIT(15);
+                }
+            }
+        }
+    }
+}
+
 void renderer_draw_battlefield_bottom(void) {
     tiles_render_urban_ground(g_backbuffer, 192);
     // Sanctum bunker placed at bottom center (128, 172)

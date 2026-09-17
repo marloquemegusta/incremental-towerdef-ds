@@ -298,6 +298,7 @@ void wall_init(void) {
     g_wall.fire_cooldown = 0;
     g_wall.fire_interval = 6; // ~10 shots/sec per turret
     g_wall.damage = 10;
+    g_wall.range = WALL_TURRET_RANGE;
     g_wall.locked_enemy_idx = -1;
 }
 
@@ -352,7 +353,7 @@ void wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y
             if (dist < 1) dist = 1;
             g_bullet_darts[i].dist_remaining = TO_FP(dist);
 
-            int speed = TO_FP(22); // 22 px/frame
+            int speed = TO_FP(16); // 16 px/frame
             g_bullet_darts[i].vx = (dx * speed) / dist;
             g_bullet_darts[i].vy = (dy * speed) / dist;
             break;
@@ -362,10 +363,16 @@ void wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y
 
 void wall_fire_socket(int s, int target_x, int target_y) {
     if (s < 0 || s >= WALL_SOCKET_COUNT) return;
-    g_wall.turret_cooldown[s] = g_wall.fire_interval;
 
     int sx = c_wall_sockets[s].x;
     int sy = g_wall.screen_y + c_wall_sockets[s].y;
+
+    // Strict range verification: do not fire outside effective range!
+    int tdx = target_x - sx;
+    int tdy = target_y - sy;
+    if (tdx * tdx + tdy * tdy > g_wall.range * g_wall.range) return;
+
+    g_wall.turret_cooldown[s] = g_wall.fire_interval;
 
     int angle = g_wall.turret_angles[s];
     int alt = g_wall.barrel_alt[s];
@@ -401,14 +408,22 @@ void wall_fire_at(int target_x, int target_y) {
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
         if (!(active_mask & (1 << s))) continue;
         int sx = c_wall_sockets[s].x;
-        int dist = (sx > target_x) ? (sx - target_x) : (target_x - sx);
-        if (dist < best_dist) {
-            best_dist = dist;
-            best_sock = s;
+        int sy = g_wall.screen_y + c_wall_sockets[s].y;
+        int dx = target_x - sx;
+        int dy = target_y - sy;
+        int dsq = dx * dx + dy * dy;
+        // Candidate socket must be in range of target!
+        if (dsq <= g_wall.range * g_wall.range) {
+            int h_dist = (dx < 0) ? -dx : dx;
+            if (h_dist < best_dist) {
+                best_dist = h_dist;
+                best_sock = s;
+            }
         }
     }
 
-    if (best_sock < 0) best_sock = 1;
+    // If point is out of range for all active turrets, do not fire!
+    if (best_sock < 0) return;
 
     int sx = c_wall_sockets[best_sock].x;
     int sy = g_wall.screen_y + c_wall_sockets[best_sock].y;
@@ -497,63 +512,87 @@ void wall_update(void) {
             g_wall.traverse_timer[s] = 0;
         }
 
-        // Auto-firing when aligned and enemy is in firing zone
+        // Auto-firing: only when enemy is physically inside bottom screen AND within battery range!
         if (auto_fire && g_wall.turret_cooldown[s] == 0 && target_e >= 0) {
             int gy = FROM_FP(g_enemies[target_e].y);
-            if (gy >= 160 && gy < 192 + g_wall.screen_y) {
-                int angle_diff = g_wall.turret_angles[s] - g_wall.target_angles[s];
-                if (angle_diff >= -1 && angle_diff <= 1) {
-                    int gx = FROM_FP(g_enemies[target_e].x);
-                    int local_gy = gy - 192;
-                    int evx = FROM_FP(g_enemies[target_e].vx);
-                    int evy = FROM_FP(g_enemies[target_e].vy);
-                    int pred_x = gx + (evx * 2);
-                    int pred_y = local_gy + (evy * 2);
-                    wall_fire_socket(s, pred_x, pred_y);
+            // Enemy must be on bottom screen (gy >= 192) and in front of wall
+            if (gy >= 192 && gy < 192 + g_wall.screen_y) {
+                int gx = FROM_FP(g_enemies[target_e].x);
+                int local_gy = gy - 192;
+                int tdx = gx - sx;
+                int tdy = local_gy - sy;
+                // Strict Euclidean distance within range
+                if (tdx * tdx + tdy * tdy <= g_wall.range * g_wall.range) {
+                    int angle_diff = g_wall.turret_angles[s] - g_wall.target_angles[s];
+                    if (angle_diff >= -1 && angle_diff <= 1) {
+                        int evx = FROM_FP(g_enemies[target_e].vx);
+                        int evy = FROM_FP(g_enemies[target_e].vy);
+                        int pred_x = gx + evx;
+                        int pred_y = local_gy + evy;
+                        wall_fire_socket(s, pred_x, pred_y);
+                    }
                 }
             }
         }
     }
 
-    // Update Bullet Darts
+    // Update Bullet Darts with sub-stepping (prevents tunneling through fast enemies)
     for (int i = 0; i < MAX_BULLET_DARTS; i++) {
         if (!g_bullet_darts[i].active) continue;
-        g_bullet_darts[i].x += g_bullet_darts[i].vx;
-        g_bullet_darts[i].y += g_bullet_darts[i].vy;
-
-        int step = TO_FP(22);
-        g_bullet_darts[i].dist_remaining -= step;
-
-        int cur_x = FROM_FP(g_bullet_darts[i].x);
-        int cur_y = FROM_FP(g_bullet_darts[i].y);
 
         int hit_enemy = 0;
-        int gy = cur_y + 192;
-        for (int e = 0; e < MAX_ENEMIES; e++) {
-            if (!g_enemies[e].active) continue;
-            int ex = FROM_FP(g_enemies[e].x);
-            int ey = FROM_FP(g_enemies[e].y);
-            int ddx = cur_x - ex;
-            int ddy = gy - ey;
-            if (ddx * ddx + ddy * ddy <= 14 * 14) {
-                if (g_enemies[e].hp > (uint64_t)g_bullet_darts[i].damage) {
-                    g_enemies[e].hp -= g_bullet_darts[i].damage;
-                } else {
-                    g_enemies[e].hp = 0;
-                    g_enemies[e].active = 0;
-                    g_game.enemies_killed++;
-                    g_game.scrap += (5 * (g_enemies[e].variant + 1));
-                    game_spawn_death_gore(ex, ey, g_bullet_darts[i].vx, g_bullet_darts[i].vy, g_enemies[e].variant);
-                }
-                hit_enemy = 1;
+        int hit_e_idx = -1;
+        int hit_x = 0, hit_y = 0;
+
+        // 2 sub-steps of 8 px per frame (16 px/frame bullet velocity)
+        for (int step = 0; step < 2; step++) {
+            g_bullet_darts[i].x += (g_bullet_darts[i].vx / 2);
+            g_bullet_darts[i].y += (g_bullet_darts[i].vy / 2);
+            g_bullet_darts[i].dist_remaining -= (TO_FP(16) / 2);
+
+            int cur_x = FROM_FP(g_bullet_darts[i].x);
+            int cur_y = FROM_FP(g_bullet_darts[i].y);
+            int gy = cur_y + 192;
+
+            if (cur_y < 0 || cur_x < 0 || cur_x >= SCREEN_W) {
+                hit_enemy = 2; // Exited battlefield
                 break;
             }
+
+            for (int e = 0; e < MAX_ENEMIES; e++) {
+                if (!g_enemies[e].active) continue;
+                int ex = FROM_FP(g_enemies[e].x);
+                int ey = FROM_FP(g_enemies[e].y);
+                int ddx = cur_x - ex;
+                int ddy = gy - ey;
+                if (ddx * ddx + ddy * ddy <= 12 * 12) {
+                    hit_enemy = 1;
+                    hit_e_idx = e;
+                    hit_x = cur_x;
+                    hit_y = gy;
+                    break;
+                }
+            }
+            if (hit_enemy) break;
         }
 
-        if (hit_enemy || g_bullet_darts[i].dist_remaining <= 0 || cur_y < 0) {
-            for (int k = 0; k < 4; k++) {
-                game_add_splatter_ex(cur_x, gy, COLOR_BOLTER_TRACER, 0, 15);
+        if (hit_enemy == 1 && hit_e_idx >= 0) {
+            // Kinetic impact spark burst on target
+            for (int k = 0; k < 3; k++) {
+                game_add_splatter_ex(hit_x, hit_y, COLOR_BOLTER_TRACER, 0, 8);
             }
+            if (g_enemies[hit_e_idx].hp > (uint64_t)g_bullet_darts[i].damage) {
+                g_enemies[hit_e_idx].hp -= g_bullet_darts[i].damage;
+            } else {
+                g_enemies[hit_e_idx].hp = 0;
+                g_enemies[hit_e_idx].active = 0;
+                g_game.enemies_killed++;
+                g_game.scrap += (5 * (g_enemies[hit_e_idx].variant + 1));
+                game_spawn_death_gore(hit_x, hit_y, g_bullet_darts[i].vx, g_bullet_darts[i].vy, g_enemies[hit_e_idx].variant);
+            }
+            g_bullet_darts[i].active = 0;
+        } else if (hit_enemy == 2 || g_bullet_darts[i].dist_remaining <= 0) {
+            // Dissipate cleanly when reaching max range without false ground splatters
             g_bullet_darts[i].active = 0;
         }
     }
