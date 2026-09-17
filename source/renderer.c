@@ -9,25 +9,6 @@ uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 static u16 *s_top_vram = NULL;
 static int s_top_bg = 0;
 
-static int splatter_radius(int size) {
-    return (size <= 1) ? 2 : ((size == 2) ? 4 : ((size == 3) ? 6 : 9));
-}
-
-static void draw_splatter(uint16_t *buffer, int cx, int cy, int radius, uint16_t color) {
-    if (!buffer) return;
-    int x0 = (cx - radius < 0) ? 0 : cx - radius;
-    int y0 = (cy - radius < 0) ? 0 : cy - radius;
-    int x1 = (cx + radius >= SCREEN_W) ? SCREEN_W - 1 : cx + radius;
-    int y1 = (cy + radius >= SCREEN_H) ? SCREEN_H - 1 : cy + radius;
-    for (int y = y0; y <= y1; y++) {
-        int dy = y - cy;
-        for (int x = x0; x <= x1; x++) {
-            int dx = x - cx;
-            if (dx * dx + dy * dy <= radius * radius) buffer[y * SCREEN_W + x] = color;
-        }
-    }
-}
-
 #include "turret_data.h"
 
 void format_number_compact(char *buf, size_t buf_size, uint64_t val) {
@@ -630,10 +611,11 @@ void renderer_draw_enemies_top(void) {
         }
 
         // Tight bounding box tailored to enemy variant
-        int ew = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 40 : 32);
-        int eh = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 44 : 32);
+        // Include flying shadows, altitude offsets and rotated animation canvases.
+        int ew = 96;
+        int eh = 96;
         g_enemies[i].prev_top_x = gx - ew / 2;
-        g_enemies[i].prev_top_y = gy - 16;
+        g_enemies[i].prev_top_y = gy - eh / 2;
         g_enemies[i].prev_top_w = ew;
         g_enemies[i].prev_top_h = eh;
         g_enemies[i].prev_top_active = 1;
@@ -687,10 +669,10 @@ void renderer_draw_enemies_bottom(void) {
         }
 
         // Tight bounding box tailored to enemy variant
-        int ew = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 40 : 32);
-        int eh = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 44 : 32);
+        int ew = 96;
+        int eh = 96;
         g_enemies[i].prev_bot_x = gx - ew / 2;
-        g_enemies[i].prev_bot_y = ly - 16;
+        g_enemies[i].prev_bot_y = ly - eh / 2;
         g_enemies[i].prev_bot_w = ew;
         g_enemies[i].prev_bot_h = eh;
         g_enemies[i].prev_bot_active = 1;
@@ -716,24 +698,11 @@ void renderer_draw_bullets(void) {
 }
 
 void renderer_draw_splatters_top(void) {
-    for (int i = 0; i < MAX_SPLATTERS; i++) {
-        Splatter *s = &g_splatters[i];
-        if (s->life <= 0 || s->y < 0 || s->y >= SCREEN_H) continue;
-        int r = splatter_radius(s->size);
-        draw_splatter(g_top_backbuffer, s->x, s->y, r, s->color);
-        s->prev_top_x = s->x; s->prev_top_y = s->y; s->prev_top_r = r; s->prev_top_active = 1;
-    }
+    // Persistent blood is already stored in the ground cache.
 }
 
 void renderer_draw_splatters_bottom(void) {
-    for (int i = 0; i < MAX_SPLATTERS; i++) {
-        Splatter *s = &g_splatters[i];
-        int y = s->y - 192;
-        if (s->life <= 0 || y < 0 || y >= SCREEN_H) continue;
-        int r = splatter_radius(s->size);
-        draw_splatter(g_backbuffer, s->x, y, r, s->color);
-        s->prev_bot_x = s->x; s->prev_bot_y = y; s->prev_bot_r = r; s->prev_bot_active = 1;
-    }
+    // Persistent blood is already stored in the ground cache.
 }
 
 void renderer_draw_death_particles_top(void) {
