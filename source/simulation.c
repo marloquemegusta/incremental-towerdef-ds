@@ -590,33 +590,34 @@ void wall_update(void) {
 
     int auto_fire = (g_game.upgrades.auto_target > 0) || (g_game.mode == MODE_DEBUG_SANDBOX);
 
+    int global_auto_target_e = -1;
+    if (g_wall.locked_enemy_idx >= 0) {
+        global_auto_target_e = g_wall.locked_enemy_idx;
+    } else if (auto_fire) {
+        int best_score = -99999;
+        for (int e = 0; e < MAX_ENEMIES; e++) {
+            if (!g_enemies[e].active) continue;
+            int gx = FROM_FP(g_enemies[e].x);
+            int gy = FROM_FP(g_enemies[e].y);
+            if (gy > 192 + g_wall.screen_y + 10) continue; // Behind wall
+
+            int h_dist = (gx > 128) ? (gx - 128) : (128 - gx);
+            int v_score = (gy >= 192) ? (gy * 3) : gy;
+            int score = v_score - h_dist;
+            if (score > best_score) {
+                best_score = score;
+                global_auto_target_e = e;
+            }
+        }
+    }
+
     // Aiming, tracking, and firing for each active socket
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
         if (!(active_mask & (1 << s))) continue;
         int sx = c_wall_sockets[s].x;
         int sy = g_wall.screen_y + c_wall_sockets[s].y;
 
-        int target_e = -1;
-        if (g_wall.locked_enemy_idx >= 0) {
-            target_e = g_wall.locked_enemy_idx;
-        } else if (auto_fire) {
-            int best_score = -99999;
-            for (int e = 0; e < MAX_ENEMIES; e++) {
-                if (!g_enemies[e].active) continue;
-                int gx = FROM_FP(g_enemies[e].x);
-                int gy = FROM_FP(g_enemies[e].y);
-                if (gy > 192 + g_wall.screen_y + 10) continue; // Behind wall
-
-                int h_dist = (gx > sx) ? (gx - sx) : (sx - gx);
-                int v_score = (gy >= 192) ? (gy * 3) : gy;
-                int score = v_score - h_dist;
-                if (score > best_score) {
-                    best_score = score;
-                    target_e = e;
-                }
-            }
-        }
-
+        int target_e = global_auto_target_e;
         g_wall.target_enemy_idx[s] = target_e;
 
         // Desired angle towards target (or default stance if no target)
@@ -1012,25 +1013,24 @@ void game_update_simulation(void) {
             if (spd < 1) spd = 1;
         }
 
-        // 4b. Soft separation repulsion between nearby enemies to prevent stacking/overlap
+        // 4b. Soft separation repulsion between nearby marching enemies
         int sep_force_x = 0;
-        int sep_force_y = 0;
-        for (int j = 0; j < MAX_ENEMIES; j++) {
-            if (i == j || !g_enemies[j].active) continue;
-            int ody = ey - g_enemies[j].y;
-            int aody = (ody < 0) ? -ody : ody;
-            if (aody >= TO_FP(16)) continue;
-            int odx = ex - g_enemies[j].x;
-            int aodx = (odx < 0) ? -odx : odx;
-            if (aodx >= TO_FP(16)) continue;
+        if (py < 336 && ((i & 1) == (g_game.sim_ticks_elapsed & 1))) {
+            for (int j = 0; j < MAX_ENEMIES; j++) {
+                if (i == j || !g_enemies[j].active) continue;
+                int ody = ey - g_enemies[j].y;
+                int aody = (ody < 0) ? -ody : ody;
+                if (aody >= TO_FP(16)) continue;
+                int odx = ex - g_enemies[j].x;
+                int aodx = (odx < 0) ? -odx : odx;
+                if (aodx >= TO_FP(16)) continue;
 
-            int dist_sq = (aodx >> FP_SHIFT) * (aodx >> FP_SHIFT) + (aody >> FP_SHIFT) * (aody >> FP_SHIFT);
-            if (dist_sq < (16 * 16) && dist_sq > 0) {
-                int push = TO_FP(1) / 3;
-                if (odx > 0) sep_force_x += push;
-                else if (odx < 0) sep_force_x -= push;
-                if (ody > 0) sep_force_y += push / 2;
-                else if (ody < 0) sep_force_y -= push / 2;
+                int dist_sq = (aodx >> FP_SHIFT) * (aodx >> FP_SHIFT) + (aody >> FP_SHIFT) * (aody >> FP_SHIFT);
+                if (dist_sq < (16 * 16) && dist_sq > 0) {
+                    int push = TO_FP(1) / 2;
+                    if (odx > 0) sep_force_x += push;
+                    else if (odx < 0) sep_force_x -= push;
+                }
             }
         }
         ex += sep_force_x;
@@ -1117,7 +1117,7 @@ void game_update_simulation(void) {
         }
 
         // Advance: straight vertical downward in parallel lanes across both screens
-        g_enemies[i].y += spd + sep_force_y;
+        g_enemies[i].y += spd;
         g_enemies[i].vy = spd;
         g_enemies[i].vx = sep_force_x;
 
