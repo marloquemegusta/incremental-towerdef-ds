@@ -1479,59 +1479,7 @@ void wall_draw_base(uint16_t *buffer, int wall_screen_y, uint64_t hp, uint64_t m
         }
     }
 
-    // 2. Diegetic Sanctum Aegis Cathode Display in Central Bulkhead (x=116..139, y=33..35)
-    if (max_hp > 0) {
-        int num_cells = 8;
-        int filled_cells = (int)((hp * num_cells + max_hp / 2) / max_hp);
-        if (hp > 0 && filled_cells == 0) filled_cells = 1;
-        if (filled_cells > num_cells) filled_cells = num_cells;
-
-        uint16_t c_hi, c_mid, c_lo;
-        if (hp * 2 > max_hp) {
-            // Healthy (>50%): Emerald Phosphor
-            c_hi  = RGB15(16, 31, 20) | BIT(15);
-            c_mid = RGB15(4, 26, 8)   | BIT(15);
-            c_lo  = RGB15(1, 15, 4)   | BIT(15);
-        } else if (hp * 4 > max_hp) {
-            // Damaged (25..50%): Amber Caution
-            c_hi  = RGB15(31, 28, 12) | BIT(15);
-            c_mid = RGB15(30, 18, 2)  | BIT(15);
-            c_lo  = RGB15(18, 9, 1)   | BIT(15);
-        } else {
-            // Critical (<25%): Crimson Hazard
-            c_hi  = RGB15(31, 16, 16) | BIT(15);
-            c_mid = RGB15(28, 3, 3)   | BIT(15);
-            c_lo  = RGB15(14, 1, 1)   | BIT(15);
-        }
-        uint16_t c_depleted = RGB15(2, 3, 4) | BIT(15);
-
-        for (int i = 0; i < num_cells; i++) {
-            int px = 116 + i * 3;
-            if (px + 1 >= SCREEN_W) break;
-
-            int is_lit = (i < filled_cells);
-            uint16_t col0 = is_lit ? c_hi  : c_depleted;
-            uint16_t col1 = is_lit ? c_mid : c_depleted;
-            uint16_t col2 = is_lit ? c_lo  : c_depleted;
-
-            int py0 = wall_screen_y + 33;
-            int py1 = wall_screen_y + 34;
-            int py2 = wall_screen_y + 35;
-
-            if (py0 >= 0 && py0 < SCREEN_H) {
-                buffer[py0 * SCREEN_W + px]     = col0;
-                buffer[py0 * SCREEN_W + px + 1] = col0;
-            }
-            if (py1 >= 0 && py1 < SCREEN_H) {
-                buffer[py1 * SCREEN_W + px]     = col1;
-                buffer[py1 * SCREEN_W + px + 1] = col1;
-            }
-            if (py2 >= 0 && py2 < SCREEN_H) {
-                buffer[py2 * SCREEN_W + px]     = col2;
-                buffer[py2 * SCREEN_W + px + 1] = col2;
-            }
-        }
-    }
+    // Central bulkhead armored plate (clean diegetic metal)
 }
 
 void wall_draw_turret_sprite(uint16_t *buffer, int dest_x, int dest_y, int angle_idx) {

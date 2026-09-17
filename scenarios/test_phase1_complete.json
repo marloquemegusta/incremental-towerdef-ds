@@ -1,0 +1,116 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 10,
+      "capture_sequence": "phase1",
+      "capture_every": 2,
+      "capture": "phase1_prep"
+    },
+    {
+      "tap": {
+        "x": 220,
+        "y": 170
+      },
+      "frames": 5,
+      "capture_sequence": "phase1",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 25,
+      "capture_sequence": "phase1",
+      "capture_every": 2
+    },
+    {
+      "tap": {
+        "x": 100,
+        "y": 100
+      },
+      "frames": 5,
+      "capture_sequence": "phase1",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 10,
+      "capture_sequence": "phase1",
+      "capture_every": 2,
+      "capture": "after_empty_tap"
+    },
+    {
+      "release": true,
+      "frames": 360,
+      "capture_sequence": "phase1",
+      "capture_every": 10,
+      "capture": "larva_in_range"
+    },
+    {
+      "tap": {
+        "x": 128,
+        "y": 80
+      },
+      "frames": 4,
+      "capture_sequence": "phase1",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 15,
+      "capture_sequence": "phase1",
+      "capture_every": 2
+    },
+    {
+      "tap": {
+        "x": 128,
+        "y": 85
+      },
+      "frames": 4,
+      "capture_sequence": "phase1",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 15,
+      "capture_sequence": "phase1",
+      "capture_every": 2
+    },
+    {
+      "drag": {
+        "from": {
+          "x": 128,
+          "y": 166
+        },
+        "to": {
+          "x": 88,
+          "y": 136
+        },
+        "frames": 24
+      },
+      "frames": 5,
+      "capture_sequence": "phase1",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 30,
+      "capture_sequence": "phase1",
+      "capture_every": 2,
+      "capture": "after_reload"
+    },
+    {
+      "release": true,
+      "frames": 150,
+      "capture_sequence": "phase1",
+      "capture_every": 10,
+      "capture": "phase1_end"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "phase1_prep",
+      "to": "phase1_end",
+      "min_changed_pixels": 100
+    }
+  }
+}

@@ -72,6 +72,7 @@ typedef struct {
     int vx, vy;          // Q8 velocities for lead-target prediction
     uint64_t hp;
     uint64_t max_hp;
+    uint64_t incoming_damage; // Anti-overkill virtual health damage in flight
     int active;
     int speed;           // Q8 speed
     int variant;         // 0..5 (Biocaste Tier)
@@ -164,6 +165,7 @@ typedef struct {
     int damage;
     int range;           // Maximum ballistic reach in px
     int active;
+    int target_enemy_idx; // Tracked enemy index (-1 if none)
 } BulletDart;
 
 typedef struct {
@@ -182,17 +184,27 @@ typedef struct {
 
     // Ammo, Magazine & Reload Logistics Schema
     int ammo[4];         // Current rounds in magazine for each socket
-    int max_ammo[4];     // Drum capacity per socket (default 30)
+    int max_ammo[4];     // Drum capacity per socket (default 10 in Phase 1)
     int reload_timer[4]; // Frames remaining in active reload cycle
     int reload_time;     // Base reload duration (default 90 frames = 1.5s)
-    int is_reloading[4]; // 1 if socket is currently reloading
+    int is_reloading[4]; // 1 if socket is empty / requires manual reload
 
-    int fire_cooldown;   // Global tap throttle
-    int fire_interval;   // Fire rate (frames between rounds, default 6)
-    int damage;          // Damage per bullet impact (default 10)
-    int range;           // Effective ballistic radius in px (default 96)
+    int battery_fire_step; // Metronome round-robin counter alternating turrets and barrels
+    int fire_cooldown;   // Global wall battery cadence throttle
+    int fire_interval;   // Fire rate (frames between rounds, default 12 for 1 turret)
+    int damage;          // Damage per bullet impact (default 1)
+    int range;           // Effective ballistic radius in px (default 80, reach to Y=64)
+    int range_line_y;    // Straight horizontal range perimeter line (default 64)
     int locked_enemy_idx;// Player-designated priority target (-1 if none)
 } WallPlatform;
+
+#define AMMO_DEPOT_X 128
+#define AMMO_DEPOT_Y 166
+#define AMMO_DEPOT_W 24
+#define AMMO_DEPOT_H 16
+
+void wall_reload_socket(int socket_idx);
+void wall_fire_at_target(int target_x, int target_y, int enemy_idx);
 
 typedef enum {
     MODE_PREPARATION = 0,
@@ -344,7 +356,7 @@ void wall_fire_at(int target_x, int target_y);
 void wall_fire_socket(int socket_idx, int target_x, int target_y);
 int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_y);
 void wall_spawn_casing(int x, int y, int dir_sign);
-int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y);
+int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y, int target_enemy_idx);
 extern uint16_t g_backbuffer[SCREEN_W * SCREEN_H];
 extern uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H];
 
