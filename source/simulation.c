@@ -289,9 +289,16 @@ void wall_init(void) {
     g_wall.turret_angles[1] = 1; // NNW
     g_wall.turret_angles[2] = 3; // NNE
     g_wall.turret_angles[3] = 4; // NE
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        g_wall.target_angles[s] = g_wall.turret_angles[s];
+        g_wall.target_enemy_idx[s] = -1;
+        g_wall.turret_cooldown[s] = 0;
+        g_wall.traverse_timer[s] = 0;
+    }
     g_wall.fire_cooldown = 0;
-    g_wall.fire_interval = 4; // 15 shots/sec
+    g_wall.fire_interval = 6; // ~10 shots/sec per turret
     g_wall.damage = 10;
+    g_wall.locked_enemy_idx = -1;
 }
 
 int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_y) {
@@ -353,9 +360,35 @@ void wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y
     }
 }
 
+void wall_fire_socket(int s, int target_x, int target_y) {
+    if (s < 0 || s >= WALL_SOCKET_COUNT) return;
+    g_wall.turret_cooldown[s] = g_wall.fire_interval;
+
+    int sx = c_wall_sockets[s].x;
+    int sy = g_wall.screen_y + c_wall_sockets[s].y;
+
+    int angle = g_wall.turret_angles[s];
+    int alt = g_wall.barrel_alt[s];
+    g_wall.barrel_alt[s] = 1 - alt;
+
+    const TurretCalibratedPoints *pts = &c_turret_points[angle];
+    int tx = sx - TURRET_PIVOT_X;
+    int ty = sy - TURRET_PIVOT_Y;
+
+    int mx = tx + (alt == 0 ? pts->ml_x : pts->mr_x);
+    int my = ty + (alt == 0 ? pts->ml_y : pts->mr_y);
+    int dx = tx + (alt == 0 ? pts->dl_x : pts->dr_x);
+    int dy = ty + (alt == 0 ? pts->dl_y : pts->dr_y);
+
+    g_wall.muzzle_flash_timer[s] = 2;
+    g_wall.muzzle_flash_barrel[s] = alt;
+
+    wall_spawn_bullet_dart(mx, my, target_x, target_y);
+    wall_spawn_casing(dx, dy, (alt == 0 ? -1 : 1));
+}
+
 void wall_fire_at(int target_x, int target_y) {
     if (g_wall.fire_cooldown > 0) return;
-    g_wall.fire_cooldown = g_wall.fire_interval;
 
     int active_mask = 0;
     if (g_wall.active_turrets == 1) active_mask = (1 << 1);
@@ -379,56 +412,106 @@ void wall_fire_at(int target_x, int target_y) {
 
     int sx = c_wall_sockets[best_sock].x;
     int sy = g_wall.screen_y + c_wall_sockets[best_sock].y;
-
     int angle = wall_angle_from_target(sx, sy, target_x, target_y);
     g_wall.turret_angles[best_sock] = angle;
+    g_wall.target_angles[best_sock] = angle;
 
-    int alt = g_wall.barrel_alt[best_sock];
-    g_wall.barrel_alt[best_sock] = 1 - alt;
-
-    const TurretCalibratedPoints *pts = &c_turret_points[angle];
-    int tx = sx - TURRET_PIVOT_X;
-    int ty = sy - TURRET_PIVOT_Y;
-
-    int mx = tx + (alt == 0 ? pts->ml_x : pts->mr_x);
-    int my = ty + (alt == 0 ? pts->ml_y : pts->mr_y);
-    int dx = tx + (alt == 0 ? pts->dl_x : pts->dr_x);
-    int dy = ty + (alt == 0 ? pts->dl_y : pts->dr_y);
-
-    g_wall.muzzle_flash_timer[best_sock] = 2;
-    g_wall.muzzle_flash_barrel[best_sock] = alt;
-
-    wall_spawn_bullet_dart(mx, my, target_x, target_y);
-    wall_spawn_casing(dx, dy, (alt == 0 ? -1 : 1));
+    wall_fire_socket(best_sock, target_x, target_y);
+    g_wall.fire_cooldown = g_wall.fire_interval;
 }
 
 void wall_update(void) {
     if (g_wall.fire_cooldown > 0) g_wall.fire_cooldown--;
 
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        if (g_wall.turret_cooldown[s] > 0) g_wall.turret_cooldown[s]--;
         if (g_wall.muzzle_flash_timer[s] > 0) {
             g_wall.muzzle_flash_timer[s]--;
         }
     }
 
-    // Auto-targeting if enabled and no cooldown: scan nearest enemy
-    if (g_game.upgrades.auto_target > 0 && g_wall.fire_cooldown == 0) {
-        int best_e = -1;
-        int best_y = -1;
-        for (int e = 0; e < MAX_ENEMIES; e++) {
-            if (!g_enemies[e].active) continue;
-            int ey = FROM_FP(g_enemies[e].y);
-            if (ey >= 192 && ey < 192 + g_wall.screen_y) {
-                if (ey > best_y) {
-                    best_y = ey;
-                    best_e = e;
+    int active_mask = 0;
+    if (g_wall.active_turrets == 1) active_mask = (1 << 1);
+    else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
+    else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
+    else active_mask = 0x0F;
+
+    if (g_wall.locked_enemy_idx >= 0) {
+        if (!g_enemies[g_wall.locked_enemy_idx].active) {
+            g_wall.locked_enemy_idx = -1;
+        }
+    }
+
+    int auto_fire = (g_game.upgrades.auto_target > 0) || (g_game.mode == MODE_DEBUG_SANDBOX);
+
+    // Aiming, tracking, and firing for each active socket
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        if (!(active_mask & (1 << s))) continue;
+        int sx = c_wall_sockets[s].x;
+        int sy = g_wall.screen_y + c_wall_sockets[s].y;
+
+        int target_e = -1;
+        if (g_wall.locked_enemy_idx >= 0) {
+            target_e = g_wall.locked_enemy_idx;
+        } else {
+            int best_score = -99999;
+            for (int e = 0; e < MAX_ENEMIES; e++) {
+                if (!g_enemies[e].active) continue;
+                int gx = FROM_FP(g_enemies[e].x);
+                int gy = FROM_FP(g_enemies[e].y);
+                if (gy > 192 + g_wall.screen_y + 10) continue; // Behind wall
+
+                int h_dist = (gx > sx) ? (gx - sx) : (sx - gx);
+                int v_score = (gy >= 192) ? (gy * 3) : gy;
+                int score = v_score - h_dist;
+                if (score > best_score) {
+                    best_score = score;
+                    target_e = e;
                 }
             }
         }
-        if (best_e >= 0) {
-            int ex = FROM_FP(g_enemies[best_e].x);
-            int ey = FROM_FP(g_enemies[best_e].y) - 192;
-            wall_fire_at(ex, ey);
+
+        g_wall.target_enemy_idx[s] = target_e;
+
+        // Desired angle towards target (or default stance if no target)
+        int desired_angle = c_wall_sockets[s].default_angle;
+        if (target_e >= 0) {
+            int gx = FROM_FP(g_enemies[target_e].x);
+            int local_gy = FROM_FP(g_enemies[target_e].y) - 192;
+            desired_angle = wall_angle_from_target(sx, sy, gx, local_gy);
+        }
+        g_wall.target_angles[s] = desired_angle;
+
+        // Smooth motorized traverse (1 step every 2 frames)
+        if (g_wall.turret_angles[s] != g_wall.target_angles[s]) {
+            g_wall.traverse_timer[s]++;
+            if (g_wall.traverse_timer[s] >= 2) {
+                g_wall.traverse_timer[s] = 0;
+                if (g_wall.turret_angles[s] < g_wall.target_angles[s]) {
+                    g_wall.turret_angles[s]++;
+                } else {
+                    g_wall.turret_angles[s]--;
+                }
+            }
+        } else {
+            g_wall.traverse_timer[s] = 0;
+        }
+
+        // Auto-firing when aligned and enemy is in firing zone
+        if (auto_fire && g_wall.turret_cooldown[s] == 0 && target_e >= 0) {
+            int gy = FROM_FP(g_enemies[target_e].y);
+            if (gy >= 160 && gy < 192 + g_wall.screen_y) {
+                int angle_diff = g_wall.turret_angles[s] - g_wall.target_angles[s];
+                if (angle_diff >= -1 && angle_diff <= 1) {
+                    int gx = FROM_FP(g_enemies[target_e].x);
+                    int local_gy = gy - 192;
+                    int evx = FROM_FP(g_enemies[target_e].vx);
+                    int evy = FROM_FP(g_enemies[target_e].vy);
+                    int pred_x = gx + (evx * 2);
+                    int pred_y = local_gy + (evy * 2);
+                    wall_fire_socket(s, pred_x, pred_y);
+                }
+            }
         }
     }
 
@@ -1292,12 +1375,16 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
         }
 
         if (clicked_enemy >= 0) {
-            // Lock onto this enemy for all placed turrets!
+            g_wall.locked_enemy_idx = clicked_enemy;
             for (int t = 0; t < MAX_TURRETS; t++) {
                 if (g_turrets[t].placed) {
                     g_turrets[t].locked_enemy_idx = clicked_enemy;
                 }
             }
+            // Tap directly fires at locked enemy!
+            int ex = FROM_FP(g_enemies[clicked_enemy].x);
+            int ey = FROM_FP(g_enemies[clicked_enemy].y) - 192;
+            wall_fire_at(ex, ey);
             return;
         }
     }
