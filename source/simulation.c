@@ -17,12 +17,12 @@ GameBalanceConfig g_balance;
 
 static const GameBalanceConfig s_default_balance = {
     .waves = {
-        // W1: 12 Larvae (delay 90f, speed 30, hp 6), 0 Rippers, 0 Hormagaunts
-        { .tiers = { { 12, 90, 30, 6 }, { 0, 120, 40, 24 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
-        // W2: 25 Larvae (delay 60f, speed 32, hp 6), 0 Rippers, 0 Hormagaunts
-        { .tiers = { { 25, 60, 32, 6 }, { 0, 120, 40, 24 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
-        // W3: 40 Larvae (delay 45f, speed 34, hp 7), 2 Rippers (delay 180f, speed 38, hp 24), 0 Hormagaunts
-        { .tiers = { { 40, 45, 34, 7 }, { 2, 180, 38, 24 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
+        // W1: 12 Larvae (delay 90f, speed 30, hp 2), 0 Rippers, 0 Hormagaunts (Phase 1 incremental start)
+        { .tiers = { { 12, 90, 30, 2 }, { 0, 120, 40, 6 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
+        // W2: 25 Larvae (delay 60f, speed 32, hp 3), 0 Rippers, 0 Hormagaunts
+        { .tiers = { { 25, 60, 32, 3 }, { 0, 120, 40, 8 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
+        // W3: 40 Larvae (delay 45f, speed 34, hp 3), 2 Rippers (delay 180f, speed 38, hp 8), 0 Hormagaunts
+        { .tiers = { { 40, 45, 34, 3 }, { 2, 180, 38, 8 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
         // W4: 60 Larvae (delay 35f, speed 35, hp 8), 4 Rippers (delay 140f, speed 40, hp 28), 0 Hormagaunts
         { .tiers = { { 60, 35, 35, 8 }, { 4, 140, 40, 28 }, { 0, 150, 50, 45 } }, .scrap_base = 2 },
         // W5: 100 Larvae (delay 24f, speed 35, hp 8), 8 Rippers (delay 100f, speed 42, hp 30), 1 Hormagaunt (delay 300f, speed 50, hp 50)
@@ -53,7 +53,7 @@ static const GameBalanceConfig s_default_balance = {
     .enemy_hp = { 18, 25, 75, 160, 320, 500, 1100, 2600 },
     .enemy_scrap = { 4, 5, 15, 35, 70, 120, 250, 600 },
     .upgrade_costs = { {15,25,40,65,100}, {20,30,45,70,110}, {15,25,35,55,85}, {25,40,65,105,170}, {50,90,160,0,0}, {80,0,0,0,0}, {200,400,800,1600,0} },
-    .turret_damage = { 2, 3, 4, 6, 8 },
+    .turret_damage = { 1, 2, 3, 5, 8 },
     .turret_fire_interval = { 18, 14, 10, 7, 5 },
     .turret_range = { 65, 80, 100, 125, 150 },
     .turret_magazine = { 20, 35, 50, 70, 100, 150 },
@@ -328,27 +328,38 @@ void wall_init(void) {
     g_wall.screen_y = WALL_DEFAULT_Y; // 144
     g_wall.hp = 1000;
     g_wall.max_hp = 1000;
-    g_wall.active_turrets = 2; // Default dual battery: sockets 1 & 2
+    g_wall.active_turrets = 1; // Phase 1: exactly 1 active turret in Socket 1
     g_wall.turret_angles[0] = 0; // NW
-    g_wall.turret_angles[1] = 1; // NNW
-    g_wall.turret_angles[2] = 3; // NNE
+    g_wall.turret_angles[1] = 2; // N (forward facing)
+    g_wall.turret_angles[2] = 2; // N
     g_wall.turret_angles[3] = 4; // NE
-    g_wall.reload_time = 90; // 1.5 seconds at 60 FPS
+    g_wall.reload_time = 90;
+    g_wall.range_line_y = 64;   // Straight horizontal range perimeter line
+    g_wall.range = 80;
+    g_wall.damage = 1;          // Base damage = 1
+    g_wall.fire_interval = 12;  // Base cadence (5 shots/sec)
+    g_wall.fire_cooldown = 0;
+    g_wall.battery_fire_step = 0;
+    g_wall.locked_enemy_idx = -1;
+
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
         g_wall.target_angles[s] = g_wall.turret_angles[s];
         g_wall.target_enemy_idx[s] = -1;
         g_wall.turret_cooldown[s] = 0;
         g_wall.traverse_timer[s] = 0;
-        g_wall.max_ammo[s] = 30; // 30 rounds per heavy bolter drum
-        g_wall.ammo[s] = 30;
+        g_wall.max_ammo[s] = 10; // Phase 1 drum capacity = 10 rounds
+        g_wall.ammo[s] = 10;
         g_wall.reload_timer[s] = 0;
         g_wall.is_reloading[s] = 0;
+        g_wall.barrel_alt[s] = 0;
     }
-    g_wall.fire_cooldown = 0;
-    g_wall.fire_interval = 6; // ~10 shots/sec per turret
-    g_wall.damage = 10;
-    g_wall.range = WALL_TURRET_RANGE;
-    g_wall.locked_enemy_idx = -1;
+}
+
+void wall_reload_socket(int s) {
+    if (s < 0 || s >= WALL_SOCKET_COUNT) return;
+    g_wall.ammo[s] = g_wall.max_ammo[s];
+    g_wall.is_reloading[s] = 0;
+    g_wall.reload_timer[s] = 0;
 }
 
 int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_y) {
@@ -398,7 +409,7 @@ void wall_spawn_casing(int x, int y, int dir_sign) {
     g_casings[slot].life = 60;
 }
 
-int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y) {
+int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y, int target_enemy_idx) {
     int slot = -1;
     for (int i = 0; i < MAX_BULLET_DARTS; i++) {
         if (!g_bullet_darts[i].active) {
@@ -406,7 +417,6 @@ int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y)
             break;
         }
     }
-    // If pool is full, recycle the one with smallest dist_remaining
     if (slot < 0) {
         int min_dist = 999999;
         for (int i = 0; i < MAX_BULLET_DARTS; i++) {
@@ -424,6 +434,7 @@ int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y)
     g_bullet_darts[slot].target_x = target_x;
     g_bullet_darts[slot].target_y = target_y;
     g_bullet_darts[slot].damage = g_wall.damage;
+    g_bullet_darts[slot].target_enemy_idx = target_enemy_idx;
 
     int dx = target_x - start_x;
     int dy = target_y - start_y;
@@ -439,97 +450,75 @@ int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y)
     return 1;
 }
 
-void wall_fire_socket(int s, int target_x, int target_y) {
+void wall_fire_at_target(int target_x, int target_y, int enemy_idx) {
+    if (g_wall.fire_cooldown > 0) return;
+
+    int num_act = g_wall.active_turrets;
+    if (num_act < 1) num_act = 1;
+    if (num_act > 4) num_act = 4;
+
+    static const int s_active_sockets[4][4] = {
+        { 1, -1, -1, -1 }, // 1 turret: Socket 1
+        { 1,  2, -1, -1 }, // 2 turrets: Sockets 1 & 2
+        { 0,  1,  2, -1 }, // 3 turrets: Sockets 0, 1 & 2
+        { 0,  1,  2,  3 }  // 4 turrets: All sockets
+    };
+
+    // Round-robin metronome alternating active turrets and barrels:
+    // e.g. For 2 turrets: S1(L) -> S2(L) -> S1(R) -> S2(R) -> S1(L)...
+    int k = g_wall.battery_fire_step % (num_act * 2);
+    int s = s_active_sockets[num_act - 1][k % num_act];
+    int barrel = (k / num_act) % 2;
+
     if (s < 0 || s >= WALL_SOCKET_COUNT) return;
 
-    // If socket is actively reloading, cannot fire
-    if (g_wall.is_reloading[s]) return;
-
-    // Out of ammo: trigger reload immediately
+    // If turret is out of ammo, lock it in RELOAD state and cease firing
     if (g_wall.ammo[s] <= 0) {
         g_wall.is_reloading[s] = 1;
-        g_wall.reload_timer[s] = g_wall.reload_time;
         return;
     }
 
     int sx = c_wall_sockets[s].x;
     int sy = g_wall.screen_y + c_wall_sockets[s].y;
 
-    // Strict range verification: do not fire outside effective range!
-    int tdx = target_x - sx;
-    int tdy = target_y - sy;
-    if (tdx * tdx + tdy * tdy > g_wall.range * g_wall.range) return;
-
-    g_wall.turret_cooldown[s] = g_wall.fire_interval;
-
-    int angle = g_wall.turret_angles[s];
-    int alt = g_wall.barrel_alt[s];
-    g_wall.barrel_alt[s] = 1 - alt;
+    int angle = wall_angle_from_target(sx, sy, target_x, target_y);
+    g_wall.turret_angles[s] = angle;
+    g_wall.target_angles[s] = angle;
 
     const TurretCalibratedPoints *pts = &c_turret_points[angle];
     int tx = sx - TURRET_PIVOT_X;
     int ty = sy - TURRET_PIVOT_Y;
 
-    int mx = tx + (alt == 0 ? pts->ml_x : pts->mr_x);
-    int my = ty + (alt == 0 ? pts->ml_y : pts->mr_y);
-    int dx = tx + (alt == 0 ? pts->dl_x : pts->dr_x);
-    int dy = ty + (alt == 0 ? pts->dl_y : pts->dr_y);
+    int mx = tx + (barrel == 0 ? pts->ml_x : pts->mr_x);
+    int my = ty + (barrel == 0 ? pts->ml_y : pts->mr_y);
+    int dx = tx + (barrel == 0 ? pts->dl_x : pts->dr_x);
+    int dy = ty + (barrel == 0 ? pts->dl_y : pts->dr_y);
 
-    // Spawn bullet dart with guaranteed 1:1 casing match!
-    int spawned = wall_spawn_bullet_dart(mx, my, target_x, target_y);
+    int spawned = wall_spawn_bullet_dart(mx, my, target_x, target_y, enemy_idx);
     if (spawned) {
         g_wall.ammo[s]--;
-        wall_spawn_casing(dx, dy, (alt == 0 ? -1 : 1));
+        g_wall.battery_fire_step++;
+        wall_spawn_casing(dx, dy, (barrel == 0 ? -1 : 1));
         g_wall.muzzle_flash_timer[s] = 2;
-        g_wall.muzzle_flash_barrel[s] = alt;
+        g_wall.muzzle_flash_barrel[s] = barrel;
 
-        // If drum emptied on this shot, automatically start reload cycle
+        if (enemy_idx >= 0 && enemy_idx < MAX_ENEMIES) {
+            g_enemies[enemy_idx].incoming_damage += g_wall.damage;
+        }
+
         if (g_wall.ammo[s] <= 0) {
             g_wall.is_reloading[s] = 1;
-            g_wall.reload_timer[s] = g_wall.reload_time;
         }
     }
+    g_wall.fire_cooldown = g_wall.fire_interval;
+}
+
+void wall_fire_socket(int s, int target_x, int target_y) {
+    wall_fire_at_target(target_x, target_y, -1);
 }
 
 void wall_fire_at(int target_x, int target_y) {
-    if (g_wall.fire_cooldown > 0) return;
-
-    int active_mask = 0;
-    if (g_wall.active_turrets == 1) active_mask = (1 << 1);
-    else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
-    else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
-    else active_mask = 0x0F;
-
-    int best_sock = -1;
-    int best_dist = 9999;
-    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
-        if (!(active_mask & (1 << s))) continue;
-        int sx = c_wall_sockets[s].x;
-        int sy = g_wall.screen_y + c_wall_sockets[s].y;
-        int dx = target_x - sx;
-        int dy = target_y - sy;
-        int dsq = dx * dx + dy * dy;
-        // Candidate socket must be in range of target!
-        if (dsq <= g_wall.range * g_wall.range) {
-            int h_dist = (dx < 0) ? -dx : dx;
-            if (h_dist < best_dist) {
-                best_dist = h_dist;
-                best_sock = s;
-            }
-        }
-    }
-
-    // If point is out of range for all active turrets, do not fire!
-    if (best_sock < 0) return;
-
-    int sx = c_wall_sockets[best_sock].x;
-    int sy = g_wall.screen_y + c_wall_sockets[best_sock].y;
-    int angle = wall_angle_from_target(sx, sy, target_x, target_y);
-    g_wall.turret_angles[best_sock] = angle;
-    g_wall.target_angles[best_sock] = angle;
-
-    wall_fire_socket(best_sock, target_x, target_y);
-    g_wall.fire_cooldown = g_wall.fire_interval;
+    wall_fire_at_target(target_x, target_y, -1);
 }
 
 void wall_update(void) {
@@ -617,31 +606,20 @@ void wall_update(void) {
             g_wall.traverse_timer[s] = 0;
         }
 
-        // Auto-firing: only when enemy is physically inside bottom screen AND within battery range!
-        if (auto_fire && g_wall.turret_cooldown[s] == 0 && target_e >= 0) {
+        // Auto-firing: respects straight horizontal range line (local Y >= range_line_y) and virtual health
+        if (auto_fire && g_wall.fire_cooldown == 0 && target_e >= 0) {
             int gy = FROM_FP(g_enemies[target_e].y);
-            // Enemy must be on bottom screen (gy >= 192) and in front of wall
             if (gy >= 192 && gy < 192 + g_wall.screen_y) {
                 int gx = FROM_FP(g_enemies[target_e].x);
                 int local_gy = gy - 192;
-                int tdx = gx - sx;
-                int tdy = local_gy - sy;
-                // Strict Euclidean distance within range
-                if (tdx * tdx + tdy * tdy <= g_wall.range * g_wall.range) {
-                    int angle_diff = g_wall.turret_angles[s] - g_wall.target_angles[s];
-                    if (angle_diff >= -1 && angle_diff <= 1) {
-                        int evx = FROM_FP(g_enemies[target_e].vx);
-                        int evy = FROM_FP(g_enemies[target_e].vy);
-                        int pred_x = gx + evx;
-                        int pred_y = local_gy + evy;
-                        wall_fire_socket(s, pred_x, pred_y);
-                    }
+                if (local_gy >= g_wall.range_line_y && g_enemies[target_e].hp > g_enemies[target_e].incoming_damage) {
+                    wall_fire_at_target(gx, local_gy, target_e);
                 }
             }
         }
     }
 
-    // Update Bullet Darts with sub-stepping (prevents tunneling through fast enemies)
+    // Update Bullet Darts with sub-stepping and coordinated virtual health impact
     for (int i = 0; i < MAX_BULLET_DARTS; i++) {
         if (!g_bullet_darts[i].active) continue;
 
@@ -664,40 +642,69 @@ void wall_update(void) {
                 break;
             }
 
-            for (int e = 0; e < MAX_ENEMIES; e++) {
-                if (!g_enemies[e].active) continue;
-                int ex = FROM_FP(g_enemies[e].x);
-                int ey = FROM_FP(g_enemies[e].y);
+            int target_e = g_bullet_darts[i].target_enemy_idx;
+            if (target_e >= 0 && target_e < MAX_ENEMIES && g_enemies[target_e].active) {
+                int ex = FROM_FP(g_enemies[target_e].x);
+                int ey = FROM_FP(g_enemies[target_e].y);
                 int ddx = cur_x - ex;
                 int ddy = gy - ey;
-                if (ddx * ddx + ddy * ddy <= 12 * 12) {
+                if (ddx * ddx + ddy * ddy <= 14 * 14 || g_bullet_darts[i].dist_remaining <= 0) {
                     hit_enemy = 1;
-                    hit_e_idx = e;
-                    hit_x = cur_x;
-                    hit_y = gy;
+                    hit_e_idx = target_e;
+                    hit_x = ex;
+                    hit_y = ey;
                     break;
                 }
+            } else {
+                for (int e = 0; e < MAX_ENEMIES; e++) {
+                    if (!g_enemies[e].active) continue;
+                    int ex = FROM_FP(g_enemies[e].x);
+                    int ey = FROM_FP(g_enemies[e].y);
+                    int ddx = cur_x - ex;
+                    int ddy = gy - ey;
+                    if (ddx * ddx + ddy * ddy <= 12 * 12) {
+                        hit_enemy = 1;
+                        hit_e_idx = e;
+                        hit_x = ex;
+                        hit_y = ey;
+                        break;
+                    }
+                }
+                if (hit_enemy) break;
             }
-            if (hit_enemy) break;
         }
 
         if (hit_enemy == 1 && hit_e_idx >= 0) {
-            // Kinetic impact spark burst on target
+            // Kinetic impact sparks
             for (int k = 0; k < 3; k++) {
                 game_add_splatter_ex(hit_x, hit_y, COLOR_BOLTER_TRACER, 0, 8);
             }
+            if (g_enemies[hit_e_idx].incoming_damage >= (uint64_t)g_bullet_darts[i].damage) {
+                g_enemies[hit_e_idx].incoming_damage -= g_bullet_darts[i].damage;
+            } else {
+                g_enemies[hit_e_idx].incoming_damage = 0;
+            }
+
             if (g_enemies[hit_e_idx].hp > (uint64_t)g_bullet_darts[i].damage) {
                 g_enemies[hit_e_idx].hp -= g_bullet_darts[i].damage;
             } else {
                 g_enemies[hit_e_idx].hp = 0;
                 g_enemies[hit_e_idx].active = 0;
+                g_enemies[hit_e_idx].incoming_damage = 0;
                 g_game.enemies_killed++;
                 g_game.scrap += (5 * (g_enemies[hit_e_idx].variant + 1));
                 game_spawn_death_gore(hit_x, hit_y, g_bullet_darts[i].vx, g_bullet_darts[i].vy, g_enemies[hit_e_idx].variant);
             }
             g_bullet_darts[i].active = 0;
         } else if (hit_enemy == 2 || g_bullet_darts[i].dist_remaining <= 0) {
-            // Dissipate cleanly when reaching max range without false ground splatters
+            int target_e = g_bullet_darts[i].target_enemy_idx;
+            if (target_e >= 0 && target_e < MAX_ENEMIES && g_enemies[target_e].active) {
+                if (g_enemies[target_e].incoming_damage >= (uint64_t)g_bullet_darts[i].damage) {
+                    g_enemies[target_e].incoming_damage -= g_bullet_darts[i].damage;
+                } else {
+                    g_enemies[target_e].incoming_damage = 0;
+                }
+            }
             g_bullet_darts[i].active = 0;
         }
     }
@@ -1454,56 +1461,6 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     int touch_press = ((keys_down & KEY_TOUCH) || (is_touch && !s_wave_touching));
     s_wave_touching = is_touch;
 
-    // Touch down: Stylus manual targeting - only fires if an enemy is in the area or tapped!
-    if (touch_press && touch.px > 0 && touch.py > 14 && touch.py < g_wall.screen_y) {
-        int clicked_enemy = -1;
-        int best_dist_sq = 28 * 28;
-        for (int e = 0; e < MAX_ENEMIES; e++) {
-            if (!g_enemies[e].active) continue;
-            int gy = FROM_FP(g_enemies[e].y);
-            if (gy < 192) continue;
-            int local_y = gy - 192;
-            int gx = FROM_FP(g_enemies[e].x);
-            int ddx = touch.px - gx;
-            int ddy = touch.py - local_y;
-            int dsq = ddx * ddx + ddy * ddy;
-            if (dsq <= best_dist_sq) {
-                best_dist_sq = dsq;
-                clicked_enemy = e;
-            }
-        }
-        // Check if touching an active turret socket directly to trigger manual tactical reload!
-        int clicked_turret = 0;
-        int active_mask = 0;
-        if (g_wall.active_turrets == 1) active_mask = (1 << 1);
-        else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
-        else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
-        else active_mask = 0x0F;
-
-        for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
-            if (!(active_mask & (1 << s))) continue;
-            int sx = c_wall_sockets[s].x;
-            int sy = g_wall.screen_y + c_wall_sockets[s].y;
-            int ddx = touch.px - sx;
-            int ddy = touch.py - sy;
-            if (ddx * ddx + ddy * ddy <= 18 * 18) {
-                if (g_wall.ammo[s] < g_wall.max_ammo[s] && !g_wall.is_reloading[s]) {
-                    g_wall.is_reloading[s] = 1;
-                    g_wall.reload_timer[s] = g_wall.reload_time;
-                    clicked_turret = 1;
-                    break;
-                }
-            }
-        }
-
-        if (!clicked_turret && clicked_enemy >= 0) {
-            g_wall.locked_enemy_idx = clicked_enemy;
-            int ex = FROM_FP(g_enemies[clicked_enemy].x);
-            int ey = FROM_FP(g_enemies[clicked_enemy].y) - 192;
-            wall_fire_at(ex, ey);
-        }
-    }
-
     if (touch_press) {
         // [PAUSA] Button in wave HUD: (215..250, 0..14)
         if (touch.px >= 215 && touch.px <= 250 && touch.py <= 14) {
@@ -1511,88 +1468,82 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
             return;
         }
 
-        // Ammo Depot drag start (depot is at x: 6..46, y: 150..186)
-        if (touch.px >= 6 && touch.px <= 50 && touch.py >= 145 && touch.py <= 190) {
+        // Bunker Ammo Depot touch down: (AMMO_DEPOT_X=128, Y=166, W=24, H=16) -> (112..144, 154..178)
+        if (touch.px >= 112 && touch.px <= 144 && touch.py >= 154 && touch.py <= 180) {
             g_game.is_dragging_ammo = 1;
             g_game.drag_x = touch.px;
             g_game.drag_y = touch.py;
             return;
         }
+    }
 
-        // Target designated enemy in bottom screen with stylus (generous closest selection)
-        int clicked_enemy = -1;
-        int best_dist_sq = 28 * 28;
+    // Dragging ammo crate following stylus
+    if (is_touch && g_game.is_dragging_ammo) {
+        g_game.drag_x = touch.px;
+        g_game.drag_y = touch.py;
+        return;
+    }
+
+    // Touch release while dragging ammo: drop onto active turret socket to reload
+    if (!is_touch && g_game.is_dragging_ammo) {
+        int num_act = g_wall.active_turrets;
+        static const int s_active_sockets[4][4] = {
+            { 1, -1, -1, -1 }, { 1, 2, -1, -1 }, { 0, 1, 2, -1 }, { 0, 1, 2, 3 }
+        };
+        for (int i = 0; i < num_act; i++) {
+            int s = s_active_sockets[num_act - 1][i];
+            if (s < 0) continue;
+            int sx = c_wall_sockets[s].x;
+            int sy = g_wall.screen_y + c_wall_sockets[s].y;
+            int dx = g_game.drag_x - sx;
+            int dy = g_game.drag_y - sy;
+            if (dx * dx + dy * dy <= 24 * 24) {
+                wall_reload_socket(s);
+                break;
+            }
+        }
+        g_game.is_dragging_ammo = 0;
+        return;
+    }
+
+    // Combat interaction (Upper & Mid road: Y >= 14 && Y < 144)
+    // STRICT RULE: Only fires when touching a living enemy inside range!
+    // Empty asphalt clicks DO NOT FIRE!
+    if (is_touch && touch.px > 0 && touch.py >= 14 && touch.py < g_wall.screen_y) {
+        int can_trigger = touch_press || g_game.upgrades.continuous_fire;
+
+        // Find enemy touched within tolerance (radius ~22px)
+        int hit_enemy = -1;
+        int best_dsq = 22 * 22;
         for (int e = 0; e < MAX_ENEMIES; e++) {
             if (!g_enemies[e].active) continue;
             int gy = FROM_FP(g_enemies[e].y);
-            if (gy < 192) continue;
+            if (gy < 192) continue; // Must be on bottom screen
             int local_y = gy - 192;
-            int gx = FROM_FP(g_enemies[e].x);
+            if (local_y < g_wall.range_line_y) continue; // Outside range perimeter (Y < 64)
 
+            // Anti-overkill virtual health: must have positive effective health remaining!
+            if (g_enemies[e].hp <= g_enemies[e].incoming_damage) continue;
+
+            int gx = FROM_FP(g_enemies[e].x);
             int ddx = touch.px - gx;
             int ddy = touch.py - local_y;
             int dsq = ddx * ddx + ddy * ddy;
-            if (dsq <= best_dist_sq) {
-                best_dist_sq = dsq;
-                clicked_enemy = e;
+            if (dsq <= best_dsq) {
+                best_dsq = dsq;
+                hit_enemy = e;
             }
         }
 
-        if (clicked_enemy >= 0) {
-            g_wall.locked_enemy_idx = clicked_enemy;
-            for (int t = 0; t < MAX_TURRETS; t++) {
-                if (g_turrets[t].placed) {
-                    g_turrets[t].locked_enemy_idx = clicked_enemy;
-                }
-            }
-            // Tap directly fires at locked enemy!
-            int ex = FROM_FP(g_enemies[clicked_enemy].x);
-            int ey = FROM_FP(g_enemies[clicked_enemy].y) - 192;
-            wall_fire_at(ex, ey);
-            return;
-        }
-    }
-
-    if (keys_held & KEY_TOUCH) {
-        if (g_game.is_dragging_ammo) {
-            g_game.drag_x = touch.px;
-            g_game.drag_y = touch.py;
-        } else {
-            // If continuous fire / sweep is enabled and touching bottom screen battlefield
-            if (g_game.upgrades.continuous_fire && touch.py < 150) {
-                // Find enemy near touch to track
-                for (int e = 0; e < MAX_ENEMIES; e++) {
-                    if (!g_enemies[e].active) continue;
-                    int gy = FROM_FP(g_enemies[e].y);
-                    if (gy < 192) continue;
-                    int local_y = gy - 192;
-                    int gx = FROM_FP(g_enemies[e].x);
-
-                    if (abs(touch.px - gx) <= 24 && abs(touch.py - local_y) <= 24) {
-                        for (int t = 0; t < MAX_TURRETS; t++) {
-                            if (g_turrets[t].placed) {
-                                g_turrets[t].locked_enemy_idx = e;
-                            }
-                        }
-                        break;
-                    }
-                }
+        if (hit_enemy >= 0) {
+            g_wall.locked_enemy_idx = hit_enemy;
+            if (can_trigger && g_wall.fire_cooldown == 0) {
+                int ex = FROM_FP(g_enemies[hit_enemy].x);
+                int ey = FROM_FP(g_enemies[hit_enemy].y) - 192;
+                wall_fire_at_target(ex, ey, hit_enemy);
             }
         }
-    } else {
-        // Release touch: if dragging ammo over a turret, reload it!
-        if (g_game.is_dragging_ammo) {
-            for (int t = 0; t < MAX_TURRETS; t++) {
-                if (g_turrets[t].placed) {
-                    int d = abs(g_game.drag_x - g_turrets[t].x) + abs(g_game.drag_y - g_turrets[t].y);
-                    if (d <= 24) {
-                        g_turrets[t].ammo = g_turrets[t].max_ammo; // Reloaded!
-                        break;
-                    }
-                }
-            }
-            g_game.is_dragging_ammo = 0;
-        }
+        // If hit_enemy < 0 (empty asphalt): DO NOTHING. Battery stays silent!
     }
 }
 

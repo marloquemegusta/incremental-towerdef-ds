@@ -232,7 +232,31 @@ void renderer_draw_wall(void) {
     // 1. Draw Wall Base
     wall_draw_base(g_backbuffer, g_wall.screen_y, g_wall.hp, g_wall.max_hp);
 
-    // 2. Draw Active Turrets on Sockets
+    // 2. Draw Bunker Ammo Depot Crate at (AMMO_DEPOT_X=128, AMMO_DEPOT_Y=166, 24x14)
+    {
+        int cx = AMMO_DEPOT_X;
+        int cy = AMMO_DEPOT_Y;
+        int x0 = cx - 12;
+        int y0 = cy - 7;
+        // Heavy brass/steel ammunition chest with drop shadow
+        renderer_fill_rect(x0 + 1, y0 + 1, 24, 14, RGB15(1, 1, 2) | BIT(15));
+        renderer_fill_rect(x0, y0, 24, 14, RGB15(8, 7, 5) | BIT(15));
+        renderer_draw_rect(x0, y0, 24, 14, COLOR_BRASS);
+        // Brass corner braces
+        renderer_draw_rect(x0, y0, 4, 4, COLOR_BRASS);
+        renderer_draw_rect(x0 + 20, y0, 4, 4, COLOR_BRASS);
+        renderer_draw_rect(x0, y0 + 10, 4, 4, COLOR_BRASS);
+        renderer_draw_rect(x0 + 20, y0 + 10, 4, 4, COLOR_BRASS);
+        // Stenciled AMMO chevron marking
+        renderer_draw_line(x0 + 8, y0 + 7, x0 + 12, y0 + 4, COLOR_AMBER);
+        renderer_draw_line(x0 + 12, y0 + 4, x0 + 16, y0 + 7, COLOR_AMBER);
+        renderer_draw_line(x0 + 8, y0 + 10, x0 + 12, y0 + 7, COLOR_AMBER);
+        renderer_draw_line(x0 + 12, y0 + 7, x0 + 16, y0 + 10, COLOR_AMBER);
+        // Central heavy padlock
+        renderer_fill_rect(cx - 2, y0 + 5, 4, 4, RGB15(28, 24, 8) | BIT(15));
+    }
+
+    // 3. Draw Active Turrets on Sockets
     int active_mask = 0;
     if (g_wall.active_turrets == 1) active_mask = (1 << 1);
     else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
@@ -254,18 +278,22 @@ void renderer_draw_wall(void) {
         int bar_x = sx - bar_w / 2;
         int bar_y = sy + 5;
         if (bar_y >= 0 && bar_y + 2 < SCREEN_H) {
-            g_backbuffer[(bar_y - 1) * SCREEN_W + bar_x - 1] = COLOR_BLACK;
             renderer_fill_rect(bar_x - 1, bar_y - 1, bar_w + 2, 3, COLOR_BLACK);
-            if (g_wall.is_reloading[s]) {
-                // Reload in progress: filling phosphor green progress bar
-                int reload_prog = ((g_wall.reload_time - g_wall.reload_timer[s]) * bar_w) / g_wall.reload_time;
-                if (reload_prog > 0) {
-                    renderer_fill_rect(bar_x, bar_y, reload_prog, 1, COLOR_PHOSPHOR_GREEN);
+            if (g_wall.ammo[s] <= 0 || g_wall.is_reloading[s]) {
+                // Out of ammo: blinking RELOAD alert banner
+                static int s_blink_timer = 0;
+                s_blink_timer++;
+                uint16_t warn_col = ((s_blink_timer / 15) % 2 == 0) ? COLOR_LED_RED : COLOR_AMBER;
+                renderer_fill_rect(bar_x, bar_y, bar_w, 1, warn_col);
+                if ((s_blink_timer / 15) % 2 == 0) {
+                    renderer_draw_text(sx - 14, bar_y - 12, "RELOAD", COLOR_LED_RED);
                 }
             } else {
-                // Ammo bar: amber gold turning LED red when low (< 25%)
-                int ammo_fill = (g_wall.ammo[s] * bar_w) / (g_wall.max_ammo[s] > 0 ? g_wall.max_ammo[s] : 1);
-                uint16_t ammo_col = (g_wall.ammo[s] > g_wall.max_ammo[s] / 4) ? COLOR_AMBER : COLOR_LED_RED;
+                // Ammo drum gauge: amber gold turning LED red when <= 2 rounds
+                int max_a = (g_wall.max_ammo[s] > 0) ? g_wall.max_ammo[s] : 1;
+                int ammo_fill = (g_wall.ammo[s] * bar_w) / max_a;
+                if (ammo_fill < 1 && g_wall.ammo[s] > 0) ammo_fill = 1;
+                uint16_t ammo_col = (g_wall.ammo[s] > 2) ? COLOR_AMBER : COLOR_LED_RED;
                 if (ammo_fill > 0) {
                     renderer_fill_rect(bar_x, bar_y, ammo_fill, 1, ammo_col);
                 }
@@ -286,6 +314,61 @@ void renderer_draw_wall(void) {
                 g_backbuffer[my * SCREEN_W + (mx - 1)] = COLOR_MUZZLE_FLASH;
                 g_backbuffer[my * SCREEN_W + (mx + 1)] = COLOR_MUZZLE_FLASH;
             }
+        }
+    }
+
+    // 4. Diegetic 32 Cathode Bulbs Wall Health Row along the bottom edge (Y=188, X=4..252)
+    {
+        int num_bulbs = 32;
+        int max_hp = (g_wall.max_hp > 0) ? g_wall.max_hp : 1;
+        int lit_bulbs = (int)((g_wall.hp * num_bulbs + max_hp - 1) / max_hp);
+        if (g_wall.hp > 0 && lit_bulbs == 0) lit_bulbs = 1;
+        if (lit_bulbs > num_bulbs) lit_bulbs = num_bulbs;
+
+        uint16_t col_hot, col_glow;
+        if (g_wall.hp * 4 > (uint64_t)max_hp) {
+            // Healthy (>25%): Emerald Green Phosphor
+            col_hot  = RGB15(22, 31, 22) | BIT(15);
+            col_glow = RGB15(2, 30, 8)   | BIT(15);
+        } else {
+            // Critical (<=25%): Pulsing Crimson Alert
+            col_hot  = RGB15(31, 20, 20) | BIT(15);
+            col_glow = RGB15(30, 3, 3)   | BIT(15);
+        }
+        uint16_t col_cold = RGB15(2, 3, 3) | BIT(15);
+        uint16_t col_bezel = RGB15(4, 4, 5) | BIT(15);
+
+        int cy = 188;
+        for (int i = 0; i < num_bulbs; i++) {
+            int cx = 4 + i * 8;
+            int is_lit = (i < lit_bulbs);
+            uint16_t c_core = is_lit ? col_hot : col_cold;
+            uint16_t c_rim  = is_lit ? col_glow : RGB15(1, 1, 2) | BIT(15);
+
+            // 4x4 circular bezel housing
+            // Row 0 (cy - 1): . # # .
+            g_backbuffer[(cy - 1) * SCREEN_W + cx - 1] = col_bezel;
+            g_backbuffer[(cy - 1) * SCREEN_W + cx]     = c_rim;
+            g_backbuffer[(cy - 1) * SCREEN_W + cx + 1] = c_rim;
+            g_backbuffer[(cy - 1) * SCREEN_W + cx + 2] = col_bezel;
+
+            // Row 1 (cy):     # O O #
+            g_backbuffer[cy * SCREEN_W + cx - 1] = c_rim;
+            g_backbuffer[cy * SCREEN_W + cx]     = c_core;
+            g_backbuffer[cy * SCREEN_W + cx + 1] = c_core;
+            g_backbuffer[cy * SCREEN_W + cx + 2] = c_rim;
+
+            // Row 2 (cy + 1): # O O #
+            g_backbuffer[(cy + 1) * SCREEN_W + cx - 1] = c_rim;
+            g_backbuffer[(cy + 1) * SCREEN_W + cx]     = c_core;
+            g_backbuffer[(cy + 1) * SCREEN_W + cx + 1] = c_core;
+            g_backbuffer[(cy + 1) * SCREEN_W + cx + 2] = c_rim;
+
+            // Row 3 (cy + 2): . # # .
+            g_backbuffer[(cy + 2) * SCREEN_W + cx - 1] = col_bezel;
+            g_backbuffer[(cy + 2) * SCREEN_W + cx]     = c_rim;
+            g_backbuffer[(cy + 2) * SCREEN_W + cx + 1] = c_rim;
+            g_backbuffer[(cy + 2) * SCREEN_W + cx + 2] = col_bezel;
         }
     }
 
@@ -335,48 +418,25 @@ void renderer_draw_wall(void) {
 }
 
 void renderer_draw_range_perimeter(void) {
-    int active_mask = 0;
-    if (g_wall.active_turrets == 1) active_mask = (1 << 1);
-    else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
-    else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
-    else active_mask = 0x0F;
+    int y = g_wall.range_line_y; // Straight horizontal line parallel to wall (default Y=64)
+    if (y < 20 || y >= g_wall.screen_y) return;
 
-    int r = g_wall.range;
-    int r_sq = r * r;
-
-    // High-visibility military hazard range perimeter across road (x: 32..224)
+    // High-visibility military hazard range line across road (X: 32..224)
     for (int x = 32; x < 224; x++) {
-        int min_y = 999;
-        for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
-            if (!(active_mask & (1 << s))) continue;
-            int sx = c_wall_sockets[s].x;
-            int sy = g_wall.screen_y + c_wall_sockets[s].y;
-            int dx = x - sx;
-            if (dx * dx <= r_sq) {
-                int dy = 0;
-                while ((dy + 1) * (dy + 1) <= (r_sq - dx * dx)) dy++;
-                int y = sy - dy;
-                if (y < min_y) min_y = y;
-            }
-        }
+        int is_amber = ((x / 4) % 2 == 0);
+        uint16_t stripe_col = is_amber ? (RGB15(31, 22, 2) | BIT(15)) : (RGB15(6, 6, 8) | BIT(15));
+        uint16_t shadow_col = RGB15(2, 2, 4) | BIT(15);
+        uint16_t hi_col     = is_amber ? (RGB15(31, 28, 12) | BIT(15)) : (RGB15(12, 14, 16) | BIT(15));
 
-        if (min_y >= 20 && min_y < g_wall.screen_y) {
-            // Hazard striping: alternating amber gold & dark steel
-            int is_amber = ((x / 4) % 2 == 0);
-            uint16_t stripe_col = is_amber ? (RGB15(31, 22, 2) | BIT(15)) : (RGB15(6, 6, 8) | BIT(15));
-            uint16_t shadow_col = RGB15(2, 2, 4) | BIT(15);
-            uint16_t hi_col     = is_amber ? (RGB15(31, 28, 12) | BIT(15)) : (RGB15(12, 14, 16) | BIT(15));
+        // 2 px thick hazard line with top shadow
+        g_backbuffer[(y - 1) * SCREEN_W + x] = shadow_col;
+        g_backbuffer[y * SCREEN_W + x]       = hi_col;
+        g_backbuffer[(y + 1) * SCREEN_W + x] = stripe_col;
 
-            // 2 px thick band
-            g_backbuffer[(min_y - 1) * SCREEN_W + x] = shadow_col;
-            g_backbuffer[min_y * SCREEN_W + x]       = hi_col;
-            g_backbuffer[(min_y + 1) * SCREEN_W + x] = stripe_col;
-
-            // Inward hazard tick marks every 16 px
-            if ((x % 16) == 0) {
-                g_backbuffer[(min_y + 2) * SCREEN_W + x] = RGB15(31, 20, 0) | BIT(15);
-                g_backbuffer[(min_y + 3) * SCREEN_W + x] = RGB15(24, 14, 0) | BIT(15);
-            }
+        // Inward hazard tick marks every 16 px
+        if ((x % 16) == 0) {
+            g_backbuffer[(y + 2) * SCREEN_W + x] = RGB15(31, 20, 0) | BIT(15);
+            g_backbuffer[(y + 3) * SCREEN_W + x] = RGB15(24, 14, 0) | BIT(15);
         }
     }
 }
@@ -663,10 +723,13 @@ void renderer_draw_ui_wave(void) {
 
     // Ammo drag box removed - WallPlatform has unlimited heavy bolter reserves
 
-    // If currently dragging ammo
+    // If currently dragging ammo crate
     if (g_game.is_dragging_ammo) {
-        renderer_draw_circle(g_game.drag_x, g_game.drag_y, 8, COLOR_AMBER, 1);
-        renderer_draw_text(g_game.drag_x - 6, g_game.drag_y - 3, "BOX", COLOR_BLACK);
+        int dx = g_game.drag_x;
+        int dy = g_game.drag_y;
+        renderer_fill_rect(dx - 7, dy - 5, 14, 10, RGB15(8, 7, 5) | BIT(15));
+        renderer_draw_rect(dx - 7, dy - 5, 14, 10, COLOR_BRASS);
+        renderer_fill_rect(dx - 2, dy - 2, 4, 4, COLOR_AMBER);
     }
 }
 

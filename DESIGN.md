@@ -213,3 +213,14 @@ Leyenda de Estados:
 - **Dilema:** ¿Cómo obtiene el jugador los consumibles (bombardeo, pulso PEM, sobrecarga) y cómo los ejecuta en la pantalla táctil?
   - *Alternativa 1:* Ranuras fijas en la barra inferior para arrastrar al campo de batalla con stylus.
   - *Alternativa 2:* Cajas de suministros paracaidistas que caen en el campo de batalla y deben abrirse con un tap antes de ser destruidas.
+
+### `[OQ-06]` Balística Canónica, Metrónomo de Muralla, Salud Virtual y Logística Táctil
+- **Estado:** `[DECIDIDO]`
+- **Decisión:**
+  1. **La Muralla como Metrónomo Central:** La cadencia de disparo es un atributo unificado de la plataforma (`fire_interval`). Las torretas individuales son puntos de fuego visuales; al incorporar una 2ª torreta, la cadencia global de la muralla escala y el fuego se intercala homogéneamente.
+  2. **Alternancia Bidimensional (Torretas y Cañones):** El metrónomo alterna de forma continua tanto la torreta activa como los cañones izquierdo y derecho ($T_1 L \to T_2 L \to T_1 R \to T_2 R \dots$). A máxima cadencia, el frente se percibe como una batería pesada implacable y coordinada.
+  3. **Línea de Alcance Recta Paralela ($Y=64$):** El rango no es un círculo individual por torreta, sino una línea horizontal paralela al muro a $Y=64$ en la calzada ($X \in [32..224]$), alineada a las juntas de baldosas.
+  4. **Salud Virtual Anti-Overkill (`incoming_damage`):** Los proyectiles vuelan visualmente a destino con daño garantizado. Cada enemigo acumula `incoming_damage`; la batería únicamente dispara a enemigos donde $\text{hp} - \text{incoming\_damage} > 0$, eliminando el desperdicio de munición por sobreaniquilación.
+  5. **Comportamiento Táctil Estricto (Prohibido Fuego a Asfalto Vacío):** Pulsar o arrastrar el stylus sobre asfalto vacío NO dispara. El fuego solo se activa si el stylus pulsa o pasa sobre un enemigo vivo (dentro de tolerancia táctil de ~16-20 px).
+  6. **Logística Táctil de Munición (Fricción Manual Fase 1):** Cajón único de munición en búnker ($X=128, Y=166$). Al vaciarse el tambor (10 disparos base), la torreta entra en bloqueo y requiere arrastrar suministros desde el depósito con el stylus para recargar.
+  7. **Indicador de Integridad Dieléctrico por Cátodos (32 Bombillas):** La barra de vida de la muralla se sustituye por una fila de 32 bombillas de filamento/cátodo verde a lo largo del zócalo inferior ($Y \in [186..191]$), integradas visualmente en la chapa del búnker.
