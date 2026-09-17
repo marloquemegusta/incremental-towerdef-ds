@@ -175,34 +175,74 @@ void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration) 
 void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
 
-    int particle_count = 10 + variant * 8;
-    uint16_t col_primary = (variant == 0 || variant == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
-    uint16_t col_secondary = COLOR_XENOS_FLESH;
+    // More particles: 18 base + variant * 4 (up to 46 for colossus)
+    int particle_count = 18 + variant * 4;
+    if (particle_count > 48) particle_count = 48;
 
-    // Ground puddles
-    game_add_splatter_ex(x, y, col_primary, (variant >= 2 ? 1 : 0), 400 + (rand() % 100));
-    if (variant >= 1) {
-        game_add_splatter_ex(x - 2, y + 1, col_secondary, 0, 350 + (rand() % 100));
-        game_add_splatter_ex(x + 2, y - 1, col_primary, 0, 350 + (rand() % 100));
+    uint16_t col_primary   = (variant == 0 || variant == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
+    uint16_t col_secondary = COLOR_XENOS_FLESH;
+    uint16_t col_chitin    = COLOR_XENOS_CHITIN;
+    uint16_t col_ichor     = COLOR_XENOS_ICHOR;
+
+    // Proportional puddle on ground (lasts 900-1200 frames, ~15-20s):
+    // size 1: Small (Scourge, Zergling) ~ 8x5 px
+    // size 2: Medium (Hydralisk, Mutalisk, Defiler) ~ 14x7 px
+    // size 3: Large (Lurker, Guardian) ~ 20x9 px
+    // size 4: Colossus (Ultralisk) ~ 30x13 px
+    int pool_size = 1;
+    if (variant >= 2 && variant <= 4) pool_size = 2;
+    else if (variant >= 5 && variant <= 6) pool_size = 3;
+    else if (variant >= 7) pool_size = 4;
+
+    game_add_splatter_ex(x, y, col_primary, pool_size, 900 + (rand() % 300));
+
+    // Satellite splatter droplets around the pool
+    int satellite_count = 2 + pool_size * 2;
+    for (int d = 0; d < satellite_count; d++) {
+        int ang = rand() % 256;
+        int dist = (rand() % (pool_size * 3 + 3)) + 3;
+        int dx = (fixed_cos(ang) * dist) >> 8;
+        int dy = (fixed_sin(ang) * dist) >> 8;
+        uint16_t d_col = (rand() % 2 == 0) ? col_secondary : col_ichor;
+        game_add_splatter_ex(x + dx, y + dy, d_col, 0, 700 + (rand() % 300));
     }
 
-    // Airborne ballistic particles
+    // Airborne ballistic particles: LOCAL EXPLOSION with 1 or 2 shrapnel flung far
     int spawned = 0;
     for (int i = 0; i < MAX_DEATH_PARTICLES && spawned < particle_count; i++) {
         if (!g_death_particles[i].active) {
             g_death_particles[i].active = 1;
-            g_death_particles[i].x = TO_FP(x) + ((rand() % 7 - 3) << FP_SHIFT);
-            g_death_particles[i].y = TO_FP(y) + ((rand() % 7 - 3) << FP_SHIFT);
-            g_death_particles[i].z = TO_FP(3 + variant * 2);
+            g_death_particles[i].x = TO_FP(x) + ((rand() % 7 - 3) << (FP_SHIFT - 1));
+            g_death_particles[i].y = TO_FP(y) + ((rand() % 7 - 3) << (FP_SHIFT - 1));
+            g_death_particles[i].z = TO_FP(2 + (rand() % 3));
 
             int ang = rand() % 256;
-            int spd = (rand() % TO_FP(3)) + TO_FP(1);
-            g_death_particles[i].vx = ((fixed_cos(ang) * spd) >> FP_SHIFT) + (bvx / 10);
-            g_death_particles[i].vy = ((fixed_sin(ang) * spd) >> FP_SHIFT) + (bvy / 10);
-            g_death_particles[i].vz = TO_FP(1) + (rand() % TO_FP(3));
-            g_death_particles[i].life = 35;
-            g_death_particles[i].color = (rand() % 2 == 0) ? col_primary : col_secondary;
-            g_death_particles[i].size = (variant >= 3 && (rand() % 2 == 0)) ? 1 : 0;
+
+            // Exactly 1 or 2 particles shoot far; the rest remain strictly local
+            int is_distant = (spawned == 0 || (spawned == 1 && (rand() % 3 == 0)));
+
+            if (is_distant) {
+                // High velocity shrapnel flung far (2..3.5 px/frame)
+                int spd = TO_FP(2) + (rand() % (FP_ONE * 3 / 2));
+                g_death_particles[i].vx = ((fixed_cos(ang) * spd) >> FP_SHIFT) + (bvx / 16);
+                g_death_particles[i].vy = ((fixed_sin(ang) * spd) >> FP_SHIFT) + (bvy / 16);
+                g_death_particles[i].vz = TO_FP(2) + (rand() % TO_FP(2));
+                g_death_particles[i].life = 35 + (rand() % 15);
+                g_death_particles[i].size = 1; // Chunky fragment
+                g_death_particles[i].color = col_chitin;
+            } else {
+                // LOCAL EXPLOSION: Low velocity (0.15..0.75 px/frame), stays within 3..8 px
+                int spd = (rand() % (FP_ONE * 5 / 8)) + (FP_ONE / 8);
+                g_death_particles[i].vx = ((fixed_cos(ang) * spd) >> FP_SHIFT) + (bvx / 48);
+                g_death_particles[i].vy = ((fixed_sin(ang) * spd) >> FP_SHIFT) + (bvy / 48);
+                g_death_particles[i].vz = (FP_ONE / 2) + (rand() % (FP_ONE * 3 / 2)); // Pop up in air
+                g_death_particles[i].life = 16 + (rand() % 14);
+                g_death_particles[i].size = (rand() % 3 == 0) ? 1 : 0;
+                int r_col = rand() % 3;
+                if (r_col == 0) g_death_particles[i].color = col_primary;
+                else if (r_col == 1) g_death_particles[i].color = col_secondary;
+                else g_death_particles[i].color = col_ichor;
+            }
             spawned++;
         }
     }
@@ -799,6 +839,9 @@ void game_update_simulation(void) {
         g_death_particles[i].x += g_death_particles[i].vx;
         g_death_particles[i].y += g_death_particles[i].vy;
         g_death_particles[i].z += g_death_particles[i].vz;
+        // Aerodynamic viscous drag: rapidly settles particles into local blast radius
+        g_death_particles[i].vx = (g_death_particles[i].vx * 7) / 8;
+        g_death_particles[i].vy = (g_death_particles[i].vy * 7) / 8;
         g_death_particles[i].vz -= (FP_ONE / 8); // Gravity
         g_death_particles[i].life--;
 

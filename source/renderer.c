@@ -504,17 +504,51 @@ void renderer_draw_bullets(void) {
     }
 }
 
+static void draw_splatter_blob_buffer(uint16_t *buffer, int cx, int cy, int size, uint16_t col_primary) {
+    if (size == 0) {
+        if (cx >= 0 && cx < SCREEN_W && cy >= 0 && cy < SCREEN_H) {
+            buffer[cy * SCREEN_W + cx] = col_primary;
+        }
+        return;
+    }
+
+    uint16_t col_rim = COLOR_XENOS_ICHOR;
+
+    // Fast pre-baked integer row spans for organic elliptical puddles
+    static const int8_t s_spans_s1[5]  = { 2, 4, 4, 3, 2 }; // size 1: 5 rows (-2..+2) ~ 8x5 px
+    static const int8_t s_spans_s2[7]  = { 3, 5, 7, 7, 6, 4, 2 }; // size 2: 7 rows (-3..+3) ~ 14x7 px
+    static const int8_t s_spans_s3[9]  = { 4, 7, 9, 10, 10, 9, 7, 5, 3 }; // size 3: 9 rows (-4..+4) ~ 20x9 px
+    static const int8_t s_spans_s4[13] = { 5, 8, 11, 13, 15, 15, 15, 14, 12, 10, 8, 6, 3 }; // size 4: 13 rows (-6..+6) ~ 30x13 px
+
+    const int8_t *spans;
+    int half_h;
+    if (size == 1) { spans = s_spans_s1; half_h = 2; }
+    else if (size == 2) { spans = s_spans_s2; half_h = 3; }
+    else if (size == 3) { spans = s_spans_s3; half_h = 4; }
+    else { spans = s_spans_s4; half_h = 6; }
+
+    for (int dy = -half_h; dy <= half_h; dy++) {
+        int py = cy + dy;
+        if (py < 0 || py >= SCREEN_H) continue;
+        int hw = spans[dy + half_h];
+        uint16_t *dst_row = &buffer[py * SCREEN_W];
+        for (int dx = -hw; dx <= hw; dx++) {
+            int px = cx + dx;
+            if (px < 0 || px >= SCREEN_W) continue;
+            int dist_sq = dx * dx + (dy * 2) * (dy * 2);
+            uint16_t col = (dist_sq <= (hw * hw / 2)) ? col_primary : col_rim;
+            dst_row[px] = col;
+        }
+    }
+}
+
 void renderer_draw_splatters_top(void) {
     for (int i = 0; i < MAX_SPLATTERS; i++) {
         if (g_splatters[i].life <= 0) continue;
         int gx = g_splatters[i].x;
         int gy = g_splatters[i].y;
-        if (gy >= 0 && gy < SCREEN_H) {
-            top_draw_pixel(gx, gy, g_splatters[i].color);
-            if (g_splatters[i].size > 1) {
-                top_draw_pixel(gx + 1, gy, g_splatters[i].color);
-                top_draw_pixel(gx, gy + 1, g_splatters[i].color);
-            }
+        if (gy >= -16 && gy < SCREEN_H + 16) {
+            draw_splatter_blob_buffer(g_top_backbuffer, gx, gy, g_splatters[i].size, g_splatters[i].color);
         }
     }
 }
@@ -524,12 +558,8 @@ void renderer_draw_splatters_bottom(void) {
         if (g_splatters[i].life <= 0) continue;
         int gx = g_splatters[i].x;
         int gy = g_splatters[i].y - 192;
-        if (gy >= 0 && gy < SCREEN_H) {
-            renderer_draw_pixel(gx, gy, g_splatters[i].color);
-            if (g_splatters[i].size > 1) {
-                renderer_draw_pixel(gx + 1, gy, g_splatters[i].color);
-                renderer_draw_pixel(gx, gy + 1, g_splatters[i].color);
-            }
+        if (gy >= -16 && gy < SCREEN_H + 16) {
+            draw_splatter_blob_buffer(g_backbuffer, gx, gy, g_splatters[i].size, g_splatters[i].color);
         }
     }
 }
@@ -539,8 +569,13 @@ void renderer_draw_death_particles_top(void) {
         if (!g_death_particles[i].active) continue;
         int gx = FROM_FP(g_death_particles[i].x);
         int gy = FROM_FP(g_death_particles[i].y);
-        if (gy >= 0 && gy < SCREEN_H) {
-            top_draw_pixel(gx, gy, g_death_particles[i].color);
+        int gz = FROM_FP(g_death_particles[i].z);
+        int draw_y = gy - gz; // Elevated 3D parabolic arc!
+        if (draw_y >= 0 && draw_y < SCREEN_H && gx >= 0 && gx < SCREEN_W) {
+            top_draw_pixel(gx, draw_y, g_death_particles[i].color);
+            if (g_death_particles[i].size > 0 && gx + 1 < SCREEN_W) {
+                top_draw_pixel(gx + 1, draw_y, g_death_particles[i].color);
+            }
         }
     }
 }
@@ -550,8 +585,17 @@ void renderer_draw_death_particles_bottom(void) {
         if (!g_death_particles[i].active) continue;
         int gx = FROM_FP(g_death_particles[i].x);
         int gy = FROM_FP(g_death_particles[i].y) - 192;
-        if (gy >= 0 && gy < SCREEN_H) {
-            renderer_draw_pixel(gx, gy, g_death_particles[i].color);
+        int gz = FROM_FP(g_death_particles[i].z);
+        int draw_y = gy - gz; // Elevated 3D parabolic arc!
+        if (draw_y >= 0 && draw_y < SCREEN_H && gx >= 0 && gx < SCREEN_W) {
+            renderer_draw_pixel(gx, draw_y, g_death_particles[i].color);
+            if (g_death_particles[i].size > 0) {
+                if (gx + 1 < SCREEN_W) renderer_draw_pixel(gx + 1, draw_y, g_death_particles[i].color);
+                // Drop shadow on ground under flying chunks
+                if (gy >= 0 && gy < SCREEN_H && gz > 1) {
+                    renderer_draw_pixel(gx, gy, RGB15(2, 2, 4) | BIT(15));
+                }
+            }
         }
     }
 }
