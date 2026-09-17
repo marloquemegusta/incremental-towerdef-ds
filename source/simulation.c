@@ -1017,22 +1017,20 @@ void game_update_simulation(void) {
         int sep_force_y = 0;
         for (int j = 0; j < MAX_ENEMIES; j++) {
             if (i == j || !g_enemies[j].active) continue;
-            // Only check enemies within a fast bounding box (Manhattan distance < 32 px)
-            int odx = ex - g_enemies[j].x;
             int ody = ey - g_enemies[j].y;
-            int aodx = (odx < 0) ? -odx : odx;
             int aody = (ody < 0) ? -ody : ody;
-            if (aodx < TO_FP(24) && aody < TO_FP(24)) {
-                int dist_sq = (aodx >> FP_SHIFT) * (aodx >> FP_SHIFT) + (aody >> FP_SHIFT) * (aody >> FP_SHIFT);
-                // Repel if closer than 16 px center-to-center
-                if (dist_sq < (16 * 16) && dist_sq > 0) {
-                    // Small repulsive impulse in fixed point (~0.25 to 0.5 px)
-                    int push = TO_FP(1) / 3;
-                    if (odx > 0) sep_force_x += push;
-                    else if (odx < 0) sep_force_x -= push;
-                    if (ody > 0) sep_force_y += push / 2;
-                    else if (ody < 0) sep_force_y -= push / 2;
-                }
+            if (aody >= TO_FP(16)) continue;
+            int odx = ex - g_enemies[j].x;
+            int aodx = (odx < 0) ? -odx : odx;
+            if (aodx >= TO_FP(16)) continue;
+
+            int dist_sq = (aodx >> FP_SHIFT) * (aodx >> FP_SHIFT) + (aody >> FP_SHIFT) * (aody >> FP_SHIFT);
+            if (dist_sq < (16 * 16) && dist_sq > 0) {
+                int push = TO_FP(1) / 3;
+                if (odx > 0) sep_force_x += push;
+                else if (odx < 0) sep_force_x -= push;
+                if (ody > 0) sep_force_y += push / 2;
+                else if (ody < 0) sep_force_y -= push / 2;
             }
         }
         ex += sep_force_x;

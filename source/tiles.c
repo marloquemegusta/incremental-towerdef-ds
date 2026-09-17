@@ -226,11 +226,18 @@ void tiles_restore_ground_rect(uint16_t *dst_buffer, int x, int y, int w, int h,
     int y0 = (y < 0) ? 0 : y;
     int x1 = (x + w > SCREEN_W) ? SCREEN_W : (x + w);
     int y1 = (y + h > SCREEN_H) ? SCREEN_H : (y + h);
-    int copy_w = x1 - x0;
-    if (copy_w <= 0 || y1 <= y0) return;
+    if (x1 <= x0 || y1 <= y0) return;
+
+    int align_x0 = x0 & ~1;
+    int align_x1 = (x1 + 1) & ~1;
+    int words = (align_x1 - align_x0) >> 1;
 
     for (int j = y0; j < y1; j++) {
-        memcpy(&dst_buffer[j * SCREEN_W + x0], &src_cache[j * SCREEN_W + x0], copy_w * sizeof(uint16_t));
+        uint32_t *d32 = (uint32_t *)&dst_buffer[j * SCREEN_W + align_x0];
+        const uint32_t *s32 = (const uint32_t *)&src_cache[j * SCREEN_W + align_x0];
+        for (int k = 0; k < words; k++) {
+            d32[k] = s32[k];
+        }
     }
 }
 
