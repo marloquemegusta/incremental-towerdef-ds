@@ -2,99 +2,94 @@
   "rom": "game.nds",
   "steps": [
     {
-      "frames": 25,
-      "capture": "combat_000"
+      "frames": 10,
+      "capture_sequence": "f600",
+      "capture": "boot_prep"
     },
     {
       "tap": {
         "x": 220,
         "y": 170
       },
-      "frames": 4
+      "frames": 4,
+      "capture_sequence": "f600"
     },
     {
       "release": true,
       "frames": 20,
-      "capture": "combat_001"
+      "capture_sequence": "f600"
     },
     {
-      "frames": 60,
-      "capture": "combat_002"
+      "frames": 45,
+      "capture_sequence": "f600"
     },
     {
-      "touch": {
+      "tap": {
         "x": 80,
         "y": 60
       },
-      "frames": 24,
-      "capture_sequence": "combat_seq1",
-      "capture_every": 2
+      "frames": 80,
+      "capture_sequence": "f600"
+    },
+    {
+      "tap": {
+        "x": 105,
+        "y": 50
+      },
+      "frames": 80,
+      "capture_sequence": "f600"
+    },
+    {
+      "tap": {
+        "x": 150,
+        "y": 45
+      },
+      "frames": 80,
+      "capture_sequence": "f600"
+    },
+    {
+      "tap": {
+        "x": 190,
+        "y": 60
+      },
+      "frames": 80,
+      "capture_sequence": "f600"
+    },
+    {
+      "tap": {
+        "x": 128,
+        "y": 80
+      },
+      "frames": 100,
+      "capture_sequence": "f600"
+    },
+    {
+      "tap": {
+        "x": 60,
+        "y": 70
+      },
+      "frames": 40,
+      "capture_sequence": "f600"
+    },
+    {
+      "tap": {
+        "x": 180,
+        "y": 70
+      },
+      "frames": 40,
+      "capture_sequence": "f600"
     },
     {
       "release": true,
-      "frames": 8,
-      "capture_sequence": "combat_seq1_rel",
-      "capture_every": 2
-    },
-    {
-      "touch": {
-        "x": 160,
-        "y": 55
-      },
-      "frames": 24,
-      "capture_sequence": "combat_seq2",
-      "capture_every": 2
-    },
-    {
-      "release": true,
-      "frames": 8,
-      "capture_sequence": "combat_seq2_rel",
-      "capture_every": 2
-    },
-    {
-      "touch": {
-        "x": 125,
-        "y": 75
-      },
-      "frames": 30,
-      "capture_sequence": "combat_seq3",
-      "capture_every": 2
-    },
-    {
-      "release": true,
-      "frames": 8,
-      "capture_sequence": "combat_seq3_rel",
-      "capture_every": 2
-    },
-    {
-      "touch": {
-        "x": 50,
-        "y": 65
-      },
-      "frames": 16,
-      "capture_sequence": "combat_seq4",
-      "capture_every": 2
-    },
-    {
-      "touch": {
-        "x": 200,
-        "y": 65
-      },
-      "frames": 16,
-      "capture_sequence": "combat_seq5",
-      "capture_every": 2
-    },
-    {
-      "release": true,
-      "frames": 30,
-      "capture_sequence": "combat_seq6",
-      "capture_every": 3
+      "frames": 21,
+      "capture_sequence": "f600",
+      "capture": "combat_end"
     }
   ],
   "assertions": {
     "screen_changed": {
-      "from": "combat_000",
-      "to": "combat_002",
+      "from": "boot_prep",
+      "to": "combat_end",
       "min_changed_pixels": 100
     }
   }
