@@ -96,6 +96,7 @@ int main(void) {
             renderer_draw_battlefield_bottom();
             renderer_draw_splatters_bottom();
             renderer_draw_enemies_bottom();
+            renderer_draw_wall(); // 3D Depth: Wall parapet occludes enemy heads & front limbs
             renderer_draw_bullets();
             renderer_draw_death_particles_bottom();
 
