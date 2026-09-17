@@ -523,6 +523,7 @@ void wall_fire_at(int target_x, int target_y) {
 
 void wall_update(void) {
     if (g_wall.fire_cooldown > 0) g_wall.fire_cooldown--;
+    if (g_wall.damage_flash_timer > 0) g_wall.damage_flash_timer--;
 
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
         // Active reload progress
@@ -1011,45 +1012,31 @@ void game_update_simulation(void) {
         if (ex > TO_FP(248)) ex = TO_FP(248);
         g_enemies[i].x = ex;
 
-        // Check if reaching Bunker Sanctum baseline (py >= 344):
-        // Never teleport! Stagger frontline along bunker wall (x: 88..168) using index-based slot
-        int slot_x = 88 + ((i * 13) % 80); // Distributed slots across 80 px width
-        if (py >= 344) {
-            g_enemies[i].y = TO_FP(344);
+        // Check if reaching Wall fortification rim (Y_global >= 330, i.e. Y_local >= 138):
+        // The Wall is a continuous defensive line across the entire road (x: 32..224).
+        // Enemies DO NOT steer towards turrets; they attack the Wall directly in their lane!
+        if (py >= 330) {
+            g_enemies[i].y = TO_FP(330);
             g_enemies[i].vy = 0;
-
-            if (px < slot_x - 3) {
-                g_enemies[i].x += spd;
-                g_enemies[i].vx = spd;
-                g_enemies[i].dir = 2; // East (dir 2 = East in 8-way compass)
-                g_enemies[i].biting_target = -1;
-                continue;
-            } else if (px > slot_x + 3) {
-                g_enemies[i].x -= spd;
-                g_enemies[i].vx = -spd;
-                g_enemies[i].dir = 6; // West (dir 6 = West in 8-way compass)
-                g_enemies[i].biting_target = -1;
-                continue;
-            }
-
-            // Arrived at Bunker slot: bite the Sanctum!
             g_enemies[i].vx = 0;
-            g_enemies[i].dir = 4; // Face South against the bunker wall
-            g_enemies[i].biting_target = 99;
+            g_enemies[i].dir = 4; // Face South against the fortified wall
+            g_enemies[i].biting_target = 99; // Attacking the Wall
             g_enemies[i].bite_timer++;
 
-            // Cycle attack animation while attacking
+            // Cycle attack animation
             const EnemyTypeDef *type = &g_enemy_types[g_enemies[i].variant];
             if (type->attack_frame_count > 0) {
                 g_enemies[i].anim_frame = (g_enemies[i].bite_timer / 6) % type->attack_frame_count;
             }
 
-            if (g_enemies[i].bite_timer >= 40) {
+            // Attack cycle every 25 frames (~2.4 attacks/sec per breaching xenos)
+            if (g_enemies[i].bite_timer >= 25) {
                 g_enemies[i].bite_timer = 0;
                 int b_variant = g_enemies[i].variant;
                 if (b_variant < 0) b_variant = 0;
                 if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
                 uint64_t bite_dmg = g_balance.enemy_bite_damage[b_variant];
+                if (bite_dmg < 6) bite_dmg = 6; // Guaranteed visible chunk (~2 bulbs per bite)
                 if (g_game.mode != MODE_DEBUG_SANDBOX) {
                     if (g_wall.hp > bite_dmg) {
                         g_wall.hp -= bite_dmg;
@@ -1060,36 +1047,22 @@ void game_update_simulation(void) {
                         return;
                     }
                     g_game.bunker_hp = g_wall.hp;
+                    g_wall.damage_flash_timer = 6; // Trigger visual cathode trauma feedback
 
-                    // Wall impact sparks and blood splatter feedback
+                    // Wall impact sparks & concrete dust at the enemy's exact contact point along the wall
                     int bpx = FROM_FP(g_enemies[i].x);
-                    int bpy = FROM_FP(g_enemies[i].y) - 192;
-                    game_add_splatter_ex(bpx, bpy, COLOR_LED_RED, 1, 10);
-                    game_add_splatter_ex(bpx + ((rand() % 9) - 4), bpy + ((rand() % 5) - 2), COLOR_BOLTER_TRACER, 0, 6);
+                    int bpy = 138;
+                    game_add_splatter_ex(bpx, bpy, COLOR_BOLTER_TRACER, 1, 8);
+                    game_add_splatter_ex(bpx + ((rand() % 9) - 4), bpy + ((rand() % 5) - 2), COLOR_LED_RED, 0, 6);
                 }
             }
             continue;
         }
 
-        // Advance: vertical downward in parallel lanes across top screen and upper bottom screen
+        // Advance: straight vertical downward in parallel lanes across both screens
         g_enemies[i].y += spd + sep_force_y;
         g_enemies[i].vy = spd;
         g_enemies[i].vx = sep_force_x;
-
-        // Funnel X towards Sanctum bunker slot in lower bottom screen (py > 255)
-        if (spd > 0 && py > 255) {
-            int target_x = TO_FP(slot_x);
-            int h_spd = spd / 3;
-            if (h_spd < 1) h_spd = 1;
-            if (ex < target_x - TO_FP(4)) {
-                ex += h_spd;
-                g_enemies[i].vx = h_spd;
-            } else if (ex > target_x + TO_FP(4)) {
-                ex -= h_spd;
-                g_enemies[i].vx = -h_spd;
-            }
-            g_enemies[i].x = ex;
-        }
 
         int move_dir = enemy_direction_from_delta(g_enemies[i].x - old_x,
                                                    g_enemies[i].y - old_y);

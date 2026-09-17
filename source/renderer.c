@@ -334,25 +334,40 @@ void renderer_draw_wall(void) {
         if (g_wall.hp > 0 && lit_bulbs == 0) lit_bulbs = 1;
         if (lit_bulbs > num_bulbs) lit_bulbs = num_bulbs;
 
+        int is_flashing = (g_wall.damage_flash_timer > 0);
+
         uint16_t col_hot, col_glow;
-        if (g_wall.hp * 4 > (uint64_t)max_hp) {
+        if (is_flashing) {
+            // Trauma flash: bright white-gold shockwave across active bulbs
+            col_hot  = RGB15(31, 31, 28) | BIT(15);
+            col_glow = RGB15(31, 22, 4)  | BIT(15);
+        } else if (g_wall.hp * 4 > (uint64_t)max_hp) {
             // Healthy (>25%): Emerald Green Phosphor
-            col_hot  = RGB15(22, 31, 22) | BIT(15);
-            col_glow = RGB15(2, 30, 8)   | BIT(15);
+            col_hot  = RGB15(24, 31, 24) | BIT(15);
+            col_glow = RGB15(2, 31, 6)   | BIT(15);
         } else {
             // Critical (<=25%): Pulsing Crimson Alert
-            col_hot  = RGB15(31, 20, 20) | BIT(15);
-            col_glow = RGB15(30, 3, 3)   | BIT(15);
+            static int s_pulse_timer = 0;
+            s_pulse_timer++;
+            if ((s_pulse_timer / 8) % 2 == 0) {
+                col_hot  = RGB15(31, 24, 24) | BIT(15);
+                col_glow = RGB15(31, 4, 4)   | BIT(15);
+            } else {
+                col_hot  = RGB15(24, 6, 6)   | BIT(15);
+                col_glow = RGB15(16, 2, 2)   | BIT(15);
+            }
         }
-        uint16_t col_cold = RGB15(2, 3, 3) | BIT(15);
-        uint16_t col_bezel = RGB15(4, 4, 5) | BIT(15);
+        // Distinct lifeless extinguished socket: dark gray ring, black hollow center
+        uint16_t col_dead_rim   = RGB15(6, 6, 7) | BIT(15);
+        uint16_t col_dead_core  = RGB15(1, 1, 2) | BIT(15);
+        uint16_t col_bezel      = RGB15(3, 3, 4) | BIT(15);
 
         int cy = 188;
         for (int i = 0; i < num_bulbs; i++) {
             int cx = 4 + i * 8;
             int is_lit = (i < lit_bulbs);
-            uint16_t c_core = is_lit ? col_hot : col_cold;
-            uint16_t c_rim  = is_lit ? col_glow : RGB15(1, 1, 2) | BIT(15);
+            uint16_t c_core = is_lit ? col_hot : col_dead_core;
+            uint16_t c_rim  = is_lit ? col_glow : col_dead_rim;
 
             // 4x4 circular bezel housing
             // Row 0 (cy - 1): . # # .

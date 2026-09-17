@@ -190,6 +190,7 @@ typedef struct {
     int is_reloading[4]; // 1 if socket is empty / requires manual reload
 
     int battery_fire_step; // Metronome round-robin counter alternating turrets and barrels
+    int damage_flash_timer; // Feedback trauma flash when wall integrity is damaged
     int fire_cooldown;   // Global wall battery cadence throttle
     int fire_interval;   // Fire rate (frames between rounds, default 12 for 1 turret)
     int damage;          // Damage per bullet impact (default 1)
