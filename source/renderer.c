@@ -249,6 +249,29 @@ void renderer_draw_wall(void) {
         int dest_y = sy - TURRET_PIVOT_Y;
         wall_draw_turret_sprite(g_backbuffer, dest_x, dest_y, angle);
 
+        // Diegetic Ammo & Reload indicator beneath each turret cupola
+        int bar_w = 16;
+        int bar_x = sx - bar_w / 2;
+        int bar_y = sy + 5;
+        if (bar_y >= 0 && bar_y + 2 < SCREEN_H) {
+            g_backbuffer[(bar_y - 1) * SCREEN_W + bar_x - 1] = COLOR_BLACK;
+            renderer_fill_rect(bar_x - 1, bar_y - 1, bar_w + 2, 3, COLOR_BLACK);
+            if (g_wall.is_reloading[s]) {
+                // Reload in progress: filling phosphor green progress bar
+                int reload_prog = ((g_wall.reload_time - g_wall.reload_timer[s]) * bar_w) / g_wall.reload_time;
+                if (reload_prog > 0) {
+                    renderer_fill_rect(bar_x, bar_y, reload_prog, 1, COLOR_PHOSPHOR_GREEN);
+                }
+            } else {
+                // Ammo bar: amber gold turning LED red when low (< 25%)
+                int ammo_fill = (g_wall.ammo[s] * bar_w) / (g_wall.max_ammo[s] > 0 ? g_wall.max_ammo[s] : 1);
+                uint16_t ammo_col = (g_wall.ammo[s] > g_wall.max_ammo[s] / 4) ? COLOR_AMBER : COLOR_LED_RED;
+                if (ammo_fill > 0) {
+                    renderer_fill_rect(bar_x, bar_y, ammo_fill, 1, ammo_col);
+                }
+            }
+        }
+
         // Muzzle Flash
         if (g_wall.muzzle_flash_timer[s] > 0) {
             int alt = g_wall.muzzle_flash_barrel[s];
