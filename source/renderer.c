@@ -706,28 +706,6 @@ void renderer_draw_death_particles_bottom(void) {
     }
 }
 
-void renderer_draw_ui_prep(void) {
-    // Top HUD banner
-    top_fill_rect(0, 0, SCREEN_W, 14, COLOR_BLACK);
-    char buf[64];
-    snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
-    top_draw_text(6, 4, buf, COLOR_AMBER);
-    
-    char scrap_buf[32];
-    format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
-    snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
-    top_draw_text(160, 4, buf, COLOR_PHOSPHOR_GREEN);
-
-    // Sleek, unobtrusive prep buttons on battlefield floor (y=112..136, above the wall)
-    // Start wave button (clean green prompt)
-    renderer_fill_rect(190, 150, 60, 36, COLOR_LED_GREEN);
-    renderer_draw_rect(190, 150, 60, 36, COLOR_WHITE);
-    renderer_draw_text(198, 164, "START", COLOR_BLACK);
-
-    // Instruction banner on highway
-    renderer_draw_text(35, 126, "PULSA [A / START] PARA COMBATE", COLOR_AMBER);
-}
-
 void renderer_draw_ui_wave(void) {
     // Top HUD banner
     top_fill_rect(0, 0, SCREEN_W, 28, COLOR_BLACK);
@@ -776,28 +754,94 @@ void renderer_draw_ui_wave(void) {
     }
 }
 
+void renderer_draw_ui_prep(void) {
+    renderer_draw_ui_pause();
+}
+
 void renderer_draw_ui_pause(void) {
-    renderer_fill_rect(48, 60, 160, 72, COLOR_BLACK);
-    renderer_draw_rect(48, 60, 160, 72, COLOR_AMBER);
-    renderer_draw_text(100, 75, "PAUSED", COLOR_AMBER);
-    renderer_draw_text(70, 95, "PRESS START TO RESUME", COLOR_WHITE);
+    // Top HUD banner
+    top_fill_rect(0, 0, SCREEN_W, 14, COLOR_BLACK);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
+    top_draw_text(6, 4, buf, COLOR_AMBER);
+    top_draw_text(90, 4, "[PAUSA]", COLOR_WHITE);
+
+    char scrap_buf[32];
+    format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
+    snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
+    top_draw_text(160, 4, buf, COLOR_PHOSPHOR_GREEN);
+
+    int is_fresh = (g_game.wave_timer >= STAGE_DURATION_FRAMES || g_game.enemies_spawned == 0);
+
+    // Prompt banner on battlefield road
+    renderer_draw_text(24, 128, "TOCA UN BOTON O PULSA START", COLOR_AMBER);
+
+    // 1. [TIENDA] Button (x: 10..84, y: 146..182)
+    renderer_fill_rect(10, 146, 74, 36, COLOR_IRON_PANEL);
+    renderer_draw_rect(10, 146, 74, 36, COLOR_AMBER);
+    renderer_draw_text(26, 154, "TIENDA", COLOR_WHITE);
+    renderer_draw_text(18, 168, "+MEJORAS", COLOR_AMBER);
+
+    // 2. [CALIBRAR] Button (x: 90..164, y: 146..182)
+    renderer_fill_rect(90, 146, 74, 36, COLOR_IRON_PANEL);
+    renderer_draw_rect(90, 146, 74, 36, COLOR_AMBER);
+    renderer_draw_text(98, 154, "CALIBRAR", COLOR_WHITE);
+    renderer_draw_text(102, 168, "(STATS)", COLOR_PHOSPHOR_GREEN);
+
+    // 3. [JUGAR / REANUDAR] Button (x: 170..246, y: 146..182)
+    renderer_fill_rect(170, 146, 76, 36, COLOR_LED_GREEN);
+    renderer_draw_rect(170, 146, 76, 36, COLOR_WHITE);
+    if (is_fresh) {
+        renderer_draw_text(186, 154, "INICIAR", COLOR_BLACK);
+        renderer_draw_text(184, 168, "COMBATE", COLOR_BLACK);
+    } else {
+        renderer_draw_text(180, 154, "REANUDAR", COLOR_BLACK);
+        renderer_draw_text(186, 168, "[START]", COLOR_BLACK);
+    }
 }
 
 void renderer_draw_ui_game_over(void) {
-    renderer_fill_rect(40, 50, 176, 92, COLOR_BLACK);
-    renderer_draw_rect(40, 50, 176, 92, COLOR_LED_RED);
-    renderer_draw_text(85, 65, "SANCTUM FALLEN", COLOR_LED_RED);
+    renderer_fill_rect(36, 36, 184, 120, COLOR_BLACK);
+    renderer_draw_rect(36, 36, 184, 120, COLOR_LED_RED);
+    renderer_draw_rect(38, 38, 180, 116, COLOR_AMBER);
+    renderer_draw_text(76, 48, "SANCTUM CAIDO", COLOR_LED_RED);
     
     char buf[64];
-    snprintf(buf, sizeof(buf), "WAVES SURVIVED: %d", g_game.wave_number - 1);
-    renderer_draw_text(65, 85, buf, COLOR_WHITE);
+    snprintf(buf, sizeof(buf), "ETAPA ALCANZADA: %d/5", g_game.wave_number);
+    renderer_draw_text(48, 70, buf, COLOR_WHITE);
+
+    snprintf(buf, sizeof(buf), "BAJAS CONFIRMADAS: %llu", (unsigned long long)g_game.enemies_killed);
+    renderer_draw_text(48, 86, buf, COLOR_WHITE);
 
     char scrap_buf[32];
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
     snprintf(buf, sizeof(buf), "TOTAL SCRAP: %s", scrap_buf);
-    renderer_draw_text(65, 100, buf, COLOR_AMBER);
+    renderer_draw_text(48, 102, buf, COLOR_AMBER);
 
-    renderer_draw_text(65, 120, "TAP ANYWHERE TO RETRY", COLOR_PHOSPHOR_GREEN);
+    renderer_draw_text(44, 128, "TOCA O PULSA B PARA REINTENTAR", COLOR_PHOSPHOR_GREEN);
+}
+
+void renderer_draw_ui_victory(void) {
+    renderer_fill_rect(24, 28, 208, 136, COLOR_BLACK);
+    renderer_draw_rect(24, 28, 208, 136, COLOR_PHOSPHOR_GREEN);
+    renderer_draw_rect(26, 30, 204, 132, COLOR_AMBER);
+
+    renderer_draw_text(48, 40, "SECTOR 1 ASEGURADO!", COLOR_PHOSPHOR_GREEN);
+    renderer_draw_text(72, 56, "VICTORIA TOTAL", COLOR_AMBER);
+
+    char buf[64];
+    snprintf(buf, sizeof(buf), "ETAPAS SUPERADAS: 5/5");
+    renderer_draw_text(40, 78, buf, COLOR_WHITE);
+
+    snprintf(buf, sizeof(buf), "ENEMIGOS ELIMINADOS: %llu", (unsigned long long)g_game.enemies_killed);
+    renderer_draw_text(40, 94, buf, COLOR_WHITE);
+
+    char scrap_buf[32];
+    format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
+    snprintf(buf, sizeof(buf), "CHATARRA RECOLECTADA: %s", scrap_buf);
+    renderer_draw_text(40, 110, buf, COLOR_AMBER);
+
+    renderer_draw_text(35, 136, "TOCA O PULSA B PARA NUEVO CICLO", COLOR_PHOSPHOR_GREEN);
 }
 
 void renderer_draw_ui_upgrades(void) {

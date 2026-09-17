@@ -216,7 +216,8 @@ typedef enum {
     MODE_GAME_OVER,
     MODE_UPGRADES,
     MODE_CALIBRATION,
-    MODE_DEBUG_SANDBOX
+    MODE_DEBUG_SANDBOX,
+    MODE_VICTORY
 } GameMode;
 
 // Debug / Test Sandbox parameters state
@@ -378,6 +379,7 @@ void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_held);
+void game_handle_input_victory(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held);
@@ -417,6 +419,7 @@ void renderer_draw_ui_prep(void);
 void renderer_draw_ui_wave(void);
 void renderer_draw_ui_pause(void);
 void renderer_draw_ui_game_over(void);
+void renderer_draw_ui_victory(void);
 void renderer_draw_ui_upgrades(void);
 void renderer_draw_ui_calibration(void);
 void renderer_draw_ui_sandbox(void);
