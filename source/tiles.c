@@ -175,16 +175,10 @@ static void generate_urban_sandbags(uint16_t *buf) {
     }
 }
 
-void tiles_init(void) {
-    generate_urban_slab(s_tiles[0], 101);
-    generate_urban_grass(s_tiles[1]);
-    generate_urban_crack(s_tiles[2]);
-    generate_urban_oil(s_tiles[3]);
-    generate_urban_drain(s_tiles[4]);
-    generate_urban_sandbags(s_tiles[5]);
-}
+static uint16_t s_ground_top_cache[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
+static uint16_t s_ground_bottom_cache[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 
-void tiles_render_urban_ground(uint16_t *buffer, int y_offset) {
+static void generate_ground_to_buffer(uint16_t *buffer, int y_offset) {
     if (!buffer) return;
 
     for (int ty = 0; ty < MAP_ROWS; ty++) {
@@ -223,6 +217,24 @@ void tiles_render_urban_ground(uint16_t *buffer, int y_offset) {
             }
         }
     }
+}
+
+void tiles_init(void) {
+    generate_urban_slab(s_tiles[0], 101);
+    generate_urban_grass(s_tiles[1]);
+    generate_urban_crack(s_tiles[2]);
+    generate_urban_oil(s_tiles[3]);
+    generate_urban_drain(s_tiles[4]);
+    generate_urban_sandbags(s_tiles[5]);
+
+    generate_ground_to_buffer(s_ground_top_cache, 0);
+    generate_ground_to_buffer(s_ground_bottom_cache, 192);
+}
+
+void tiles_render_urban_ground(uint16_t *buffer, int y_offset) {
+    if (!buffer) return;
+    const uint16_t *src = (y_offset == 0) ? s_ground_top_cache : s_ground_bottom_cache;
+    dmaCopyWords(2, src, buffer, SCREEN_W * SCREEN_H * sizeof(uint16_t));
 }
 
 
