@@ -1,0 +1,54 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 10,
+      "capture_sequence": "frontline",
+      "capture_every": 2,
+      "capture": "start_prep"
+    },
+    {
+      "tap": {
+        "x": 220,
+        "y": 170
+      },
+      "frames": 5,
+      "capture_sequence": "frontline",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 25,
+      "capture_sequence": "frontline",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 640,
+      "capture_sequence": "frontline",
+      "capture_every": 15,
+      "capture": "frontline_approach"
+    },
+    {
+      "release": true,
+      "frames": 60,
+      "capture_sequence": "frontline",
+      "capture_every": 5,
+      "capture": "wall_first_bites"
+    },
+    {
+      "release": true,
+      "frames": 150,
+      "capture_sequence": "frontline",
+      "capture_every": 5,
+      "capture": "wall_heavy_damage"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "start_prep",
+      "to": "wall_heavy_damage",
+      "min_changed_pixels": 100
+    }
+  }
+}
