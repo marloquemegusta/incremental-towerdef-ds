@@ -8,7 +8,7 @@ const WallSocketDef c_wall_sockets[WALL_SOCKET_COUNT] = {
     { .x = 227, .y = 16, .default_angle = 4 }  // Socket 3: NE (+45 deg)
 };
 
-const TurretCalibratedPoints c_turret_points[TURRET_ANGLE_COUNT] = {
+const TurretCalibratedPoints c_turret_points[WALL_TURRET_ANGLE_COUNT] = {
     /* F0: NW  (-45 deg)  */ { .ml_x =  0, .ml_y = 8, .mr_x =  4, .mr_y = 6, .dl_x = 11, .dl_y = 28, .dr_x = 34, .dr_y = 19 },
     /* F1: NNW (-22.5 deg)*/ { .ml_x =  4, .ml_y = 4, .mr_x =  8, .mr_y = 3, .dl_x = 12, .dl_y = 27, .dr_x = 35, .dr_y = 18 },
     /* F2: N   (0 deg)    */ { .ml_x = 19, .ml_y = 0, .mr_x = 24, .mr_y = 0, .dl_x =  9, .dl_y = 20, .dr_x = 34, .dr_y = 20 },
@@ -787,7 +787,7 @@ const uint16_t c_wall_bitmap[WALL_WIDTH * WALL_HEIGHT] __attribute__((aligned(4)
     0x8400, 0x8400, 0x8400, 0x8400, 0x8400, 0x8400, 0x8400, 0x8400, 0x8400, 0x8400, 0x8400, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000,
 };
 
-const uint16_t c_turret_frames[TURRET_ANGLE_COUNT][TURRET_SPRITE_W * TURRET_SPRITE_H] __attribute__((aligned(4))) = {
+const uint16_t c_turret_frames[WALL_TURRET_ANGLE_COUNT][TURRET_SPRITE_W * TURRET_SPRITE_H] __attribute__((aligned(4))) = {
   // Angle 0
   {
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
@@ -1446,7 +1446,7 @@ void wall_draw_base(uint16_t *buffer, int wall_screen_y, uint64_t hp, uint64_t m
 }
 
 void wall_draw_turret_sprite(uint16_t *buffer, int dest_x, int dest_y, int angle_idx) {
-    if (!buffer || angle_idx < 0 || angle_idx >= TURRET_ANGLE_COUNT) return;
+    if (!buffer || angle_idx < 0 || angle_idx >= WALL_TURRET_ANGLE_COUNT) return;
     const uint16_t *src = c_turret_frames[angle_idx];
     for (int y = 0; y < TURRET_SPRITE_H; y++) {
         int py = dest_y + y;
