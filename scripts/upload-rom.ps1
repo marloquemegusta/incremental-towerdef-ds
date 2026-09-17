@@ -18,7 +18,7 @@ $curl = Get-Command curl.exe -ErrorAction Stop
 $base = "ftp://$HostName`:$Port$RemoteDirectory"
 $remote = "$base/$RemoteName"
 Write-Host "Subiendo $rom a $remote"
-& $curl.Source --connect-timeout 8 --max-time 60 --fail --show-error --ftp-pasv --user "$User`:$Password" --upload-file $rom $remote
+& $curl.Source --connect-timeout 10 --max-time 180 --fail --show-error --ftp-pasv --user "$User`:$Password" --upload-file $rom $remote
 if ($LASTEXITCODE -ne 0) { throw "FTP falló. Valida IP=$HostName, puerto=$Port y que la DS esté disponible." }
 $listing = & $curl.Source --connect-timeout 8 --max-time 20 --fail --silent --show-error --ftp-pasv --user "$User`:$Password" "$base/"
 $listingText = $listing -join "`n"

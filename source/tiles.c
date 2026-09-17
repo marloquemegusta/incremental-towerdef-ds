@@ -292,8 +292,35 @@ void tiles_init(void) {
         }
     }
 
-    // Pre-bake the Wall Base Parapet into the bottom ground cache! (wall_screen_y = 128)
-    wall_draw_base(s_ground_bottom_cache, 128, 100, 100);
+    // Pre-bake the Wall Base Parapet into the bottom ground cache at canonical WALL_DEFAULT_Y (144)
+    wall_draw_base(s_ground_bottom_cache, WALL_DEFAULT_Y, 100, 100);
+
+    // Pre-bake the Bunker Ammo Depot Crate at (AMMO_DEPOT_X=128, AMMO_DEPOT_Y=166)
+    int crate_x0 = AMMO_DEPOT_X - AMMO_CRATE_W / 2;
+    int crate_y0 = AMMO_DEPOT_Y - AMMO_CRATE_H / 2;
+    for (int dy = 0; dy < AMMO_CRATE_H; dy++) {
+        int py = crate_y0 + dy + 1;
+        if (py < 0 || py >= SCREEN_H) continue;
+        for (int dx = 0; dx < AMMO_CRATE_W; dx++) {
+            int px = crate_x0 + dx + 1;
+            if (px < 0 || px >= SCREEN_W) continue;
+            if (c_ammo_crate_sprite[dy * AMMO_CRATE_W + dx] & BIT(15)) {
+                s_ground_bottom_cache[py * SCREEN_W + px] = RGB15(1, 1, 2) | BIT(15);
+            }
+        }
+    }
+    for (int dy = 0; dy < AMMO_CRATE_H; dy++) {
+        int py = crate_y0 + dy;
+        if (py < 0 || py >= SCREEN_H) continue;
+        for (int dx = 0; dx < AMMO_CRATE_W; dx++) {
+            int px = crate_x0 + dx;
+            if (px < 0 || px >= SCREEN_W) continue;
+            uint16_t c = c_ammo_crate_sprite[dy * AMMO_CRATE_W + dx];
+            if (c & BIT(15)) {
+                s_ground_bottom_cache[py * SCREEN_W + px] = c;
+            }
+        }
+    }
 
     // Initial full copy to backbuffers
     tiles_full_screen_refresh();

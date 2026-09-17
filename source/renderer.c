@@ -244,49 +244,7 @@ void renderer_draw_battlefield_top(void) {
 
 
 void renderer_draw_wall(void) {
-    // 1. Draw Wall Base flash only when taking damage (base is pre-baked in ground cache)
-    static int s_wall_flashed = 0;
-    if (g_wall.damage_flash_timer > 0) {
-        wall_draw_base(g_backbuffer, g_wall.screen_y, g_wall.hp, g_wall.max_hp);
-        s_wall_flashed = 1;
-    } else if (s_wall_flashed) {
-        tiles_restore_ground_rect(g_backbuffer, 0, g_wall.screen_y, WALL_WIDTH, WALL_HEIGHT, 1);
-        s_wall_flashed = 0;
-    }
-
-    // 2. Bunker Ammo Depot Crate is static at (128, 166); drawn if dragging or damaged
-    static int s_crate_drawn = 0;
-    if (!s_crate_drawn || g_game.is_dragging_ammo) {
-        s_crate_drawn = 1;
-        int x0 = AMMO_DEPOT_X - AMMO_CRATE_W / 2;
-        int y0 = AMMO_DEPOT_Y - AMMO_CRATE_H / 2;
-
-        for (int dy = 0; dy < AMMO_CRATE_H; dy++) {
-            int py = y0 + dy + 1;
-            if (py < 0 || py >= SCREEN_H) continue;
-            for (int dx = 0; dx < AMMO_CRATE_W; dx++) {
-                int px = x0 + dx + 1;
-                if (px < 0 || px >= SCREEN_W) continue;
-                if (c_ammo_crate_sprite[dy * AMMO_CRATE_W + dx] & BIT(15)) {
-                    g_backbuffer[py * SCREEN_W + px] = RGB15(1, 1, 2) | BIT(15);
-                }
-            }
-        }
-        for (int dy = 0; dy < AMMO_CRATE_H; dy++) {
-            int py = y0 + dy;
-            if (py < 0 || py >= SCREEN_H) continue;
-            for (int dx = 0; dx < AMMO_CRATE_W; dx++) {
-                int px = x0 + dx;
-                if (px < 0 || px >= SCREEN_W) continue;
-                uint16_t c = c_ammo_crate_sprite[dy * AMMO_CRATE_W + dx];
-                if (c & BIT(15)) {
-                    g_backbuffer[py * SCREEN_W + px] = c;
-                }
-            }
-        }
-    }
-
-    // 3. Draw Active Turrets on Sockets
+    // 1. Draw Active Turrets on Sockets (Wall Base and Ammo Depot are pre-baked in s_ground_bottom_cache at Y=144)
     int active_mask = 0;
     if (g_wall.active_turrets == 1) active_mask = (1 << 1);
     else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
