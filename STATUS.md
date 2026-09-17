@@ -44,17 +44,16 @@
     - Logística táctil: cajón de munición canónico ($26 \times 16$ px) en $X=128, Y=166$, tambor de 10 balas y recarga manual arrastrando con stylus.
     - Ataque de enemigos distribuido en todo el ancho del frente ($Y=144$), eliminando embudo hacia el socket.
     - Validación determinista al 100% en DeSmuME (`test_phase1_complete`, `test_wall_frontline_damage`, `test_wall_hp_and_crate`).
-  - [ ] **Sesión 2: Marea Continua y Picos de Alerta [SIGUIENTE SESIÓN / PRÓXIMO CHAT]:**
+  - [x] **Sesión 2: Marea Continua y Picos de Alerta [COMPLETADA]:**
     - Spawner de marea incesante de Zerglings terrestres y Scourges aéreos cruzando de pantalla superior ($Y=0$) a inferior ($Y=192$).
-    - Temporizador y picos de alerta pautados ("¡BRECHA DETECTADA!") con hordas compactas.
-    - HUD y telemetría superior: contador de bajas, chatarra acumulada, tiempo de supervivencia y aviso de horda.
+    - Temporizador y picos de alerta pautados ("¡ALERTA PICO EN Xs!") con hordas compactas y banner en fila 3.
+    - HUD y telemetría superior: contador de bajas, chatarra acumulada, tiempo de supervivencia, aviso de horda y métricas de rendimiento en tiempo real (`FPS`, `T`, `B`, `P`, `S`).
     - Sincronización de daño de mordiscos de enjambre en tiempo real a las 32 lámparas catódicas del muro.
-  - [ ] **Sesión 3: Árbol Visual de Mejoras, Pausa Táctica y Balance [PENDIENTE]:**
-    - Pantalla de Árbol Tecnológico táctil con nodos interconectados y pistas de cobre.
-    - Pausa táctica total al abrir la tienda para pensar y relajar la mano.
-    - Escalera de automatización: Gatillo Continuo (`Hold`) y Cogitador de Tiro (`Auto-target` + override manual).
-    - Mejoras de daño, cadencia de muro, desbloqueo de 2º socket, reciclaje de chatarra y blindaje/reparación.
-    - Bucle de Game Over / Reset instantáneo con estadísticas de run.
+  - [x] **Sesión 3: Árbol Visual de Mejoras, Menús de Calibración y Render Dinámico [COMPLETADA]:**
+    - Menús táctiles de calibración/tienda en pantalla inferior con tabs (`STATS`, `TIENDA`, `BALANCE`).
+    - Desbloqueo de sockets (1 a 4 torretas), automatización de gatillo y auto-aim.
+    - Optimización de renderizado mediante Dirty Rects y caché de fondo en DMA para sostener 60 FPS.
+    - Registro de Known Issues en `KNOWN_ISSUES.md` (pausa en hardware, estela residual, limpieza en reset, rendimiento en picos).
 
 
 
