@@ -149,6 +149,8 @@ void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration) 
     g_splatters[best_slot].size = size;
     g_splatters[best_slot].life = duration;
     g_splatters[best_slot].max_life = duration;
+
+    tiles_stamp_splatter(x, y, size, color);
 }
 
 void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
@@ -1421,9 +1423,11 @@ void game_toggle_pause(void) {
         } else {
             game_start_wave();
         }
+        tiles_full_screen_refresh();
     } else if (g_game.mode == MODE_WAVE) {
         g_game.previous_mode = g_game.mode;
         g_game.mode = MODE_PAUSED;
+        tiles_full_screen_refresh();
     }
 }
 
@@ -1651,6 +1655,7 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
     (void)keys_held;
     if (keys_down & (KEY_B | KEY_START)) {
         g_game.mode = MODE_PAUSED;
+        tiles_full_screen_refresh();
         return;
     }
 
@@ -1658,6 +1663,7 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
         // Return button: (130, 174, 76, 16)
         if (touch.px >= 120 && touch.px <= 215 && touch.py >= 165 && touch.py <= 191) {
             g_game.mode = MODE_PAUSED;
+            tiles_full_screen_refresh();
             return;
         }
 
@@ -1811,6 +1817,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     if (keys_down & KEY_B) {
         calib_commit_changes();
         g_game.mode = MODE_PAUSED;
+        tiles_full_screen_refresh();
         return;
     }
 
@@ -1961,6 +1968,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         if (touch.px >= 175 && touch.px <= 248 && touch.py >= 158 && touch.py <= 186) {
             calib_commit_changes();
             g_game.mode = MODE_PAUSED;
+            tiles_full_screen_refresh();
             return;
         }
     }

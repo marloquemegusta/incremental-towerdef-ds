@@ -219,6 +219,50 @@ static void generate_ground_to_buffer(uint16_t *buffer, int y_offset) {
     }
 }
 
+void tiles_restore_ground_rect(uint16_t *dst_buffer, int x, int y, int w, int h, int is_bottom) {
+    if (!dst_buffer) return;
+    const uint16_t *src_cache = is_bottom ? s_ground_bottom_cache : s_ground_top_cache;
+    int x0 = (x < 0) ? 0 : x;
+    int y0 = (y < 0) ? 0 : y;
+    int x1 = (x + w > SCREEN_W) ? SCREEN_W : (x + w);
+    int y1 = (y + h > SCREEN_H) ? SCREEN_H : (y + h);
+    int copy_w = x1 - x0;
+    if (copy_w <= 0 || y1 <= y0) return;
+
+    for (int j = y0; j < y1; j++) {
+        memcpy(&dst_buffer[j * SCREEN_W + x0], &src_cache[j * SCREEN_W + x0], copy_w * sizeof(uint16_t));
+    }
+}
+
+void tiles_stamp_splatter(int x, int y, int size, uint16_t color) {
+    int is_bottom = (y >= 192);
+    int sy = is_bottom ? (y - 192) : y;
+    uint16_t *cache = is_bottom ? s_ground_bottom_cache : s_ground_top_cache;
+    uint16_t *backbuf = is_bottom ? g_backbuffer : g_top_backbuffer;
+
+    int r = (size <= 1) ? 2 : ((size == 2) ? 4 : ((size == 3) ? 6 : 9));
+    int x0 = x - r; if (x0 < 0) x0 = 0;
+    int y0 = sy - r; if (y0 < 0) y0 = 0;
+    int x1 = x + r; if (x1 >= SCREEN_W) x1 = SCREEN_W - 1;
+    int y1 = sy + r; if (y1 >= SCREEN_H) y1 = SCREEN_H - 1;
+
+    for (int py = y0; py <= y1; py++) {
+        int dy = py - sy;
+        for (int px = x0; px <= x1; px++) {
+            int dx = px - x;
+            if (dx * dx + dy * dy <= r * r) {
+                cache[py * SCREEN_W + px] = color;
+                backbuf[py * SCREEN_W + px] = color;
+            }
+        }
+    }
+}
+
+void tiles_full_screen_refresh(void) {
+    dmaCopyWords(2, s_ground_top_cache, g_top_backbuffer, SCREEN_W * SCREEN_H * sizeof(uint16_t));
+    dmaCopyWords(2, s_ground_bottom_cache, g_backbuffer, SCREEN_W * SCREEN_H * sizeof(uint16_t));
+}
+
 void tiles_init(void) {
     generate_urban_slab(s_tiles[0], 101);
     generate_urban_grass(s_tiles[1]);
@@ -229,6 +273,30 @@ void tiles_init(void) {
 
     generate_ground_to_buffer(s_ground_top_cache, 0);
     generate_ground_to_buffer(s_ground_bottom_cache, 192);
+
+    // Pre-bake the military hazard range line across road (X: 32..224, Y: 64)
+    int range_y = 64;
+    for (int x = 32; x < 224; x++) {
+        int is_amber = ((x / 4) % 2 == 0);
+        uint16_t stripe_col = is_amber ? (RGB15(31, 22, 2) | BIT(15)) : (RGB15(6, 6, 8) | BIT(15));
+        uint16_t shadow_col = RGB15(2, 2, 4) | BIT(15);
+        uint16_t hi_col     = is_amber ? (RGB15(31, 28, 12) | BIT(15)) : (RGB15(12, 14, 16) | BIT(15));
+
+        s_ground_bottom_cache[(range_y - 1) * SCREEN_W + x] = shadow_col;
+        s_ground_bottom_cache[range_y * SCREEN_W + x]       = hi_col;
+        s_ground_bottom_cache[(range_y + 1) * SCREEN_W + x] = stripe_col;
+
+        if ((x % 16) == 0) {
+            s_ground_bottom_cache[(range_y + 2) * SCREEN_W + x] = RGB15(31, 20, 0) | BIT(15);
+            s_ground_bottom_cache[(range_y + 3) * SCREEN_W + x] = RGB15(24, 14, 0) | BIT(15);
+        }
+    }
+
+    // Pre-bake the Wall Base Parapet into the bottom ground cache! (wall_screen_y = 128)
+    wall_draw_base(s_ground_bottom_cache, 128, 100, 100);
+
+    // Initial full copy to backbuffers
+    tiles_full_screen_refresh();
 }
 
 void tiles_render_urban_ground(uint16_t *buffer, int y_offset) {
