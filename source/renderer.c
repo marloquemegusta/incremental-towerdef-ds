@@ -9,6 +9,25 @@ uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 static u16 *s_top_vram = NULL;
 static int s_top_bg = 0;
 
+static int splatter_radius(int size) {
+    return (size <= 1) ? 2 : ((size == 2) ? 4 : ((size == 3) ? 6 : 9));
+}
+
+static void draw_splatter(uint16_t *buffer, int cx, int cy, int radius, uint16_t color) {
+    if (!buffer) return;
+    int x0 = (cx - radius < 0) ? 0 : cx - radius;
+    int y0 = (cy - radius < 0) ? 0 : cy - radius;
+    int x1 = (cx + radius >= SCREEN_W) ? SCREEN_W - 1 : cx + radius;
+    int y1 = (cy + radius >= SCREEN_H) ? SCREEN_H - 1 : cy + radius;
+    for (int y = y0; y <= y1; y++) {
+        int dy = y - cy;
+        for (int x = x0; x <= x1; x++) {
+            int dx = x - cx;
+            if (dx * dx + dy * dy <= radius * radius) buffer[y * SCREEN_W + x] = color;
+        }
+    }
+}
+
 #include "turret_data.h"
 
 void format_number_compact(char *buf, size_t buf_size, uint64_t val) {
@@ -240,6 +259,14 @@ void renderer_draw_battlefield_top(void) {
             g_death_particles[i].prev_top_active = 0;
         }
     }
+    for (int i = 0; i < MAX_SPLATTERS; i++) {
+        if (g_splatters[i].prev_top_active) {
+            int r = g_splatters[i].prev_top_r;
+            tiles_restore_ground_rect(g_top_backbuffer, g_splatters[i].prev_top_x - r,
+                                      g_splatters[i].prev_top_y - r, r * 2 + 1, r * 2 + 1, 0);
+            g_splatters[i].prev_top_active = 0;
+        }
+    }
 }
 
 
@@ -429,7 +456,7 @@ void renderer_draw_wall(void) {
 
 void renderer_draw_range_perimeter(void) {
     int y = g_wall.range_line_y; // Straight horizontal line parallel to wall (default Y=64)
-    if (y < 20 || y >= g_wall.screen_y) return;
+    if (y < 20 || y + 3 >= SCREEN_H || y >= g_wall.screen_y) return;
 
     // High-visibility military hazard range line across road (X: 32..224)
     for (int x = 32; x < 224; x++) {
@@ -507,6 +534,14 @@ void renderer_draw_battlefield_bottom(void) {
         if (g_bullets[i].prev_active) {
             tiles_restore_ground_rect(g_backbuffer, g_bullets[i].prev_x - 1, g_bullets[i].prev_y - 1, 4, 4, 1);
             g_bullets[i].prev_active = 0;
+        }
+    }
+    for (int i = 0; i < MAX_SPLATTERS; i++) {
+        if (g_splatters[i].prev_bot_active) {
+            int r = g_splatters[i].prev_bot_r;
+            tiles_restore_ground_rect(g_backbuffer, g_splatters[i].prev_bot_x - r,
+                                      g_splatters[i].prev_bot_y - r, r * 2 + 1, r * 2 + 1, 1);
+            g_splatters[i].prev_bot_active = 0;
         }
     }
     if (g_game.prev_drag_active) {
@@ -588,7 +623,7 @@ void renderer_draw_enemies_top(void) {
             int bx = gx - bw / 2;
             int by = gy - 10;
             top_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
-            int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
+            int fill = (g_enemies[i].max_hp > 0) ? (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp) : 0;
             if (fill > 0) {
                 top_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
             }
@@ -645,7 +680,7 @@ void renderer_draw_enemies_bottom(void) {
             int bx = gx - bw / 2;
             int by = ly - 10;
             renderer_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
-            int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
+            int fill = (g_enemies[i].max_hp > 0) ? (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp) : 0;
             if (fill > 0) {
                 renderer_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
             }
@@ -681,11 +716,24 @@ void renderer_draw_bullets(void) {
 }
 
 void renderer_draw_splatters_top(void) {
-    // Splatters are permanently stamped into ground cache upon creation (0 per-frame cost)
+    for (int i = 0; i < MAX_SPLATTERS; i++) {
+        Splatter *s = &g_splatters[i];
+        if (s->life <= 0 || s->y < 0 || s->y >= SCREEN_H) continue;
+        int r = splatter_radius(s->size);
+        draw_splatter(g_top_backbuffer, s->x, s->y, r, s->color);
+        s->prev_top_x = s->x; s->prev_top_y = s->y; s->prev_top_r = r; s->prev_top_active = 1;
+    }
 }
 
 void renderer_draw_splatters_bottom(void) {
-    // Splatters are permanently stamped into ground cache upon creation (0 per-frame cost)
+    for (int i = 0; i < MAX_SPLATTERS; i++) {
+        Splatter *s = &g_splatters[i];
+        int y = s->y - 192;
+        if (s->life <= 0 || y < 0 || y >= SCREEN_H) continue;
+        int r = splatter_radius(s->size);
+        draw_splatter(g_backbuffer, s->x, y, r, s->color);
+        s->prev_bot_x = s->x; s->prev_bot_y = y; s->prev_bot_r = r; s->prev_bot_active = 1;
+    }
 }
 
 void renderer_draw_death_particles_top(void) {
@@ -1210,7 +1258,9 @@ void renderer_draw_ui_sandbox(void) {
                 snprintf(buf, sizeof(buf), "%d px", g_game.sandbox.turret_range);
                 break;
             case 4:
-                snprintf(buf, sizeof(buf), "%d f (%d/s)", g_game.sandbox.turret_firerate, 60 / g_game.sandbox.turret_firerate);
+                    int fire_rate = g_game.sandbox.turret_firerate;
+                    if (fire_rate < 1) fire_rate = 1;
+                    snprintf(buf, sizeof(buf), "%d f (%d/s)", fire_rate, 60 / fire_rate);
                 break;
             case 5:
                 snprintf(buf, sizeof(buf), "%d DMG", g_game.sandbox.turret_damage);
