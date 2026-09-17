@@ -232,28 +232,37 @@ void renderer_draw_wall(void) {
     // 1. Draw Wall Base
     wall_draw_base(g_backbuffer, g_wall.screen_y, g_wall.hp, g_wall.max_hp);
 
-    // 2. Draw Bunker Ammo Depot Crate at (AMMO_DEPOT_X=128, AMMO_DEPOT_Y=166, 24x14)
+    // 2. Draw Bunker Ammo Depot Crate Asset at (AMMO_DEPOT_X=128, AMMO_DEPOT_Y=166, 26x16)
     {
-        int cx = AMMO_DEPOT_X;
-        int cy = AMMO_DEPOT_Y;
-        int x0 = cx - 12;
-        int y0 = cy - 7;
-        // Heavy brass/steel ammunition chest with drop shadow
-        renderer_fill_rect(x0 + 1, y0 + 1, 24, 14, RGB15(1, 1, 2) | BIT(15));
-        renderer_fill_rect(x0, y0, 24, 14, RGB15(8, 7, 5) | BIT(15));
-        renderer_draw_rect(x0, y0, 24, 14, COLOR_BRASS);
-        // Brass corner braces
-        renderer_draw_rect(x0, y0, 4, 4, COLOR_BRASS);
-        renderer_draw_rect(x0 + 20, y0, 4, 4, COLOR_BRASS);
-        renderer_draw_rect(x0, y0 + 10, 4, 4, COLOR_BRASS);
-        renderer_draw_rect(x0 + 20, y0 + 10, 4, 4, COLOR_BRASS);
-        // Stenciled AMMO chevron marking
-        renderer_draw_line(x0 + 8, y0 + 7, x0 + 12, y0 + 4, COLOR_AMBER);
-        renderer_draw_line(x0 + 12, y0 + 4, x0 + 16, y0 + 7, COLOR_AMBER);
-        renderer_draw_line(x0 + 8, y0 + 10, x0 + 12, y0 + 7, COLOR_AMBER);
-        renderer_draw_line(x0 + 12, y0 + 7, x0 + 16, y0 + 10, COLOR_AMBER);
-        // Central heavy padlock
-        renderer_fill_rect(cx - 2, y0 + 5, 4, 4, RGB15(28, 24, 8) | BIT(15));
+        int x0 = AMMO_DEPOT_X - AMMO_CRATE_W / 2;
+        int y0 = AMMO_DEPOT_Y - AMMO_CRATE_H / 2;
+
+        // Drop shadow on bunker floor
+        for (int dy = 0; dy < AMMO_CRATE_H; dy++) {
+            int py = y0 + dy + 1;
+            if (py < 0 || py >= SCREEN_H) continue;
+            for (int dx = 0; dx < AMMO_CRATE_W; dx++) {
+                int px = x0 + dx + 1;
+                if (px < 0 || px >= SCREEN_W) continue;
+                if (c_ammo_crate_sprite[dy * AMMO_CRATE_W + dx] & BIT(15)) {
+                    g_backbuffer[py * SCREEN_W + px] = RGB15(1, 1, 2) | BIT(15);
+                }
+            }
+        }
+
+        // Blit sprite
+        for (int dy = 0; dy < AMMO_CRATE_H; dy++) {
+            int py = y0 + dy;
+            if (py < 0 || py >= SCREEN_H) continue;
+            for (int dx = 0; dx < AMMO_CRATE_W; dx++) {
+                int px = x0 + dx;
+                if (px < 0 || px >= SCREEN_W) continue;
+                uint16_t c = c_ammo_crate_sprite[dy * AMMO_CRATE_W + dx];
+                if (c & BIT(15)) {
+                    g_backbuffer[py * SCREEN_W + px] = c;
+                }
+            }
+        }
     }
 
     // 3. Draw Active Turrets on Sockets
@@ -725,11 +734,20 @@ void renderer_draw_ui_wave(void) {
 
     // If currently dragging ammo crate
     if (g_game.is_dragging_ammo) {
-        int dx = g_game.drag_x;
-        int dy = g_game.drag_y;
-        renderer_fill_rect(dx - 7, dy - 5, 14, 10, RGB15(8, 7, 5) | BIT(15));
-        renderer_draw_rect(dx - 7, dy - 5, 14, 10, COLOR_BRASS);
-        renderer_fill_rect(dx - 2, dy - 2, 4, 4, COLOR_AMBER);
+        int x0 = g_game.drag_x - AMMO_CRATE_W / 2;
+        int y0 = g_game.drag_y - AMMO_CRATE_H / 2;
+        for (int dy = 0; dy < AMMO_CRATE_H; dy++) {
+            int py = y0 + dy;
+            if (py < 0 || py >= SCREEN_H) continue;
+            for (int dx = 0; dx < AMMO_CRATE_W; dx++) {
+                int px = x0 + dx;
+                if (px < 0 || px >= SCREEN_W) continue;
+                uint16_t c = c_ammo_crate_sprite[dy * AMMO_CRATE_W + dx];
+                if (c & BIT(15)) {
+                    g_backbuffer[py * SCREEN_W + px] = c;
+                }
+            }
+        }
     }
 }
 

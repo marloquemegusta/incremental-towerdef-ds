@@ -1,0 +1,70 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 10,
+      "capture_sequence": "hp_test",
+      "capture_every": 2,
+      "capture": "prep_view"
+    },
+    {
+      "tap": {
+        "x": 220,
+        "y": 170
+      },
+      "frames": 5,
+      "capture_sequence": "hp_test",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 25,
+      "capture_sequence": "hp_test",
+      "capture_every": 2
+    },
+    {
+      "drag": {
+        "from": {
+          "x": 128,
+          "y": 166
+        },
+        "to": {
+          "x": 88,
+          "y": 136
+        },
+        "frames": 20
+      },
+      "frames": 5,
+      "capture_sequence": "hp_test",
+      "capture_every": 2
+    },
+    {
+      "release": true,
+      "frames": 20,
+      "capture_sequence": "hp_test",
+      "capture_every": 2,
+      "capture": "after_crate_drag"
+    },
+    {
+      "release": true,
+      "frames": 600,
+      "capture_sequence": "hp_test",
+      "capture_every": 15,
+      "capture": "enemies_at_wall"
+    },
+    {
+      "release": true,
+      "frames": 120,
+      "capture_sequence": "hp_test",
+      "capture_every": 10,
+      "capture": "wall_damaged_bulbs"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "prep_view",
+      "to": "wall_damaged_bulbs",
+      "min_changed_pixels": 100
+    }
+  }
+}

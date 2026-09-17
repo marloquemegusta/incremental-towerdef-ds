@@ -37,4 +37,8 @@ extern const uint16_t c_turret_frames[WALL_TURRET_ANGLE_COUNT][TURRET_SPRITE_W *
 void wall_draw_base(uint16_t *buffer, int wall_screen_y, uint64_t hp, uint64_t max_hp);
 void wall_draw_turret_sprite(uint16_t *buffer, int dest_x, int dest_y, int angle_idx);
 
+#define AMMO_CRATE_W 26
+#define AMMO_CRATE_H 16
+extern const uint16_t c_ammo_crate_sprite[AMMO_CRATE_W * AMMO_CRATE_H];
+
 #endif // WALL_DATA_H
