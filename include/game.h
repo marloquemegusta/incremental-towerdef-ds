@@ -369,6 +369,7 @@ void renderer_draw_circle(int cx, int cy, int radius, uint16_t color, int filled
 void renderer_draw_text(int x, int y, const char *str, uint16_t color);
 
 void renderer_draw_battlefield_bottom(void);
+void renderer_draw_wall(void);
 void renderer_draw_battlefield_top(void);
 void renderer_draw_turret(const Turret *t, int is_selected);
 void renderer_draw_enemies_bottom(void);
