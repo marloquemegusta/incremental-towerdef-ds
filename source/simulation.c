@@ -271,6 +271,242 @@ static void spawn_bullet(int x, int y, int angle, int turret_idx, uint64_t dmg) 
     }
 }
 
+
+WallPlatform g_wall;
+CasingParticle g_casings[MAX_CASINGS];
+BulletDart g_bullet_darts[MAX_BULLET_DARTS];
+
+void wall_init(void) {
+    memset(&g_wall, 0, sizeof(g_wall));
+    memset(g_casings, 0, sizeof(g_casings));
+    memset(g_bullet_darts, 0, sizeof(g_bullet_darts));
+
+    g_wall.screen_y = WALL_DEFAULT_Y; // 144
+    g_wall.hp = 1000;
+    g_wall.max_hp = 1000;
+    g_wall.active_turrets = 2; // Default dual battery: sockets 1 & 2
+    g_wall.turret_angles[0] = 0; // NW
+    g_wall.turret_angles[1] = 1; // NNW
+    g_wall.turret_angles[2] = 3; // NNE
+    g_wall.turret_angles[3] = 4; // NE
+    g_wall.fire_cooldown = 0;
+    g_wall.fire_interval = 4; // 15 shots/sec
+    g_wall.damage = 10;
+}
+
+int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_y) {
+    int dx = target_x - turret_x;
+    int dy = turret_y - target_y; // Upward is positive
+    if (dy <= 0) dy = 1;
+
+    int slope = (dx * 100) / dy;
+    if (slope < -65) return 0;      // NW (-45 deg)
+    else if (slope < -18) return 1; // NNW (-22.5 deg)
+    else if (slope <= 18) return 2; // N (0 deg)
+    else if (slope <= 65) return 3; // NNE (+22.5 deg)
+    else return 4;                  // NE (+45 deg)
+}
+
+void wall_spawn_casing(int x, int y, int dir_sign) {
+    for (int i = 0; i < MAX_CASINGS; i++) {
+        if (!g_casings[i].active) {
+            g_casings[i].active = 1;
+            g_casings[i].x = TO_FP(x);
+            g_casings[i].y = TO_FP(y);
+            g_casings[i].z = TO_FP(4);
+            int base_vx = TO_FP(1) + (rand() % TO_FP(1));
+            g_casings[i].vx = dir_sign * base_vx;
+            g_casings[i].vy = TO_FP(1) + (rand() % TO_FP(1)); // pops toward bottom screen
+            g_casings[i].vz = TO_FP(3) + (rand() % TO_FP(2)); // pops upward
+            g_casings[i].angle = rand() % 360;
+            g_casings[i].spin_speed = dir_sign * (30 + (rand() % 20));
+            g_casings[i].bounces = 0;
+            g_casings[i].life = 60;
+            break;
+        }
+    }
+}
+
+void wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y) {
+    for (int i = 0; i < MAX_BULLET_DARTS; i++) {
+        if (!g_bullet_darts[i].active) {
+            g_bullet_darts[i].active = 1;
+            g_bullet_darts[i].x = TO_FP(start_x);
+            g_bullet_darts[i].y = TO_FP(start_y);
+            g_bullet_darts[i].target_x = target_x;
+            g_bullet_darts[i].target_y = target_y;
+            g_bullet_darts[i].damage = g_wall.damage;
+
+            int dx = target_x - start_x;
+            int dy = target_y - start_y;
+            int ax = (dx < 0) ? -dx : dx;
+            int ay = (dy < 0) ? -dy : dy;
+            int dist = (ax > ay) ? (ax + (ay >> 1)) : (ay + (ax >> 1));
+            if (dist < 1) dist = 1;
+            g_bullet_darts[i].dist_remaining = TO_FP(dist);
+
+            int speed = TO_FP(22); // 22 px/frame
+            g_bullet_darts[i].vx = (dx * speed) / dist;
+            g_bullet_darts[i].vy = (dy * speed) / dist;
+            break;
+        }
+    }
+}
+
+void wall_fire_at(int target_x, int target_y) {
+    if (g_wall.fire_cooldown > 0) return;
+    g_wall.fire_cooldown = g_wall.fire_interval;
+
+    int active_mask = 0;
+    if (g_wall.active_turrets == 1) active_mask = (1 << 1);
+    else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
+    else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
+    else active_mask = 0x0F;
+
+    int best_sock = -1;
+    int best_dist = 9999;
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        if (!(active_mask & (1 << s))) continue;
+        int sx = c_wall_sockets[s].x;
+        int dist = (sx > target_x) ? (sx - target_x) : (target_x - sx);
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_sock = s;
+        }
+    }
+
+    if (best_sock < 0) best_sock = 1;
+
+    int sx = c_wall_sockets[best_sock].x;
+    int sy = g_wall.screen_y + c_wall_sockets[best_sock].y;
+
+    int angle = wall_angle_from_target(sx, sy, target_x, target_y);
+    g_wall.turret_angles[best_sock] = angle;
+
+    int alt = g_wall.barrel_alt[best_sock];
+    g_wall.barrel_alt[best_sock] = 1 - alt;
+
+    const TurretCalibratedPoints *pts = &c_turret_points[angle];
+    int tx = sx - TURRET_PIVOT_X;
+    int ty = sy - TURRET_PIVOT_Y;
+
+    int mx = tx + (alt == 0 ? pts->ml_x : pts->mr_x);
+    int my = ty + (alt == 0 ? pts->ml_y : pts->mr_y);
+    int dx = tx + (alt == 0 ? pts->dl_x : pts->dr_x);
+    int dy = ty + (alt == 0 ? pts->dl_y : pts->dr_y);
+
+    g_wall.muzzle_flash_timer[best_sock] = 2;
+    g_wall.muzzle_flash_barrel[best_sock] = alt;
+
+    wall_spawn_bullet_dart(mx, my, target_x, target_y);
+    wall_spawn_casing(dx, dy, (alt == 0 ? -1 : 1));
+}
+
+void wall_update(void) {
+    if (g_wall.fire_cooldown > 0) g_wall.fire_cooldown--;
+
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        if (g_wall.muzzle_flash_timer[s] > 0) {
+            g_wall.muzzle_flash_timer[s]--;
+        }
+    }
+
+    // Auto-targeting if enabled and no cooldown: scan nearest enemy
+    if (g_game.upgrades.auto_target > 0 && g_wall.fire_cooldown == 0) {
+        int best_e = -1;
+        int best_y = -1;
+        for (int e = 0; e < MAX_ENEMIES; e++) {
+            if (!g_enemies[e].active) continue;
+            int ey = FROM_FP(g_enemies[e].y);
+            if (ey >= 192 && ey < 192 + g_wall.screen_y) {
+                if (ey > best_y) {
+                    best_y = ey;
+                    best_e = e;
+                }
+            }
+        }
+        if (best_e >= 0) {
+            int ex = FROM_FP(g_enemies[best_e].x);
+            int ey = FROM_FP(g_enemies[best_e].y) - 192;
+            wall_fire_at(ex, ey);
+        }
+    }
+
+    // Update Bullet Darts
+    for (int i = 0; i < MAX_BULLET_DARTS; i++) {
+        if (!g_bullet_darts[i].active) continue;
+        g_bullet_darts[i].x += g_bullet_darts[i].vx;
+        g_bullet_darts[i].y += g_bullet_darts[i].vy;
+
+        int step = TO_FP(22);
+        g_bullet_darts[i].dist_remaining -= step;
+
+        int cur_x = FROM_FP(g_bullet_darts[i].x);
+        int cur_y = FROM_FP(g_bullet_darts[i].y);
+
+        int hit_enemy = 0;
+        int gy = cur_y + 192;
+        for (int e = 0; e < MAX_ENEMIES; e++) {
+            if (!g_enemies[e].active) continue;
+            int ex = FROM_FP(g_enemies[e].x);
+            int ey = FROM_FP(g_enemies[e].y);
+            int ddx = cur_x - ex;
+            int ddy = gy - ey;
+            if (ddx * ddx + ddy * ddy <= 14 * 14) {
+                if (g_enemies[e].hp > (uint64_t)g_bullet_darts[i].damage) {
+                    g_enemies[e].hp -= g_bullet_darts[i].damage;
+                } else {
+                    g_enemies[e].hp = 0;
+                    g_enemies[e].active = 0;
+                    g_game.enemies_killed++;
+                    g_game.scrap += (5 * (g_enemies[e].variant + 1));
+                    game_spawn_death_gore(ex, ey, g_bullet_darts[i].vx, g_bullet_darts[i].vy, g_enemies[e].variant);
+                }
+                hit_enemy = 1;
+                break;
+            }
+        }
+
+        if (hit_enemy || g_bullet_darts[i].dist_remaining <= 0 || cur_y < 0) {
+            for (int k = 0; k < 4; k++) {
+                game_add_splatter_ex(cur_x, gy, COLOR_BOLTER_TRACER, 0, 15);
+            }
+            g_bullet_darts[i].active = 0;
+        }
+    }
+
+    // Update Casings
+    for (int i = 0; i < MAX_CASINGS; i++) {
+        if (!g_casings[i].active) continue;
+        g_casings[i].x += g_casings[i].vx;
+        g_casings[i].y += g_casings[i].vy;
+        g_casings[i].z += g_casings[i].vz;
+        g_casings[i].vz -= 140; // Gravity in Q8
+        g_casings[i].angle = (g_casings[i].angle + g_casings[i].spin_speed) % 360;
+
+        if (g_casings[i].z <= 0) {
+            g_casings[i].z = 0;
+            if (g_casings[i].bounces < 2) {
+                g_casings[i].vz = -(g_casings[i].vz * 42) / 100;
+                g_casings[i].vx = (g_casings[i].vx * 55) / 100;
+                g_casings[i].vy = (g_casings[i].vy * 55) / 100;
+                g_casings[i].spin_speed /= 2;
+                g_casings[i].bounces++;
+            } else {
+                g_casings[i].vz = 0;
+                g_casings[i].vx = 0;
+                g_casings[i].vy = 0;
+                g_casings[i].spin_speed = 0;
+            }
+        }
+
+        g_casings[i].life--;
+        if (g_casings[i].life <= 0) {
+            g_casings[i].active = 0;
+        }
+    }
+}
+
 void game_init(void) {
     static int s_balance_inited = 0;
     if (!s_balance_inited) {
@@ -285,6 +521,7 @@ void game_init(void) {
     memset(g_splatters, 0, sizeof(g_splatters));
     memset(g_death_particles, 0, sizeof(g_death_particles));
 
+    wall_init();
     g_game.mode = MODE_PREPARATION;
     g_game.wave_number = 1;
     g_game.total_waves = 20;
@@ -402,6 +639,7 @@ void game_start_wave(void) {
 }
 
 void game_reset_to_prep(void) {
+    wall_init();
     g_game.mode = MODE_PREPARATION;
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
@@ -418,6 +656,7 @@ void game_update_simulation(void) {
     if (g_game.mode != MODE_WAVE && g_game.mode != MODE_DEBUG_SANDBOX) return;
 
     g_game.sim_ticks_elapsed++;
+    wall_update();
     if (g_game.wave_timer > 0) g_game.wave_timer--;
 
     int w_idx = g_game.wave_number - 1;
@@ -1013,6 +1252,11 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     s_wave_touching = is_touch;
 
     // Touch down: Clicker attack on enemies, start ammo drag, or toggle pause
+    // Stylus tap or continuous hold fire on battlefield!
+    if (is_touch && touch.px > 0 && touch.py > 14 && touch.py < g_wall.screen_y) {
+        wall_fire_at(touch.px, touch.py);
+    }
+
     if (touch_press) {
         // [PAUSA] Button in wave HUD: (215..250, 0..14)
         if (touch.px >= 215 && touch.px <= 250 && touch.py <= 14) {
@@ -1446,7 +1690,8 @@ static void calib_modify_val(int delta) {
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held) {
     // B exits calibration back to preparation
     if (keys_down & KEY_B) {
-        g_game.mode = MODE_PREPARATION;
+        wall_init();
+    g_game.mode = MODE_PREPARATION;
         return;
     }
 
