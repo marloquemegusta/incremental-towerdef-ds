@@ -468,7 +468,6 @@ void renderer_draw_range_perimeter(void) {
 void renderer_draw_battlefield_bottom(void) {
     tiles_render_urban_ground(g_backbuffer, 192);
     renderer_draw_range_perimeter();
-    renderer_draw_wall();
 }
 
 void renderer_draw_turret(const Turret *t, int is_selected) {

@@ -1012,11 +1012,11 @@ void game_update_simulation(void) {
         if (ex > TO_FP(248)) ex = TO_FP(248);
         g_enemies[i].x = ex;
 
-        // Check if reaching Wall fortification rim (Y_global >= 330, i.e. Y_local >= 138):
-        // The Wall is a continuous defensive line across the entire road (x: 32..224).
-        // Enemies DO NOT steer towards turrets; they attack the Wall directly in their lane!
-        if (py >= 330) {
-            g_enemies[i].y = TO_FP(330);
+        // Check if reaching Wall fortification rim (Y_global >= 336, i.e. Y_local >= 144):
+        // 3D Depth: Enemies press against the wall parapet at Y=144; their head/mouth
+        // tucks behind the sandbag bulwark, leaving only their rear/hind legs visible on the road.
+        if (py >= 336) {
+            g_enemies[i].y = TO_FP(336);
             g_enemies[i].vy = 0;
             g_enemies[i].vx = 0;
             g_enemies[i].dir = 4; // Face South against the fortified wall
