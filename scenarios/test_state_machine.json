@@ -1,0 +1,88 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 30,
+      "capture": "01_start_pause"
+    },
+    {
+      "tap": {
+        "x": 45,
+        "y": 166
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 20,
+      "capture": "02_upgrades_menu"
+    },
+    {
+      "button_down": "B",
+      "frames": 5
+    },
+    {
+      "button_up": "B",
+      "frames": 20,
+      "capture": "03_back_to_pause"
+    },
+    {
+      "tap": {
+        "x": 125,
+        "y": 166
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 20,
+      "capture": "04_calib_menu"
+    },
+    {
+      "button_down": "B",
+      "frames": 5
+    },
+    {
+      "button_up": "B",
+      "frames": 20,
+      "capture": "05_back_to_pause2"
+    },
+    {
+      "tap": {
+        "x": 210,
+        "y": 166
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 120,
+      "capture": "06_wave_combat"
+    },
+    {
+      "button_down": "START",
+      "frames": 5
+    },
+    {
+      "button_up": "START",
+      "frames": 20,
+      "capture": "07_midwave_pause"
+    },
+    {
+      "button_down": "START",
+      "frames": 5
+    },
+    {
+      "button_up": "START",
+      "frames": 60,
+      "capture": "08_resumed_combat"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_start_pause",
+      "to": "02_upgrades_menu",
+      "min_changed_pixels": 50
+    }
+  }
+}

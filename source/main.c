@@ -42,25 +42,13 @@ int main(void) {
             }
         } else {
             s_sandbox_hotkey_held = 0;
-            if (keys_down & KEY_SELECT) {
-                // SELECT toggles Upgrade Tree directly
-                if (g_game.mode == MODE_UPGRADES) {
-                    g_game.mode = (g_game.previous_mode == MODE_UPGRADES || g_game.previous_mode == MODE_PAUSED) 
-                                  ? MODE_PREPARATION : g_game.previous_mode;
-                } else if (g_game.mode != MODE_GAME_OVER && g_game.mode != MODE_CALIBRATION && g_game.mode != MODE_DEBUG_SANDBOX) {
-                    g_game.previous_mode = g_game.mode;
-                    g_game.mode = MODE_UPGRADES;
-                }
-            }
         }
 
         // Bottom Screen mode-specific input
         if (g_game.mode == MODE_DEBUG_SANDBOX) {
             game_handle_input_sandbox(touch, keys_down, keys_held);
-        } else if (g_game.mode == MODE_PAUSED) {
+        } else if (g_game.mode == MODE_PAUSED || g_game.mode == MODE_PREPARATION) {
             game_handle_input_pause(touch, keys_down, keys_held);
-        } else if (g_game.mode == MODE_PREPARATION) {
-            game_handle_input_prep(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_WAVE) {
             game_handle_input_wave(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_UPGRADES) {
@@ -69,6 +57,8 @@ int main(void) {
             game_handle_input_calibration(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_GAME_OVER) {
             game_handle_input_game_over(touch, keys_down, keys_held);
+        } else if (g_game.mode == MODE_VICTORY) {
+            game_handle_input_victory(touch, keys_down, keys_held);
         }
 
         // Simulation update (during active WAVE mode or live SANDBOX mode)
@@ -102,14 +92,14 @@ int main(void) {
 
             // Legacy placed turrets removed - WallPlatform is unified defense
 
-            if (g_game.mode == MODE_PREPARATION) {
-                renderer_draw_ui_prep();
+            if (g_game.mode == MODE_PREPARATION || g_game.mode == MODE_PAUSED) {
+                renderer_draw_ui_pause();
             } else if (g_game.mode == MODE_WAVE) {
                 renderer_draw_ui_wave();
-            } else if (g_game.mode == MODE_PAUSED) {
-                renderer_draw_ui_pause();
             } else if (g_game.mode == MODE_GAME_OVER) {
                 renderer_draw_ui_game_over();
+            } else if (g_game.mode == MODE_VICTORY) {
+                renderer_draw_ui_victory();
             } else if (g_game.mode == MODE_DEBUG_SANDBOX) {
                 renderer_draw_ui_sandbox();
             }

@@ -795,7 +795,7 @@ void game_init(void) {
     memset(g_death_particles, 0, sizeof(g_death_particles));
 
     wall_init();
-    g_game.mode = MODE_PREPARATION;
+    g_game.mode = MODE_PAUSED;
     g_game.wave_number = 1;
     g_game.total_waves = STAGE_COUNT;
     g_game.bunker_hp = g_balance.bunker_start_hp;
@@ -865,7 +865,7 @@ void game_reset_to_prep(void) {
     wall_init();
     g_game.bunker_hp = g_wall.hp;
     g_game.bunker_max_hp = g_wall.max_hp;
-    g_game.mode = MODE_PREPARATION;
+    g_game.mode = MODE_PAUSED;
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_death_particles, 0, sizeof(g_death_particles));
@@ -1405,18 +1405,22 @@ void game_update_simulation(void) {
         uint64_t stage_bonus = g_balance.stages[st_idx].stage_reward_scrap;
         g_game.scrap += stage_bonus;
 
-        g_game.wave_number++;
-        if (g_game.wave_number > g_game.total_waves) {
-            // Victory loop: all 5 stages survived (10 minutes completed)!
-            g_game.wave_number = g_game.total_waves;
+        if (g_game.wave_number >= g_game.total_waves) {
+            g_game.mode = MODE_VICTORY;
+            return;
         }
+        g_game.wave_number++;
         game_reset_to_prep();
     }
 }
 
 void game_toggle_pause(void) {
     if (g_game.mode == MODE_PAUSED) {
-        g_game.mode = (g_game.previous_mode == MODE_PAUSED) ? MODE_WAVE : g_game.previous_mode;
+        if (g_game.enemies_spawned > 0 && g_game.wave_timer > 0) {
+            g_game.mode = MODE_WAVE;
+        } else {
+            game_start_wave();
+        }
     } else if (g_game.mode == MODE_WAVE) {
         g_game.previous_mode = g_game.mode;
         g_game.mode = MODE_PAUSED;
@@ -1424,81 +1428,15 @@ void game_toggle_pause(void) {
 }
 
 void game_handle_input_prep(touchPosition touch, int keys_down, int keys_held) {
-    // Physical button shortcuts: A or START launches the wave!
-    if (keys_down & (KEY_START | KEY_A)) {
-        game_start_wave();
-        return;
-    }
-
-    // X opens upgrades (SELECT handled in main loop)
-    if (keys_down & KEY_X) {
-        g_game.previous_mode = g_game.mode;
-        g_game.mode = MODE_UPGRADES;
-        return;
-    }
-
-    if (keys_down & KEY_R) {
-        g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
-    }
-
-    static int s_prep_touching = 0;
-    int is_touch = (keys_held & KEY_TOUCH) || (touch.px > 0 && touch.py > 0);
-    int touch_press = ((keys_down & KEY_TOUCH) || (is_touch && !s_prep_touching));
-    s_prep_touching = is_touch;
-
-    if (touch_press) {
-        // [START] Button: drawn at (190, 150, 60, 36) -> hitbox (190..255, 144..191)
-        if (touch.px >= 190 && touch.px <= 255 && touch.py >= 144 && touch.py <= 191) {
-            game_start_wave();
-            return;
-        }
-
-        // [UPGRADES] Button: drawn at (54, 156, 48, 24) -> hitbox (52..104, 144..191)
-        if (touch.px >= 52 && touch.px <= 104 && touch.py >= 144 && touch.py <= 191) {
-            g_game.previous_mode = g_game.mode;
-            g_game.mode = MODE_UPGRADES;
-            return;
-        }
-
-        // [CALIB] Button: drawn at (108, 156, 36, 24) -> hitbox (106..145, 144..191)
-        if (touch.px >= 106 && touch.px <= 145 && touch.py >= 144 && touch.py <= 191) {
-            g_game.previous_mode = g_game.mode;
-            g_game.mode = MODE_CALIBRATION;
-            return;
-        }
-
-        // [SANDBOX] Button: drawn at (148, 156, 36, 24) -> hitbox (146..188, 144..191)
-        if (touch.px >= 146 && touch.px <= 188 && touch.py >= 144 && touch.py <= 191) {
-            g_game.previous_mode = g_game.mode;
-            g_game.mode = MODE_DEBUG_SANDBOX;
-            // g_turrets deprecated
-            return;
-        }
-
-        // [AMMO DEPOT]: drawn at (6, 150, 44, 36) -> tap to fully reload all placed turrets
-        if (touch.px <= 50 && touch.py >= 144) {
-            for (int t = 0; t < MAX_TURRETS; t++) {
-                if (g_turrets[t].placed) {
-                    g_turrets[t].ammo = g_turrets[t].max_ammo;
-                }
-            }
-            return;
-        }
-
-        // Turret selection in preparation
-        for (int t = 0; t < MAX_TURRETS; t++) {
-            if (g_turrets[t].placed) {
-                int d = abs(touch.px - g_turrets[t].x) + abs(touch.py - g_turrets[t].y);
-                if (d <= 16) {
-                    g_game.selected_turret = t;
-                    return;
-                }
-            }
-        }
-    }
+    game_handle_input_pause(touch, keys_down, keys_held);
 }
 
 void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
+    if (keys_down & KEY_START) {
+        game_toggle_pause();
+        return;
+    }
+
     if (keys_down & KEY_R) {
         g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
     }
@@ -1595,13 +1533,30 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
 }
 
 void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held) {
-    if (keys_down & (KEY_START | KEY_A)) {
+    (void)keys_held;
+    // Physical button shortcut: START launches/resumes wave
+    if (keys_down & KEY_START) {
         game_toggle_pause();
         return;
     }
+
     if (keys_down & KEY_TOUCH) {
-        // Resume button: x: 70..186, y: 96..116
-        if (touch.px >= 70 && touch.px <= 186 && touch.py >= 96 && touch.py <= 116) {
+        // [TIENDA] Button: (10, 146, 74, 36) -> hitbox (10..84, 144..188)
+        if (touch.px >= 10 && touch.px <= 84 && touch.py >= 144 && touch.py <= 188) {
+            g_game.previous_mode = MODE_PAUSED;
+            g_game.mode = MODE_UPGRADES;
+            return;
+        }
+
+        // [CALIBRAR] Button: (90, 146, 74, 36) -> hitbox (90..164, 144..188)
+        if (touch.px >= 90 && touch.px <= 164 && touch.py >= 144 && touch.py <= 188) {
+            g_game.previous_mode = MODE_PAUSED;
+            g_game.mode = MODE_CALIBRATION;
+            return;
+        }
+
+        // [JUGAR / REANUDAR] Button: (170, 146, 76, 36) -> hitbox (170..248, 144..188)
+        if (touch.px >= 170 && touch.px <= 248 && touch.py >= 144 && touch.py <= 188) {
             game_toggle_pause();
             return;
         }
@@ -1609,15 +1564,20 @@ void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held) 
 }
 
 void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_held) {
-    if (keys_down & (KEY_START | KEY_A)) {
+    (void)touch;
+    (void)keys_held;
+    if (keys_down & (KEY_B | KEY_START | KEY_A | KEY_TOUCH)) {
         game_init();
         return;
     }
-    if (keys_down & KEY_TOUCH) {
-        if (touch.px >= 60 && touch.px <= 196 && touch.py >= 106 && touch.py <= 128) {
-            game_init();
-            return;
-        }
+}
+
+void game_handle_input_victory(touchPosition touch, int keys_down, int keys_held) {
+    (void)touch;
+    (void)keys_held;
+    if (keys_down & (KEY_B | KEY_START | KEY_A | KEY_TOUCH)) {
+        game_init();
+        return;
     }
 }
 
@@ -1688,15 +1648,16 @@ void upgrade_purchase(int idx) {
 }
 
 void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_held) {
+    (void)keys_held;
     if (keys_down & (KEY_B | KEY_START)) {
-        g_game.mode = g_game.previous_mode;
+        g_game.mode = MODE_PAUSED;
         return;
     }
 
     if (keys_down & KEY_TOUCH) {
-        // Return button: (90, 150, 76, 28)
-        if (touch.px >= 125 && touch.px <= 210 && touch.py >= 170 && touch.py <= 191) {
-            g_game.mode = g_game.previous_mode;
+        // Return button: (130, 174, 76, 16)
+        if (touch.px >= 120 && touch.px <= 215 && touch.py >= 165 && touch.py <= 191) {
+            g_game.mode = MODE_PAUSED;
             return;
         }
 
@@ -1734,6 +1695,20 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
     }
 }
 
+static void calib_commit_changes(void) {
+    wall_apply_balance_and_upgrades();
+    for (int e = 0; e < MAX_ENEMIES; e++) {
+        if (g_enemies[e].active) {
+            int v = g_enemies[e].variant;
+            if (v >= 0 && v < ENEMY_VARIANT_COUNT) {
+                g_enemies[e].speed = TO_FP(g_balance.enemy_speed[v]);
+            }
+        }
+    }
+    g_game.calib_saved_timer = 20;
+    balance_config_save();
+}
+
 static void calib_modify_val(int delta) {
     if (g_game.calib_page == 0) {
         // ETAPAS (1..5): exactly 7 parameters per stage
@@ -1751,7 +1726,8 @@ static void calib_modify_val(int delta) {
             case 5: st->hydralisk_delay_peak += delta; if (st->hydralisk_delay_peak < 0) st->hydralisk_delay_peak = 0; break;
             case 6: st->stage_reward_scrap += delta; if (st->stage_reward_scrap < 0) st->stage_reward_scrap = 0; break;
         }
-        g_game.calib_saved_timer = 20; balance_config_save(); return;
+        calib_commit_changes();
+        return;
     }
     if (g_game.calib_page == 1) {
         // ENEMY STATS: Constant across all stages (5 fields per enemy: HP, Speed, Scrap, Bite Dmg, Bite Int)
@@ -1766,7 +1742,8 @@ static void calib_modify_val(int delta) {
             case 3: { int n = g_balance.enemy_bite_damage[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_bite_damage[enemy] = n; break; }
             case 4: { int n = g_balance.enemy_bite_interval[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_bite_interval[enemy] = n; break; }
         }
-        g_game.calib_saved_timer = 20; balance_config_save(); return;
+        calib_commit_changes();
+        return;
     }
     if (g_game.calib_page == 2) {
         int r = g_game.calib_row;
@@ -1795,7 +1772,8 @@ static void calib_modify_val(int delta) {
             g_balance.turret_magazine[i] += delta;
             if (g_balance.turret_magazine[i] < 1) g_balance.turret_magazine[i] = 1;
         }
-        g_game.calib_saved_timer = 20; balance_config_save(); return;
+        calib_commit_changes();
+        return;
     }
     if (g_game.calib_page == 3) {
         int r = g_game.calib_row;
@@ -1823,15 +1801,16 @@ static void calib_modify_val(int delta) {
             if (n > 999999) n = 999999;
             *val_ptr = n;
         }
-        g_game.calib_saved_timer = 20; balance_config_save(); return;
+        calib_commit_changes();
+        return;
     }
 }
 
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held) {
-    // B exits calibration back to preparation
+    // B exits calibration back to paused
     if (keys_down & KEY_B) {
-        wall_init();
-        g_game.mode = MODE_PREPARATION;
+        calib_commit_changes();
+        g_game.mode = MODE_PAUSED;
         return;
     }
 
@@ -1980,7 +1959,8 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         }
         // [BACK / RESUME] (175..248, 158..186)
         if (touch.px >= 175 && touch.px <= 248 && touch.py >= 158 && touch.py <= 186) {
-            g_game.mode = g_game.previous_mode;
+            calib_commit_changes();
+            g_game.mode = MODE_PAUSED;
             return;
         }
     }
