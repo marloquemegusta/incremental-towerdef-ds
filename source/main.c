@@ -1,6 +1,9 @@
 #include "game.h"
 
 int main(void) {
+    // Adaptive simulation keeps real-time progression when rendering is saturated.
+    // It is intentionally capped at 3 total simulation ticks per displayed frame.
+    static int s_adaptive_steps = 1;
     // Both screens initialized in renderer_init:
     // Bottom Screen: Direct Framebuffer Mode FB0
     // Top Screen: Sub-engine 16-bit Bitmap BG3 Mode 5
@@ -24,9 +27,11 @@ int main(void) {
         touchRead(&touch);
 
         // Global priority: START toggles pause in active wave or paused mode
+        int start_toggled = 0;
         if (keys_down & KEY_START) {
             if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PAUSED) {
                 game_toggle_pause();
+                start_toggled = 1;
             }
         }
 
@@ -48,11 +53,11 @@ int main(void) {
         }
 
         // Bottom Screen mode-specific input
-        if (g_game.mode == MODE_DEBUG_SANDBOX) {
+        if (!start_toggled && g_game.mode == MODE_DEBUG_SANDBOX) {
             game_handle_input_sandbox(touch, keys_down, keys_held);
-        } else if (g_game.mode == MODE_PAUSED || g_game.mode == MODE_PREPARATION) {
+        } else if (!start_toggled && (g_game.mode == MODE_PAUSED || g_game.mode == MODE_PREPARATION)) {
             game_handle_input_pause(touch, keys_down, keys_held);
-        } else if (g_game.mode == MODE_WAVE) {
+        } else if (!start_toggled && g_game.mode == MODE_WAVE) {
             game_handle_input_wave(touch, keys_down, keys_held);
         } else if (g_game.mode == MODE_UPGRADES) {
             game_handle_input_upgrades(touch, keys_down, keys_held);
@@ -69,8 +74,10 @@ int main(void) {
 
         // 1. Simulation update
         if (g_game.mode == MODE_WAVE) {
-            game_update_simulation();
-            if (g_game.fast_forward == 2 && g_game.mode == MODE_WAVE) {
+            int sim_steps = s_adaptive_steps;
+            if (g_game.fast_forward == 2) sim_steps *= 2;
+            if (sim_steps > 3) sim_steps = 3;
+            for (int step = 0; step < sim_steps && g_game.mode == MODE_WAVE; step++) {
                 game_update_simulation();
             }
         } else if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.run_sim) {
@@ -132,6 +139,14 @@ int main(void) {
 
         uint16_t t1_delta = timerElapsed(1);
         s_timer1_accum += t1_delta;
+        // React on the very next frame to the measured frame interval instead
+        // of waiting for the one-second FPS aggregate to close.
+        if (t1_delta > 0) {
+            int instant_fps = 32728 / t1_delta;
+            if (instant_fps <= 20) s_adaptive_steps = 3;
+            else if (instant_fps <= 30) s_adaptive_steps = 2;
+            else if (instant_fps >= 45) s_adaptive_steps = 1;
+        }
         if (s_timer1_accum >= 32728) { // 1.0 real second elapsed
             g_game.prof_fps = s_fps_counter;
             s_fps_counter = 0;
@@ -143,6 +158,10 @@ int main(void) {
                 g_game.prof_pres_ticks = s_sum_pres / s_prof_frames;
                 s_sum_sim = s_sum_top = s_sum_bot = s_sum_pres = 0;
                 s_prof_frames = 0;
+            }
+            g_game.prof_enemies_active = 0;
+            for (int i = 0; i < MAX_ENEMIES; i++) {
+                if (g_enemies[i].active) g_game.prof_enemies_active++;
             }
         }
     }

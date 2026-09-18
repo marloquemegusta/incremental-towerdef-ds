@@ -9,6 +9,75 @@ uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 static u16 *s_top_vram = NULL;
 static int s_top_bg = 0;
 
+static void renderer_enemy_bounds(const Enemy *enemy, int cx, int cy,
+                                  int is_attacking, int *x, int *y,
+                                  int *w, int *h) {
+    int variant = enemy->variant;
+    if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
+    const EnemyTypeDef *type = &g_enemy_types[variant];
+    int dir = enemy->dir & 7;
+    int source_dir;
+    int flip_h = 0;
+
+    if (dir > 4) {
+        flip_h = 1;
+        source_dir = (dir == 5) ? 3 : ((dir == 6) ? 2 : 1);
+    } else {
+        source_dir = dir;
+    }
+
+    const EnemyFrameDef *frame = NULL;
+    int frame_count = is_attacking ? type->attack_frame_count : type->frame_count;
+    if (is_attacking && frame_count > 0) {
+        int frame_idx = enemy->anim_frame % frame_count;
+        if (frame_idx < 0) frame_idx += frame_count;
+        frame = &type->attack_frames[source_dir][frame_idx];
+    } else if (type->frame_count > 0) {
+        int frame_idx = enemy->anim_frame % type->frame_count;
+        if (frame_idx < 0) frame_idx += type->frame_count;
+        frame = &type->frames[source_dir][frame_idx];
+    }
+
+    if (!frame || frame->w == 0 || frame->h == 0) {
+        *x = cx - 1; *y = cy - 1; *w = 2; *h = 2;
+        return;
+    }
+
+    int min_x, min_y, max_x, max_y;
+    int ox = cx + (flip_h ? frame->flip_ox : frame->offset_x);
+    int oy = cy + frame->offset_y;
+    min_x = ox;
+    min_y = oy;
+    max_x = ox + frame->w - 1;
+    max_y = oy + frame->h - 1;
+
+    // Flying sprites also draw a ground shadow around the unshifted center.
+    if (type->is_flying && type->flight_altitude > 0) {
+        if (cx - 10 < min_x) min_x = cx - 10;
+        if (cy - 4 < min_y) min_y = cy - 4;
+        if (cx + 10 > max_x) max_x = cx + 10;
+        if (cy + 4 > max_y) max_y = cy + 4;
+    }
+
+    // Health bars are dynamic pixels too. Union their exact footprint with the
+    // sprite bounds so a damaged enemy cannot leave stale bar pixels behind.
+    if (enemy->hp < enemy->max_hp) {
+        int bar_x0 = cx - 8;
+        int bar_y0 = cy - 11;
+        int bar_x1 = cx + 7;
+        int bar_y1 = cy - 9;
+        if (bar_x0 < min_x) min_x = bar_x0;
+        if (bar_y0 < min_y) min_y = bar_y0;
+        if (bar_x1 > max_x) max_x = bar_x1;
+        if (bar_y1 > max_y) max_y = bar_y1;
+    }
+
+    *x = min_x;
+    *y = min_y;
+    *w = max_x - min_x + 1;
+    *h = max_y - min_y + 1;
+}
+
 #include "turret_data.h"
 
 void format_number_compact(char *buf, size_t buf_size, uint64_t val) {
@@ -429,7 +498,7 @@ void renderer_draw_wall(void) {
 
 void renderer_draw_range_perimeter(void) {
     int y = g_wall.range_line_y; // Straight horizontal line parallel to wall (default Y=64)
-    if (y < 20 || y >= g_wall.screen_y) return;
+    if (y < 20 || y + 3 >= SCREEN_H || y >= g_wall.screen_y) return;
 
     // High-visibility military hazard range line across road (X: 32..224)
     for (int x = 32; x < 224; x++) {
@@ -550,29 +619,28 @@ void renderer_draw_turret(const Turret *t, int is_selected) {
     }
 }
 
-void renderer_draw_enemies_top(void) {
-    // Collect visible enemies on top screen
-    int visible_indices[MAX_ENEMIES];
-    int count = 0;
+static int renderer_collect_sorted_enemies(int *out, int bottom_screen) {
+    int heads[SCREEN_H];
+    int next[MAX_ENEMIES];
+    for (int y = 0; y < SCREEN_H; y++) heads[y] = -1;
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
-        int gy = FROM_FP(g_enemies[i].y);
-        if (gy >= -32 && gy < 192) {
-            visible_indices[count++] = i;
-        }
+        int local_y = FROM_FP(g_enemies[i].y) - (bottom_screen ? 192 : 0);
+        if (local_y < -32 || local_y >= SCREEN_H) continue;
+        int bucket = (local_y < 0) ? 0 : local_y;
+        next[i] = heads[bucket];
+        heads[bucket] = i;
     }
+    int count = 0;
+    for (int y = 0; y < SCREEN_H; y++) {
+        for (int i = heads[y]; i >= 0; i = next[i]) out[count++] = i;
+    }
+    return count;
+}
 
-    // Insertion sort by Y (typically < 40 enemies on screen, takes negligible cycles)
-    for (int i = 1; i < count; i++) {
-        int key = visible_indices[i];
-        int key_y = g_enemies[key].y;
-        int j = i - 1;
-        while (j >= 0 && g_enemies[visible_indices[j]].y > key_y) {
-            visible_indices[j + 1] = visible_indices[j];
-            j--;
-        }
-        visible_indices[j + 1] = key;
-    }
+void renderer_draw_enemies_top(void) {
+    int visible_indices[MAX_ENEMIES];
+    int count = renderer_collect_sorted_enemies(visible_indices, 0);
 
     // Render sorted back-to-front (smaller Y first, larger Y drawn on top)
     for (int idx = 0; idx < count; idx++) {
@@ -588,17 +656,17 @@ void renderer_draw_enemies_top(void) {
             int bx = gx - bw / 2;
             int by = gy - 10;
             top_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
-            int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
+            int fill = (g_enemies[i].max_hp > 0) ? (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp) : 0;
             if (fill > 0) {
                 top_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
             }
         }
 
-        // Tight bounding box tailored to enemy variant
-        int ew = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 40 : 32);
-        int eh = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 44 : 32);
-        g_enemies[i].prev_top_x = gx - ew / 2;
-        g_enemies[i].prev_top_y = gy - 16;
+        int ew, eh;
+        renderer_enemy_bounds(&g_enemies[i], gx, gy,
+                              g_enemies[i].biting_target == 99,
+                              &g_enemies[i].prev_top_x, &g_enemies[i].prev_top_y,
+                              &ew, &eh);
         g_enemies[i].prev_top_w = ew;
         g_enemies[i].prev_top_h = eh;
         g_enemies[i].prev_top_active = 1;
@@ -606,29 +674,8 @@ void renderer_draw_enemies_top(void) {
 }
 
 void renderer_draw_enemies_bottom(void) {
-    // Collect visible enemies on bottom screen (global Y in [192..383])
     int visible_indices[MAX_ENEMIES];
-    int count = 0;
-    for (int i = 0; i < MAX_ENEMIES; i++) {
-        if (!g_enemies[i].active) continue;
-        int gy = FROM_FP(g_enemies[i].y);
-        int ly = gy - 192;
-        if (ly >= -32 && ly < SCREEN_H) {
-            visible_indices[count++] = i;
-        }
-    }
-
-    // Insertion sort by Y
-    for (int i = 1; i < count; i++) {
-        int key = visible_indices[i];
-        int key_y = g_enemies[key].y;
-        int j = i - 1;
-        while (j >= 0 && g_enemies[visible_indices[j]].y > key_y) {
-            visible_indices[j + 1] = visible_indices[j];
-            j--;
-        }
-        visible_indices[j + 1] = key;
-    }
+    int count = renderer_collect_sorted_enemies(visible_indices, 1);
 
     // Render sorted back-to-front
     for (int idx = 0; idx < count; idx++) {
@@ -645,17 +692,17 @@ void renderer_draw_enemies_bottom(void) {
             int bx = gx - bw / 2;
             int by = ly - 10;
             renderer_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
-            int fill = (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp);
+            int fill = (g_enemies[i].max_hp > 0) ? (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp) : 0;
             if (fill > 0) {
                 renderer_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
             }
         }
 
-        // Tight bounding box tailored to enemy variant
-        int ew = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 40 : 32);
-        int eh = (g_enemies[i].variant >= 6) ? 54 : ((g_enemies[i].variant == 2) ? 44 : 32);
-        g_enemies[i].prev_bot_x = gx - ew / 2;
-        g_enemies[i].prev_bot_y = ly - 16;
+        int ew, eh;
+        renderer_enemy_bounds(&g_enemies[i], gx, ly,
+                              g_enemies[i].biting_target == 99,
+                              &g_enemies[i].prev_bot_x, &g_enemies[i].prev_bot_y,
+                              &ew, &eh);
         g_enemies[i].prev_bot_w = ew;
         g_enemies[i].prev_bot_h = eh;
         g_enemies[i].prev_bot_active = 1;
@@ -681,11 +728,11 @@ void renderer_draw_bullets(void) {
 }
 
 void renderer_draw_splatters_top(void) {
-    // Splatters are permanently stamped into ground cache upon creation (0 per-frame cost)
+    // Persistent blood is already stored in the ground cache.
 }
 
 void renderer_draw_splatters_bottom(void) {
-    // Splatters are permanently stamped into ground cache upon creation (0 per-frame cost)
+    // Persistent blood is already stored in the ground cache.
 }
 
 void renderer_draw_death_particles_top(void) {
@@ -752,9 +799,9 @@ void renderer_draw_ui_wave(void) {
     top_draw_text(165, 2, buf, COLOR_PHOSPHOR_GREEN);
 
     // Profiler overlay (ALWAYS visible on row 2)
-    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d",
+    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d E:%d",
              g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
-             g_game.prof_pres_ticks, g_game.prof_sim_ticks);
+             g_game.prof_pres_ticks, g_game.prof_sim_ticks, g_game.prof_enemies_active);
     top_draw_text(6, 10, buf, COLOR_WHITE);
 
     // Peak alert / telegraphing on row 3 (does NOT cover profiler stats)
@@ -807,9 +854,9 @@ void renderer_draw_ui_pause(void) {
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
     top_draw_text(160, 4, buf, COLOR_PHOSPHOR_GREEN);
 
-    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d",
+    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d E:%d",
              g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
-             g_game.prof_pres_ticks, g_game.prof_sim_ticks);
+             g_game.prof_pres_ticks, g_game.prof_sim_ticks, g_game.prof_enemies_active);
     top_draw_text(6, 16, buf, COLOR_WHITE);
 
     int is_fresh = (g_game.wave_timer >= STAGE_DURATION_FRAMES || g_game.enemies_spawned == 0);
@@ -1210,7 +1257,9 @@ void renderer_draw_ui_sandbox(void) {
                 snprintf(buf, sizeof(buf), "%d px", g_game.sandbox.turret_range);
                 break;
             case 4:
-                snprintf(buf, sizeof(buf), "%d f (%d/s)", g_game.sandbox.turret_firerate, 60 / g_game.sandbox.turret_firerate);
+                    int fire_rate = g_game.sandbox.turret_firerate;
+                    if (fire_rate < 1) fire_rate = 1;
+                    snprintf(buf, sizeof(buf), "%d f (%d/s)", fire_rate, 60 / fire_rate);
                 break;
             case 5:
                 snprintf(buf, sizeof(buf), "%d DMG", g_game.sandbox.turret_damage);
