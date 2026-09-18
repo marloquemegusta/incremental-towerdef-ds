@@ -2024,6 +2024,9 @@ void game_sandbox_spawn_enemy(int x, int y) {
 }
 
 void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held) {
+    // Do not interpret stale touch coordinates while the entry chord is held.
+    if ((keys_held & KEY_L) && (keys_held & KEY_SELECT)) return;
+
     // START toggles live simulation running / paused
     if (keys_down & KEY_START) {
         g_game.sandbox.run_sim = !g_game.sandbox.run_sim;

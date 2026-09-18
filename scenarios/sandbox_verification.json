@@ -6,9 +6,9 @@
       "capture": "01_before_sandbox"
     },
     {"button_down": "L", "frames": 2},
-    {"button_down": "SELECT", "frames": 2, "capture": "02_sandbox_opened"},
+    {"button_down": "SELECT", "frames": 4, "capture": "02_sandbox_opened"},
     {"button_up": "SELECT", "frames": 2},
-    {"button_up": "L", "frames": 2},
+    {"button_up": "L", "frames": 4},
     {
       "tap": {
         "x": 128,

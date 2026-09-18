@@ -23,7 +23,7 @@ int main(void) {
         scanKeys();
         int keys_down = keysDown();
         int keys_held = keysHeld();
-        touchPosition touch;
+        touchPosition touch = {0};
         touchRead(&touch);
 
         // Global priority: START toggles pause in active wave or paused mode
@@ -41,9 +41,7 @@ int main(void) {
         if (hotkey_active) {
             if (!s_sandbox_hotkey_held) {
                 s_sandbox_hotkey_held = 1;
-                if (g_game.mode == MODE_DEBUG_SANDBOX) {
-                    g_game.mode = g_game.previous_mode;
-                } else if (g_game.mode != MODE_GAME_OVER) {
+                if (g_game.mode != MODE_DEBUG_SANDBOX && g_game.mode != MODE_GAME_OVER) {
                     g_game.previous_mode = g_game.mode;
                     g_game.mode = MODE_DEBUG_SANDBOX;
                 }
@@ -82,6 +80,14 @@ int main(void) {
             }
         } else if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.run_sim) {
             game_update_simulation();
+        }
+
+        // Finalize the chord transition after simulation side effects and
+        // immediately before rendering.
+        if (hotkey_active && g_game.mode != MODE_DEBUG_SANDBOX &&
+            g_game.mode != MODE_GAME_OVER) {
+            g_game.previous_mode = g_game.mode;
+            g_game.mode = MODE_DEBUG_SANDBOX;
         }
         uint16_t sim_t = timerElapsed(0);
 
