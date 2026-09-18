@@ -1,0 +1,18 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 20, "capture": "00_before"},
+    {"button_down": "L", "frames": 2},
+    {"button_down": "SELECT", "frames": 50, "capture": "01_stress_loaded"},
+    {"button_up": "SELECT", "frames": 4},
+    {"button_up": "L", "frames": 4},
+    {"frames": 120, "capture_sequence": "02_stress_profile", "capture_every": 30, "capture": "02_stress_end"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "00_before",
+      "to": "02_stress_end",
+      "min_changed_pixels": 100
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "performance_sandbox_compact",
+  "steps": [
+    {"frames": 20},
+    {"button_down": "L", "frames": 2},
+    {"button_down": "SELECT", "frames": 50, "capture": "01_full_hud"},
+    {"button_down": "SELECT", "frames": 30, "capture": "02_compact_hud"},
+    {"button_up": "SELECT", "frames": 4},
+    {"button_up": "L", "frames": 4},
+    {"frames": 60, "capture": "03_compact_end"}
+  ],
+  "assertions": [
+    {"type": "screen_changed", "from": "01_full_hud", "to": "02_compact_hud"}
+  ]
+}

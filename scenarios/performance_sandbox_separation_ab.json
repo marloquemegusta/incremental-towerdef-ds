@@ -1,0 +1,19 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 20},
+    {"button_down": "L", "frames": 2},
+    {"button_down": "SELECT", "frames": 80, "capture": "01_sep_on"},
+    {"frames": 30, "capture": "02_sep_off"},
+    {"button_up": "SELECT", "frames": 4},
+    {"button_up": "L", "frames": 4},
+    {"frames": 20}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_sep_on",
+      "to": "02_sep_off",
+      "min_changed_pixels": 100
+    }
+  }
+}

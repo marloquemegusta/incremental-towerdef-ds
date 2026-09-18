@@ -1,0 +1,25 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 20, "capture": "00_sandbox_empty"},
+    {"button_down": "L", "frames": 2},
+    {"button_down": "SELECT", "frames": 4},
+    {"button_up": "SELECT", "frames": 2},
+    {"button_up": "L", "frames": 8, "capture": "01_sandbox_ready"},
+    {"spawn_batch": {"count": 100, "columns": 10, "x": 35, "y": 18, "spacing_x": 20, "spacing_y": 10}, "frames": 30, "capture": "02_load_100"},
+    {"spawn_batch": {"count": 100, "columns": 10, "x": 35, "y": 18, "spacing_x": 20, "spacing_y": 10}, "frames": 30, "capture": "03_load_200"},
+    {"spawn_batch": {"count": 100, "columns": 10, "x": 35, "y": 18, "spacing_x": 20, "spacing_y": 10}, "frames": 30, "capture": "04_load_300"},
+    {"spawn_batch": {"count": 84, "columns": 10, "x": 35, "y": 18, "spacing_x": 20, "spacing_y": 10}, "frames": 120, "capture_sequence": "05_load_384", "capture_every": 30, "capture": "05_load_384_end"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "00_sandbox_empty",
+      "to": "05_load_384_end",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {"from": "00_sandbox_empty", "to": "01_sandbox_ready", "min_changed_pixels": 100},
+      {"from": "01_sandbox_ready", "to": "05_load_384_end", "min_changed_pixels": 100}
+    ]
+  }
+}

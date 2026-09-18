@@ -1,4 +1,5 @@
 #include "game.h"
+#include "tiles.h"
 
 int main(void) {
     // Adaptive simulation keeps real-time progression when rendering is saturated.
@@ -23,6 +24,8 @@ int main(void) {
         scanKeys();
         int keys_down = keysDown();
         int keys_held = keysHeld();
+        g_game.sandbox.last_keys_down = keys_down;
+        g_game.sandbox.last_keys_held = keys_held;
         touchPosition touch = {0};
         touchRead(&touch);
 
@@ -38,12 +41,17 @@ int main(void) {
         // Invisible Debug Hotkey: L + SELECT toggles Test Sandbox Lab
         static int s_sandbox_hotkey_held = 0;
         int hotkey_active = ((keys_held & KEY_L) != 0 && (keys_held & KEY_SELECT) != 0);
+        static int sandbox_b_was_held = 0;
         if (hotkey_active) {
             if (!s_sandbox_hotkey_held) {
                 s_sandbox_hotkey_held = 1;
                 if (g_game.mode != MODE_DEBUG_SANDBOX && g_game.mode != MODE_GAME_OVER) {
                     g_game.previous_mode = g_game.mode;
                     g_game.mode = MODE_DEBUG_SANDBOX;
+                    // Sandbox owns the full battlefield surface. Restore the
+                    // canonical ground immediately so stale victory/game-over
+                    // UI pixels cannot contaminate the first profiling frame.
+                    tiles_full_screen_refresh();
                 }
             }
         } else {
@@ -67,6 +75,35 @@ int main(void) {
             game_handle_input_victory(touch, keys_down, keys_held);
         }
 
+        // Performance harness: a deliberate 30-frame entry chord requests a
+        // full-capacity sandbox load without relying on key-release plumbing.
+        static int s_stress_chord_frames = 0;
+        if (g_game.mode == MODE_DEBUG_SANDBOX && hotkey_active) {
+            if (s_stress_chord_frames < 91) s_stress_chord_frames++;
+            if (s_stress_chord_frames == 30 && g_game.sandbox.spawn_count == 0) {
+                game_sandbox_load_stress_profile();
+            } else if (s_stress_chord_frames == 60 && g_game.sandbox.spawn_count > 0) {
+                g_game.sandbox.run_sim = 1;
+            } else if (s_stress_chord_frames == 90 && g_game.sandbox.spawn_count > 0) {
+                g_game.sandbox.separation_enabled = 0;
+            }
+        } else if (!hotkey_active) {
+            s_stress_chord_frames = 0;
+        }
+        if (g_game.mode == MODE_DEBUG_SANDBOX) {
+            int sandbox_b_held = (keys_held & KEY_B) != 0;
+            if (sandbox_b_held && !sandbox_b_was_held) {
+                g_game.sandbox.profiler_compact = !g_game.sandbox.profiler_compact;
+            }
+            sandbox_b_was_held = sandbox_b_held;
+        } else {
+            sandbox_b_was_held = 0;
+        }
+        if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.run_sim &&
+            g_game.sandbox.spawn_count > 0 && g_game.sim_ticks_elapsed == 30) {
+            g_game.sandbox.separation_enabled = 0;
+        }
+
         // --- SUB-SYSTEM PROFILER START ---
         timerElapsed(0); // Reset timer 0 baseline
 
@@ -88,6 +125,7 @@ int main(void) {
             g_game.mode != MODE_GAME_OVER) {
             g_game.previous_mode = g_game.mode;
             g_game.mode = MODE_DEBUG_SANDBOX;
+            tiles_full_screen_refresh();
         }
         uint16_t sim_t = timerElapsed(0);
 
@@ -99,6 +137,7 @@ int main(void) {
         uint16_t top_t = timerElapsed(0);
 
         // 3. Visual render Bottom Screen
+        uint16_t bot_base_t = 0, bot_enemy_t = 0, bot_fx_t = 0, bot_ui_t = 0;
         if (g_game.mode == MODE_UPGRADES) {
             renderer_draw_ui_upgrades();
         } else if (g_game.mode == MODE_CALIBRATION) {
@@ -106,10 +145,13 @@ int main(void) {
         } else {
             renderer_draw_battlefield_bottom();
             renderer_draw_splatters_bottom();
+            bot_base_t = timerElapsed(0);
             renderer_draw_enemies_bottom();
+            bot_enemy_t = timerElapsed(0);
             renderer_draw_wall(); // 3D Depth: Wall parapet occludes enemy heads & front limbs
             renderer_draw_bullets();
             renderer_draw_death_particles_bottom();
+            bot_fx_t = timerElapsed(0);
 
             if (g_game.mode == MODE_PREPARATION || g_game.mode == MODE_PAUSED) {
                 renderer_draw_ui_pause();
@@ -122,8 +164,16 @@ int main(void) {
             } else if (g_game.mode == MODE_DEBUG_SANDBOX) {
                 renderer_draw_ui_sandbox();
             }
+            bot_ui_t = timerElapsed(0);
         }
         uint16_t bot_t = timerElapsed(0);
+        // Keep the phase counters instantaneous: they are deliberately useful
+        // for spotting spikes in a single captured frame, while B remains the
+        // one-second average shown in the main profiler row.
+        g_game.prof_bot_base_ticks = bot_base_t;
+        g_game.prof_bot_enemy_ticks = bot_enemy_t;
+        g_game.prof_bot_fx_ticks = bot_fx_t;
+        g_game.prof_bot_ui_ticks = bot_ui_t;
 
         // 4. Synchronized presentation for both screens
         renderer_present();

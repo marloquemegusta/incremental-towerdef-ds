@@ -1,0 +1,19 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 20},
+    {"button_down": "L", "frames": 2},
+    {"button_down": "SELECT", "frames": 4},
+    {"button_up": "SELECT", "frames": 2},
+    {"button_up": "L", "frames": 8, "capture": "01_ready"},
+    {"button_down": "R", "frames": 5, "capture": "02_r_held"},
+    {"button_up": "R", "frames": 10, "capture": "03_r_released"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_ready",
+      "to": "03_r_released",
+      "min_changed_pixels": 10
+    }
+  }
+}
