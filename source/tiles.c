@@ -383,8 +383,9 @@ void tiles_stamp_splatter(int x, int y, int size, uint16_t color) {
 
 void tiles_full_screen_refresh(void) {
     if (g_top_backbuffer) {
-        dmaCopyWords(2, s_ground_top_cache8, g_top_backbuffer, (SCREEN_W * SCREEN_H * sizeof(uint8_t)) / 4);
+        memcpy(g_top_backbuffer, s_ground_top_cache8, SCREEN_W * SCREEN_H);
     }
+    renderer_refresh_top_vram();
     dmaCopyWords(2, s_ground_bottom_cache, (void *)VRAM_A, SCREEN_W * SCREEN_H * sizeof(uint16_t));
     dmaCopyWords(2, s_ground_bottom_cache, (void *)VRAM_B, SCREEN_W * SCREEN_H * sizeof(uint16_t));
     tiles_dirty_clear(0, 0);

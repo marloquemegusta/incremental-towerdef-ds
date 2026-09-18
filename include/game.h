@@ -459,6 +459,7 @@ void renderer_draw_ui_upgrades(void);
 void renderer_draw_ui_calibration(void);
 void renderer_draw_ui_sandbox(void);
 void renderer_present(void);
+void renderer_refresh_top_vram(void);
 
 // Top screen presentation
 void top_screen_present(void);

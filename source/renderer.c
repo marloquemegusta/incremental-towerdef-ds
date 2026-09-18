@@ -340,6 +340,7 @@ void renderer_draw_wall(void) {
                 g_backbuffer[(my + 1) * SCREEN_W + mx] = COLOR_MUZZLE_FLASH;
                 g_backbuffer[my * SCREEN_W + (mx - 1)] = COLOR_MUZZLE_FLASH;
                 g_backbuffer[my * SCREEN_W + (mx + 1)] = COLOR_MUZZLE_FLASH;
+                tiles_dirty_mark_rect(mx - 1, my - 1, 3, 3, 1, s_bot_fb_idx);
             }
         }
     }
@@ -438,6 +439,7 @@ void renderer_draw_wall(void) {
                 g_backbuffer[cy * SCREEN_W + cx] = col;
                 g_backbuffer[(cy + 1) * SCREEN_W + cx - 1] = RGB15(16, 12, 3) | BIT(15);
             }
+            tiles_dirty_mark_rect(cx - 1, cy - 1, 4, 4, 1, s_bot_fb_idx);
             g_casings[i].prev_cx = cx;
             g_casings[i].prev_cy = cy;
             g_casings[i].prev_active = 1;
@@ -459,6 +461,9 @@ void renderer_draw_wall(void) {
             if (tx >= 0 && tx < SCREEN_W && ty >= 0 && ty < SCREEN_H) {
                 g_backbuffer[ty * SCREEN_W + tx] = COLOR_BOLTER_TRACER;
             }
+            int min_dx = tx < bx ? tx : bx;
+            int min_dy = ty < by ? ty : by;
+            tiles_dirty_mark_rect(min_dx, min_dy, abs(bx - tx) + 2, abs(by - ty) + 2, 1, s_bot_fb_idx);
             g_bullet_darts[i].prev_bx = bx;
             g_bullet_darts[i].prev_by = by;
             g_bullet_darts[i].prev_active = 1;
@@ -624,9 +629,6 @@ void renderer_draw_enemies_bottom(void) {
 }
 
 void renderer_draw_bullets(void) {
-    // Draw active bullets
-
-    // 2. Draw active bullets
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (!g_bullets[i].active) continue;
         int bx = FROM_FP(g_bullets[i].x);
@@ -634,6 +636,7 @@ void renderer_draw_bullets(void) {
         renderer_draw_pixel(bx, by, COLOR_BOLTER_TRACER);
         renderer_draw_pixel(bx + 1, by, COLOR_WHITE);
         renderer_draw_pixel(bx, by + 1, COLOR_WHITE);
+        tiles_dirty_mark_rect(bx, by, 2, 2, 1, s_bot_fb_idx);
 
         g_bullets[i].prev_x = bx;
         g_bullets[i].prev_y = by;
@@ -677,12 +680,14 @@ void renderer_draw_death_particles_bottom(void) {
         int draw_y = gy - gz; // Elevated 3D parabolic arc!
         if (draw_y >= 0 && draw_y < SCREEN_H && gx >= 0 && gx < SCREEN_W) {
             renderer_draw_pixel(gx, draw_y, g_death_particles[i].color);
+            tiles_dirty_mark_rect(gx - 1, draw_y - 1, 4, 4, 1, s_bot_fb_idx);
             g_death_particles[i].prev_bot_has_shadow = 0;
             if (g_death_particles[i].size > 0) {
                 if (gx + 1 < SCREEN_W) renderer_draw_pixel(gx + 1, draw_y, g_death_particles[i].color);
                 // Drop shadow on ground under flying chunks
                 if (gy >= 0 && gy < SCREEN_H && gz > 1) {
                     renderer_draw_pixel(gx, gy, RGB15(2, 2, 4) | BIT(15));
+                    tiles_dirty_mark_rect(gx, gy, 1, 1, 1, s_bot_fb_idx);
                     g_death_particles[i].prev_bot_has_shadow = 1;
                     g_death_particles[i].prev_bot_sy = gy;
                 }
@@ -745,6 +750,7 @@ void renderer_draw_ui_wave(void) {
                 }
             }
         }
+        tiles_dirty_mark_rect(x0, y0, AMMO_CRATE_W, AMMO_CRATE_H, 1, s_bot_fb_idx);
         g_game.prev_drag_x = g_game.drag_x;
         g_game.prev_drag_y = g_game.drag_y;
         g_game.prev_drag_active = 1;
@@ -1285,9 +1291,17 @@ void renderer_present(void) {
     g_backbuffer = s_bot_fb_idx ? (uint16_t *)VRAM_B : (uint16_t *)VRAM_A;
 }
 
+void renderer_refresh_top_vram(void) {
+    if (s_top_vram && g_top_backbuffer) {
+        DC_FlushRange(g_top_backbuffer, SCREEN_W * SCREEN_H);
+        dmaCopyWords(1, g_top_backbuffer, s_top_vram, SCREEN_W * SCREEN_H);
+    }
+}
+
 void top_screen_present(void) {
     if (s_top_vram) {
-        // Fast 48 KB transfer: only 12,288 words instead of 24,576! (Cuts P in half!)
-        dmaCopyWords(1, g_top_backbuffer, s_top_vram, sizeof(s_top_backbuffer));
+        // Flush CPU D-cache before DMA transfer to ensure hardware coherency!
+        DC_FlushRange(g_top_backbuffer, SCREEN_W * SCREEN_H);
+        dmaCopyWords(1, g_top_backbuffer, s_top_vram, SCREEN_W * SCREEN_H);
     }
 }
