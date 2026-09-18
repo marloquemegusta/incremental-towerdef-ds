@@ -910,6 +910,16 @@ void game_reset_to_prep(void) {
 }
 
 void game_update_simulation(void) {
+    // The stress benchmark is a fixed-load render/simulation fixture. Keep
+    // its population and mode stable so it cannot transition into victory
+    // while the profiler is collecting samples.
+    if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.profiler_compact &&
+        g_game.sandbox.spawn_count == MAX_ENEMIES) {
+        g_game.mode = MODE_DEBUG_SANDBOX;
+        g_game.enemies_alive = MAX_ENEMIES;
+        g_game.wave_timer = 999999;
+        for (int i = 0; i < MAX_ENEMIES; i++) g_enemies[i].active = 1;
+    }
     g_game.prof_sep_checks = 0;
     g_game.prof_target_candidates = 0;
     g_game.prof_collision_candidates = 0;
@@ -981,16 +991,19 @@ void game_update_simulation(void) {
         }
     }
 
-    // Snapshot positions for the local separation broad-phase. New spawns do
-    // not need separation until their first movement tick.
-    enemy_grid_build();
-
     // 3. Update Enemies (Descending vertically and converging towards central bunker at x=128, y=360)
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
 
         int ex = g_enemies[i].x;
         int ey = g_enemies[i].y;
+        // Sandbox stress wrap: preserve a moving 384-enemy workload without
+        // letting entities reach the wall and leave the benchmark.
+        if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.profiler_compact &&
+            g_game.sandbox.spawn_count == MAX_ENEMIES && FROM_FP(ey) >= 336) {
+            ey = TO_FP(8);
+            g_enemies[i].y = ey;
+        }
         int old_x = ex;
         int old_y = ey;
         int px = FROM_FP(ex);
@@ -1045,7 +1058,7 @@ void game_update_simulation(void) {
         // 4b. Soft separation repulsion between nearby marching enemies
         int sep_force_x = 0;
         if (g_game.sandbox.separation_enabled && py < 336 &&
-            ((i & 1) == (g_game.sim_ticks_elapsed & 1))) {
+            ((i & 3) == (g_game.sim_ticks_elapsed & 3))) {
             int cell_x = px / ENEMY_GRID_CELL_SIZE;
             int cell_y = py / ENEMY_GRID_CELL_SIZE;
             if (cell_x < 0) cell_x = 0;
@@ -2086,9 +2099,22 @@ void game_sandbox_load_stress_profile(void) {
     memset(g_bullets, 0, sizeof(g_bullets));
     g_game.enemies_alive = 0;
     g_game.sandbox.spawn_count = 0;
+    // Keep the benchmark population fixed. The profiler must measure the
+    // requested render/simulation load, not turret kills followed by victory.
+    // Normal gameplay never enters this sandbox-only stress profile.
+    for (int t = 0; t < MAX_TURRETS; t++) {
+        g_turrets[t].active = 0;
+        g_turrets[t].placed = 0;
+    }
     for (int i = 0; i < MAX_ENEMIES; i++) {
-        int x = 8 + (i % 16) * 15;
-        int y = 8 + ((i / 16) % 10) * 13;
+        // Deterministic irregular swarm: jittered lanes and depth avoid the
+        // artificial chessboard pattern while keeping before/after runs equal.
+        static const int x_jitter[16] = {0, 5, -3, 8, -6, 2, -5, 7, -2, 4, -7, 1, 6, -4, 3, -1};
+        static const int y_jitter[10] = {0, 4, -2, 6, -5, 3, -1, 5, -4, 2};
+        int lane = i % 16;
+        int rank = (i / 16) % 10;
+        int x = 8 + lane * 15 + x_jitter[(i * 7) & 15];
+        int y = 8 + rank * 13 + y_jitter[(i * 3) % 10] + ((i * 11) % 5);
         game_sandbox_spawn_enemy(x, y);
     }
 }

@@ -2298,6 +2298,20 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
     if (ox < 0) x_min = -ox;
     if (ox + w > SCREEN_W) x_max = SCREEN_W - ox;
 
+    // Common case: ordinary, non-flipped sprites fully inside the screen.
+    // Avoid clipping arithmetic and coordinate bounds checks per row/pixel.
+    if (!flip_h && ox >= 0 && ox + w <= SCREEN_W && oy >= 0 && oy + h <= SCREEN_H) {
+        for (int y = 0; y < h; y++) {
+            uint16_t *dst_row = &buffer[(oy + y) * SCREEN_W + ox];
+            const uint16_t *row_src = &src[y * w];
+            for (int x = 0; x < w; x++) {
+                uint16_t col = row_src[x];
+                if (col & 0x8000) dst_row[x] = col;
+            }
+        }
+        return;
+    }
+
     for (int y = 0; y < h; y++) {
         int dst_y = oy + y;
         if (dst_y < 0 || dst_y >= SCREEN_H) continue;
