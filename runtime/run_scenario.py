@@ -27,6 +27,7 @@ BUTTON_BITS = {
     "L": 1 << 9,
     "X": 1 << 10,
     "Y": 1 << 11,
+    "TOUCH": 1 << 12,
 }
 
 
@@ -103,11 +104,44 @@ def main() -> int:
                 events.append({"step": index, "action": "button_down", "button": step["button_down"]})
             if "button_up" in step:
                 keypad = set_button(lib, keypad, step["button_up"], False)
+                # DeSmuME keeps the previous keypad state until it has seen a
+                # complete frame with the released mask. Materialize that
+                # release before the step's normal frame budget so chord
+                # guards in the ROM (notably sandbox entry) can observe it.
+                for _ in range(4):
+                    lib.desmume_input_keypad_update(0)
+                    lib.desmume_cycle(0)
                 events.append({"step": index, "action": "button_up", "button": step["button_up"]})
             if "tap" in step or "touch" in step:
                 point = step.get("tap") or step.get("touch")
                 lib.desmume_input_set_touch_pos(point["x"], point["y"])
+                keypad |= BUTTON_BITS["TOUCH"]
+                lib.desmume_input_keypad_update(keypad)
                 events.append({"step": index, "action": "tap", "x": point["x"], "y": point["y"]})
+            if "spawn_batch" in step:
+                batch = step["spawn_batch"]
+                count = max(0, int(batch["count"]))
+                columns = max(1, int(batch.get("columns", 1)))
+                start_x = int(batch.get("x", 128))
+                start_y = int(batch.get("y", 40))
+                spacing_x = int(batch.get("spacing_x", 12))
+                spacing_y = int(batch.get("spacing_y", 12))
+                for spawn_index in range(count):
+                    col = spawn_index % columns
+                    row = spawn_index // columns
+                    x = max(2, min(253, start_x + col * spacing_x))
+                    y = max(2, min(143, start_y + row * spacing_y))
+                    lib.desmume_input_set_touch_pos(x, y)
+                    spawn_keypad = keypad | BUTTON_BITS["R"]
+                    for _ in range(2):
+                        lib.desmume_input_keypad_update(spawn_keypad)
+                        lib.desmume_cycle(0)
+                        lib.desmume_input_keypad_update(spawn_keypad)
+                    lib.desmume_input_keypad_update(keypad)
+                    lib.desmume_input_release_touch()
+                    lib.desmume_cycle(0)
+                events.append({"step": index, "action": "spawn_batch", "count": count,
+                               "columns": columns, "start": {"x": start_x, "y": start_y}})
             if "drag" in step:
                 drag = step["drag"]
                 start = drag["from"]
@@ -123,6 +157,8 @@ def main() -> int:
                                "frames": drag_frames})
             if "release" in step:
                 lib.desmume_input_release_touch()
+                keypad &= ~BUTTON_BITS["TOUCH"]
+                lib.desmume_input_keypad_update(keypad)
                 events.append({"step": index, "action": "release"})
             capture_seq = step.get("capture_sequence")
             capture_every = max(1, int(step.get("capture_every", 1)))
@@ -134,7 +170,6 @@ def main() -> int:
             for f in range(frame_count):
                 lib.desmume_input_keypad_update(keypad)
                 lib.desmume_cycle(0)
-                lib.desmume_input_keypad_update(keypad)
                 if capture_seq and (f % capture_every == 0):
                     cname = f"{capture_seq}_{seq_indices[capture_seq]:04d}"
                     capture(lib, output / f"{cname}.png")

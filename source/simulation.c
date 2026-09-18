@@ -21,6 +21,7 @@ GameBalanceConfig g_balance;
 #define ENEMY_GRID_H ((FIELD_H + ENEMY_GRID_CELL_SIZE - 1) / ENEMY_GRID_CELL_SIZE)
 static int s_enemy_grid_heads[ENEMY_GRID_W * ENEMY_GRID_H];
 static int s_enemy_grid_next[MAX_ENEMIES];
+static int enemy_grid_collect(int x, int y, int radius, int *out);
 
 static void enemy_grid_build(void) {
     for (int cell = 0; cell < ENEMY_GRID_W * ENEMY_GRID_H; cell++) {
@@ -607,7 +608,10 @@ void wall_update(void) {
         global_auto_target_e = g_wall.locked_enemy_idx;
     } else if (auto_fire) {
         int best_score = -99999;
-        for (int e = 0; e < MAX_ENEMIES; e++) {
+        int candidates[MAX_ENEMIES];
+        int candidate_count = enemy_grid_collect(128, 192 + g_wall.screen_y, 200, candidates);
+        for (int ci = 0; ci < candidate_count; ci++) {
+            int e = candidates[ci];
             if (!g_enemies[e].active) continue;
             int gx = FROM_FP(g_enemies[e].x);
             int gy = FROM_FP(g_enemies[e].y);
@@ -706,7 +710,10 @@ void wall_update(void) {
                     break;
                 }
             } else {
-                for (int e = 0; e < MAX_ENEMIES; e++) {
+                int candidates[MAX_ENEMIES];
+                int candidate_count = enemy_grid_collect(cur_x, gy, 14, candidates);
+                for (int ci = 0; ci < candidate_count; ci++) {
+                    int e = candidates[ci];
                     if (!g_enemies[e].active) continue;
                     int ex = FROM_FP(g_enemies[e].x);
                     int ey = FROM_FP(g_enemies[e].y);
@@ -835,6 +842,8 @@ void game_init(void) {
     g_game.sandbox.turret_damage = 5;
     g_game.sandbox.turret_infinite_ammo = 1;
     g_game.sandbox.run_sim = 1;
+    g_game.sandbox.separation_enabled = 1;
+    g_game.sandbox.profiler_compact = 0;
     g_game.sandbox.edit_row = 0;
 
     // WallPlatform handles all defenses; g_turrets[0].placed = 0;
@@ -901,9 +910,15 @@ void game_reset_to_prep(void) {
 }
 
 void game_update_simulation(void) {
+    g_game.prof_sep_checks = 0;
+    g_game.prof_target_candidates = 0;
+    g_game.prof_collision_candidates = 0;
     if (g_game.mode != MODE_WAVE && g_game.mode != MODE_DEBUG_SANDBOX) return;
 
     g_game.sim_ticks_elapsed++;
+    // wall_update may perform enemy queries before movement; provide a valid
+    // broad-phase snapshot for that phase as well.
+    enemy_grid_build();
     wall_update();
     if (g_game.wave_timer > 0) g_game.wave_timer--;
 
@@ -1029,7 +1044,8 @@ void game_update_simulation(void) {
 
         // 4b. Soft separation repulsion between nearby marching enemies
         int sep_force_x = 0;
-        if (py < 336 && ((i & 1) == (g_game.sim_ticks_elapsed & 1))) {
+        if (g_game.sandbox.separation_enabled && py < 336 &&
+            ((i & 1) == (g_game.sim_ticks_elapsed & 1))) {
             int cell_x = px / ENEMY_GRID_CELL_SIZE;
             int cell_y = py / ENEMY_GRID_CELL_SIZE;
             if (cell_x < 0) cell_x = 0;
@@ -1042,6 +1058,7 @@ void game_update_simulation(void) {
                     if (near_x < 0 || near_x >= ENEMY_GRID_W) continue;
                     int cell = near_y * ENEMY_GRID_W + near_x;
                     for (int j = s_enemy_grid_heads[cell]; j >= 0; j = s_enemy_grid_next[j]) {
+                        g_game.prof_sep_checks++;
                         if (i == j || !g_enemies[j].active) continue;
                         int ody = ey - g_enemies[j].y;
                         int aody = (ody < 0) ? -ody : ody;
@@ -1178,6 +1195,9 @@ void game_update_simulation(void) {
         }
     }
 
+    // Movement changed positions; refresh the broad-phase before queries.
+    enemy_grid_build();
+
     // 5. Update Turrets & Logistics (Factorio conveyors & reloading)
     // 5. Update Turrets & Logistics
     for (int t = 0; t < MAX_TURRETS; t++) {
@@ -1229,7 +1249,11 @@ void game_update_simulation(void) {
         if (g_game.upgrades.auto_target) {
             // Find closest active enemy in range
             int closest_dist_sq = tur->range * tur->range;
-            for (int e = 0; e < MAX_ENEMIES; e++) {
+            int candidates[MAX_ENEMIES];
+            int candidate_count = enemy_grid_collect(tur->x, 192 + tur->y, tur->range, candidates);
+            for (int ci = 0; ci < candidate_count; ci++) {
+                int e = candidates[ci];
+                g_game.prof_target_candidates++;
                 if (!g_enemies[e].active) continue;
                 int gy = FROM_FP(g_enemies[e].y);
                 if (gy < 192) continue; // Only shoot enemies on bottom screen
@@ -1263,7 +1287,11 @@ void game_update_simulation(void) {
         // In debug sandbox: auto-acquire closest enemy within range if none locked
         if (target_enemy < 0 && g_game.mode == MODE_DEBUG_SANDBOX) {
             int closest_dist_sq = tur->range * tur->range;
-            for (int e = 0; e < MAX_ENEMIES; e++) {
+            int candidates[MAX_ENEMIES];
+            int candidate_count = enemy_grid_collect(tur->x, 192 + tur->y, tur->range, candidates);
+            for (int ci = 0; ci < candidate_count; ci++) {
+                int e = candidates[ci];
+                g_game.prof_target_candidates++;
                 if (!g_enemies[e].active) continue;
                 int gy = FROM_FP(g_enemies[e].y);
                 if (gy < 192) continue;
@@ -1374,7 +1402,11 @@ void game_update_simulation(void) {
         int mid_by = (prev_by + curr_by) / 2;
 
         int hit = 0;
-        for (int e = 0; e < MAX_ENEMIES; e++) {
+        int candidates[MAX_ENEMIES];
+        int candidate_count = enemy_grid_collect(curr_bx, 192 + curr_by, 22, candidates);
+        for (int ci = 0; ci < candidate_count; ci++) {
+            int e = candidates[ci];
+            g_game.prof_collision_candidates++;
             if (!g_enemies[e].active) continue;
             int gy = FROM_FP(g_enemies[e].y);
             if (gy < 192) continue; // Only collide in bottom screen
@@ -2023,9 +2055,65 @@ void game_sandbox_spawn_enemy(int x, int y) {
     }
 }
 
+static int enemy_grid_collect(int x, int y, int radius, int *out) {
+    int min_cx = (x - radius) / ENEMY_GRID_CELL_SIZE;
+    int max_cx = (x + radius) / ENEMY_GRID_CELL_SIZE;
+    int min_cy = (y - radius) / ENEMY_GRID_CELL_SIZE;
+    int max_cy = (y + radius) / ENEMY_GRID_CELL_SIZE;
+    if (min_cx < 0) min_cx = 0;
+    if (max_cx >= ENEMY_GRID_W) max_cx = ENEMY_GRID_W - 1;
+    if (min_cy < 0) min_cy = 0;
+    if (max_cy >= ENEMY_GRID_H) max_cy = ENEMY_GRID_H - 1;
+    int count = 0;
+    for (int cy = min_cy; cy <= max_cy; cy++) {
+        for (int cx = min_cx; cx <= max_cx; cx++) {
+            int cell = cy * ENEMY_GRID_W + cx;
+            for (int e = s_enemy_grid_heads[cell]; e >= 0; e = s_enemy_grid_next[e]) {
+                if (count < MAX_ENEMIES) out[count++] = e;
+            }
+        }
+    }
+    return count;
+}
+
+void game_sandbox_load_stress_profile(void) {
+    // Deterministic full-capacity load used by the performance harness.
+    g_game.sandbox.run_sim = 1;
+    // Stress runs keep telemetry visible but remove the expensive static help
+    // panel so the measured frame represents the game rather than the HUD.
+    g_game.sandbox.profiler_compact = 1;
+    memset(g_enemies, 0, sizeof(g_enemies));
+    memset(g_bullets, 0, sizeof(g_bullets));
+    g_game.enemies_alive = 0;
+    g_game.sandbox.spawn_count = 0;
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        int x = 8 + (i % 16) * 15;
+        int y = 8 + ((i / 16) % 10) * 13;
+        game_sandbox_spawn_enemy(x, y);
+    }
+}
+
 void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held) {
-    // Do not interpret stale touch coordinates while the entry chord is held.
-    if ((keys_held & KEY_L) && (keys_held & KEY_SELECT)) return;
+    g_game.sandbox.last_keys_down = keys_down;
+    g_game.sandbox.last_keys_held = keys_held;
+
+    // The entry chord is handled globally. Do not reject the rest of the
+    // sandbox controls here: some emulator frontends expose the released
+    // chord one frame late, while the diagnostic buttons are still valid.
+
+    // Deterministic keyboard spawn for emulator profiling and hardware tests.
+    // Touch remains the primary UX, while R gives scenarios a verified input
+    // path that does not depend on the frontend's touch-coordinate plumbing.
+    static int s_spawn_button_held = 0;
+    int spawn_button_held = (keys_held & KEY_R) != 0;
+    if (spawn_button_held && !s_spawn_button_held) {
+        int slot = g_game.sandbox.spawn_count;
+        int spawn_x = 8 + (slot % 16) * 15;
+        int spawn_y = 8 + ((slot / 16) % 10) * 13;
+        game_sandbox_spawn_enemy(spawn_x, spawn_y);
+    }
+    s_spawn_button_held = spawn_button_held;
+    if (spawn_button_held) return;
 
     // START toggles live simulation running / paused
     if (keys_down & KEY_START) {
@@ -2165,6 +2253,7 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
             // [EXIT] (210..252)
             if (touch.px >= 210 && touch.px <= 252) {
                 g_game.mode = g_game.previous_mode;
+                tiles_full_screen_refresh();
                 return;
             }
         } else {

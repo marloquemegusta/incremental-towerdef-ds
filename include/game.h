@@ -242,8 +242,12 @@ typedef struct {
     int turret_damage;    // 1..999 damage per bullet
     int turret_infinite_ammo; // 1 = infinite ammo
     int run_sim;          // 0 = paused/step, 1 = live continuous
+    int separation_enabled;
+    int profiler_compact;
     int edit_row;         // 0..5 for D-Pad parameter tuning
     int spawn_count;
+    int last_keys_down;   // Diagnostic input trace for the sandbox profiler
+    int last_keys_held;
 } DebugSandboxState;
 
 // Editable configuration per enemy tier inside each Wave
@@ -358,6 +362,13 @@ typedef struct {
     int prof_bot_ticks;
     int prof_pres_ticks;
     int prof_enemies_active;
+    int prof_sep_checks;
+    int prof_target_candidates;
+    int prof_collision_candidates;
+    int prof_bot_base_ticks;
+    int prof_bot_enemy_ticks;
+    int prof_bot_fx_ticks;
+    int prof_bot_ui_ticks;
 } GameContext;
 
 // Upgrades helper
@@ -405,6 +416,7 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held);
 void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held);
 void game_sandbox_spawn_enemy(int x, int y);
+void game_sandbox_load_stress_profile(void);
 void game_toggle_pause(void);
 void game_reset_to_prep(void);
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration);

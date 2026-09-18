@@ -1213,18 +1213,41 @@ void renderer_draw_ui_calibration(void) {
 void renderer_draw_ui_sandbox(void) {
     // --- TOP SCREEN: Telemetry & Config HUD ---
     // Keep the battlefield and spawned enemies underneath the diagnostic HUD.
-    top_fill_rect(0, 0, SCREEN_W, 20, COLOR_IRON_PANEL);
+    top_fill_rect(0, 0, SCREEN_W, 20, COLOR_BLACK);
     for (int x = 0; x < SCREEN_W; x++) {
         top_draw_pixel(x, 20, COLOR_PHOSPHOR_GREEN);
     }
-    top_draw_text(6, 6, "--- DEBUG SANDBOX LAB ---", COLOR_AMBER);
-    top_draw_text(180, 6, g_game.sandbox.run_sim ? "[RUN]" : "[STEP]", 
+    char buf[48];
+    snprintf(buf, sizeof(buf), "FPS:%d T:%d B:%d P:%d S:%d E:%d",
+             g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
+             g_game.prof_pres_ticks, g_game.prof_sim_ticks,
+             g_game.prof_enemies_active);
+    top_draw_text(4, 1, buf, COLOR_WHITE);
+    top_draw_text(4, 9, "DEBUG SANDBOX", COLOR_AMBER);
+    top_draw_text(180, 9, g_game.sandbox.run_sim ? "RUN" : "PAUSE",
                   g_game.sandbox.run_sim ? COLOR_LED_GREEN : COLOR_AMBER);
+
+    if (g_game.sandbox.profiler_compact) {
+        // Keep only dynamic evidence in the low-overhead measurement mode.
+        top_fill_rect(0, 108, SCREEN_W, 7, COLOR_IRON_PANEL);
+        snprintf(buf, sizeof(buf), "R:%d E:%d F:%d U:%d", g_game.prof_bot_base_ticks,
+                 g_game.prof_bot_enemy_ticks, g_game.prof_bot_fx_ticks,
+                 g_game.prof_bot_ui_ticks);
+        top_draw_text(6, 108, buf, COLOR_WHITE);
+        snprintf(buf, sizeof(buf), "Q:%d/%d/%d", g_game.prof_sep_checks,
+                 g_game.prof_target_candidates, g_game.prof_collision_candidates);
+        top_draw_text(154, 108, buf, COLOR_AMBER);
+        top_fill_rect(0, 176, SCREEN_W, 16, COLOR_IRON_PANEL);
+        snprintf(buf, sizeof(buf), "ALIVE:%d TOTAL:%d", g_game.enemies_alive, g_game.sandbox.spawn_count);
+        top_draw_text(12, 180, buf, COLOR_PHOSPHOR_GREEN);
+        snprintf(buf, sizeof(buf), "H:%d", g_game.sandbox.last_keys_held & 0x0FFF);
+        top_draw_text(214, 180, buf, COLOR_AMBER);
+        renderer_fill_rect(0, 148, SCREEN_W, 44, COLOR_BLACK);
+        return;
+    }
 
     // D-Pad adjustable parameters (Rows 0..5)
     static const char *s_tier_names[8] = { "SCOURGE", "ZERGLING", "HYDRALISK", "MUTALISK", "DEFILER", "LURKER", "GUARDIAN", "ULTRALISK" };
-    char buf[48];
-
     const char *labels[6] = { "ENEMY SPECIES", "ENEMY HP", "ENEMY SPEED", "TURRET RANGE", "FIRE CADENCE", "BULLET DMG" };
     for (int r = 0; r < 6; r++) {
         int y = 26 + r * 14;
@@ -1268,6 +1291,19 @@ void renderer_draw_ui_sandbox(void) {
         top_draw_text(120, y + 2, buf, val_col);
     }
 
+    // Sandbox-local profiler row; the normal battlefield HUD is covered by
+    // this diagnostic panel, so repeat the phase timings here as evidence.
+    top_fill_rect(0, 108, SCREEN_W, 7, COLOR_IRON_PANEL);
+    snprintf(buf, sizeof(buf), "R:%d E:%d F:%d U:%d", g_game.prof_bot_base_ticks,
+             g_game.prof_bot_enemy_ticks, g_game.prof_bot_fx_ticks,
+             g_game.prof_bot_ui_ticks);
+    top_draw_text(6, 108, buf, COLOR_WHITE);
+    top_fill_rect(210, 115, 46, 7, COLOR_BLACK);
+    top_draw_text(214, 116, g_game.sandbox.separation_enabled ? "SEP ON" : "SEP OFF", COLOR_AMBER);
+    snprintf(buf, sizeof(buf), "Q:%d/%d/%d", g_game.prof_sep_checks,
+             g_game.prof_target_candidates, g_game.prof_collision_candidates);
+    top_draw_text(154, 108, buf, COLOR_AMBER);
+
     // Bottom telemetry stats on top screen
     for (int x = 0; x < SCREEN_W; x++) {
         top_draw_pixel(x, 114, COLOR_IRON_BORDER);
@@ -1278,8 +1314,11 @@ void renderer_draw_ui_sandbox(void) {
     top_draw_text(12, 156, "START: Run/Pause  Y: Step 1F", COLOR_IRON_LIGHT);
     top_draw_text(12, 168, "X: Clear Entities L+SEL: Exit", COLOR_IRON_LIGHT);
 
-    snprintf(buf, sizeof(buf), "ALIVE: %d | TOTAL: %d", g_game.enemies_alive, g_game.sandbox.spawn_count);
+    top_fill_rect(0, 176, SCREEN_W, 16, COLOR_IRON_PANEL);
+    snprintf(buf, sizeof(buf), "ALIVE:%d TOTAL:%d", g_game.enemies_alive, g_game.sandbox.spawn_count);
     top_draw_text(12, 180, buf, COLOR_PHOSPHOR_GREEN);
+    snprintf(buf, sizeof(buf), "H:%d", g_game.sandbox.last_keys_held & 0x0FFF);
+    top_draw_text(214, 180, buf, COLOR_AMBER);
 
     // --- BOTTOM SCREEN: Battlefield Overlay & Touch Control Bar ---
     // Turret range circle preview
