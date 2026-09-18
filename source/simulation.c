@@ -428,7 +428,7 @@ void wall_spawn_casing(int x, int y, int dir_sign) {
     g_casings[slot].angle = rand() % 360;
     g_casings[slot].spin_speed = dir_sign * (30 + (rand() % 20));
     g_casings[slot].bounces = 0;
-    g_casings[slot].life = 60;
+    g_casings[slot].life = 480;
 }
 
 int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y, int target_enemy_idx) {
