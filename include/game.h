@@ -396,8 +396,8 @@ void wall_fire_socket(int socket_idx, int target_x, int target_y);
 int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_y);
 void wall_spawn_casing(int x, int y, int dir_sign);
 int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y, int target_enemy_idx);
-extern uint16_t g_backbuffer[SCREEN_W * SCREEN_H];
-extern uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H];
+extern uint16_t *g_backbuffer;
+extern uint16_t *g_top_backbuffer;
 
 // Math
 void math_init(void);
