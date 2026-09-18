@@ -542,6 +542,12 @@ void renderer_draw_battlefield_bottom(void) {
     // 2. Erase enemies
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (g_enemies[i].prev_bot_active) {
+            int current_x = FROM_FP(g_enemies[i].x);
+            int current_y = FROM_FP(g_enemies[i].y) - 192;
+            // Static entities already have the same background underneath.
+            // Avoid restoring and redrawing their old dirty rectangle.
+            if (current_x == g_enemies[i].prev_bot_x &&
+                current_y == g_enemies[i].prev_bot_y) continue;
             tiles_restore_ground_rect(g_backbuffer,
                                      g_enemies[i].prev_bot_x, g_enemies[i].prev_bot_y,
                                      g_enemies[i].prev_bot_w, g_enemies[i].prev_bot_h, 1);
@@ -623,6 +629,8 @@ static int renderer_collect_sorted_enemies(int *out, int bottom_screen) {
     int heads[SCREEN_H];
     int next[MAX_ENEMIES];
     for (int y = 0; y < SCREEN_H; y++) heads[y] = -1;
+    int min_bucket = SCREEN_H;
+    int max_bucket = -1;
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
         int local_y = FROM_FP(g_enemies[i].y) - (bottom_screen ? 192 : 0);
@@ -630,9 +638,12 @@ static int renderer_collect_sorted_enemies(int *out, int bottom_screen) {
         int bucket = (local_y < 0) ? 0 : local_y;
         next[i] = heads[bucket];
         heads[bucket] = i;
+        if (bucket < min_bucket) min_bucket = bucket;
+        if (bucket > max_bucket) max_bucket = bucket;
     }
+    if (max_bucket < min_bucket) return 0;
     int count = 0;
-    for (int y = 0; y < SCREEN_H; y++) {
+    for (int y = min_bucket; y <= max_bucket; y++) {
         for (int i = heads[y]; i >= 0; i = next[i]) out[count++] = i;
     }
     return count;
@@ -683,6 +694,12 @@ void renderer_draw_enemies_bottom(void) {
         int gx = FROM_FP(g_enemies[i].x);
         int gy = FROM_FP(g_enemies[i].y);
         int ly = gy - 192;
+        // The wall draw happens after enemies. If the complete sprite is
+        // below the wall edge, it cannot contribute visible pixels.
+        if (ly - 16 >= g_wall.screen_y) {
+            g_enemies[i].prev_bot_active = 0;
+            continue;
+        }
         enemy_draw_sprite_to_buffer(g_backbuffer, gx, ly, g_enemies[i].variant,
                                    g_enemies[i].anim_frame, g_enemies[i].dir,
                                    (g_enemies[i].biting_target == 99));
