@@ -2,9 +2,11 @@
 #include "tiles.h"
 #include "enemy_data.h"
 
-// Define VRAM backbuffers aligned for fast DMA
-uint16_t g_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
-uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
+// Hardware VRAM backbuffers
+uint16_t *g_backbuffer = NULL;
+static uint16_t s_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
+uint16_t *g_top_backbuffer = s_top_backbuffer;
+static int s_bot_fb_idx = 1; // Start drawing into VRAM_B while FB0 displays VRAM_A
 
 static u16 *s_top_vram = NULL;
 static int s_top_bg = 0;
@@ -80,25 +82,27 @@ static const uint8_t font4x6[128][6] = {
 };
 
 void renderer_init(void) {
-    // 1. Bottom Screen: Main engine in Direct FB0 mode on bottom LCD
+    // 1. Bottom Screen: Main engine in Direct FB mode with double VRAM banks (A & B)
     lcdMainOnBottom();
-    videoSetMode(MODE_FB0);
     vramSetBankA(VRAM_A_LCD);
+    vramSetBankB(VRAM_B_LCD);
+    videoSetMode(MODE_FB0); // Initially display VRAM_A
 
     // 2. Top Screen: Sub engine 16-bit Bitmap Mode 5
     videoSetModeSub(MODE_5_2D);
     vramSetBankC(VRAM_C_SUB_BG);
     s_top_bg = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
-    s_top_vram = bgGetGfxPtr(s_top_bg);
+    s_top_vram = (u16 *)bgGetGfxPtr(s_top_bg);
+
+    s_bot_fb_idx = 1; // Draw to VRAM_B first while VRAM_A is displayed
+    g_backbuffer = (uint16_t *)VRAM_B;
+    g_top_backbuffer = s_top_backbuffer; // RAM backbuffer avoids VRAM scanout contention!
 
     // 3. Asset generator
     tiles_init();
 
-    // 4. Initial clear
-    renderer_clear(COLOR_DECK_FLOOR);
-    for (int i = 0; i < SCREEN_W * SCREEN_H; i++) {
-        g_top_backbuffer[i] = COLOR_DECK_FLOOR;
-    }
+    // 4. Initial ground load into all VRAM buffers
+    tiles_full_screen_refresh();
 }
 
 void renderer_clear(uint16_t color) {
@@ -230,17 +234,17 @@ void renderer_draw_battlefield_top(void) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (g_enemies[i].prev_top_active) {
             tiles_dirty_mark_rect(g_enemies[i].prev_top_x, g_enemies[i].prev_top_y,
-                                  g_enemies[i].prev_top_w, g_enemies[i].prev_top_h, 0);
+                                  g_enemies[i].prev_top_w, g_enemies[i].prev_top_h, 0, 0);
             g_enemies[i].prev_top_active = 0;
         }
     }
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
         if (g_death_particles[i].prev_top_active) {
-            tiles_dirty_mark_rect(g_death_particles[i].prev_top_x - 1, g_death_particles[i].prev_top_y - 1, 4, 4, 0);
+            tiles_dirty_mark_rect(g_death_particles[i].prev_top_x - 1, g_death_particles[i].prev_top_y - 1, 4, 4, 0, 0);
             g_death_particles[i].prev_top_active = 0;
         }
     }
-    tiles_dirty_restore(g_top_backbuffer, 0);
+    tiles_dirty_restore(g_top_backbuffer, 0, 0);
 }
 
 
@@ -262,6 +266,7 @@ void renderer_draw_wall(void) {
         int dest_y = sy - TURRET_PIVOT_Y;
 
         wall_draw_turret_sprite(g_backbuffer, dest_x, dest_y, angle);
+        tiles_dirty_mark_rect(dest_x - 2, dest_y - 2, TURRET_SPRITE_W + 4, TURRET_SPRITE_H + 18, 1, s_bot_fb_idx);
 
         // Diegetic Ammo & Reload indicator beneath each turret cupola
         int bar_w = 16;
@@ -343,6 +348,7 @@ void renderer_draw_wall(void) {
         uint16_t col_dead_core  = RGB15(1, 1, 2) | BIT(15);
         uint16_t col_bezel      = RGB15(3, 3, 4) | BIT(15);
 
+        tiles_dirty_mark_rect(0, 186, SCREEN_W, 6, 1, s_bot_fb_idx);
         int cy = 188;
         for (int i = 0; i < num_bulbs; i++) {
             int cx = 4 + i * 8;
@@ -453,67 +459,9 @@ void renderer_draw_range_perimeter(void) {
 }
 
 void renderer_draw_battlefield_bottom(void) {
-    // 60 FPS Deduplicated Dirty Blocks (8x8): Erase previous frame entities on bottom screen
-
-    // 1. Mark turret cupola backgrounds
-    int active_mask = 0;
-    if (g_wall.active_turrets == 1) active_mask = (1 << 1);
-    else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
-    else if (g_wall.active_turrets == 3) active_mask = (1 << 0) | (1 << 1) | (1 << 2);
-    else active_mask = 0x0F;
-
-    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
-        if (!(active_mask & (1 << s))) continue;
-        int sx = c_wall_sockets[s].x;
-        int sy = g_wall.screen_y + c_wall_sockets[s].y;
-        int dest_x = sx - TURRET_PIVOT_X;
-        int dest_y = sy - TURRET_PIVOT_Y;
-        tiles_dirty_mark_rect(dest_x - 2, dest_y - 2, TURRET_SPRITE_W + 4, TURRET_SPRITE_H + 18, 1);
-    }
-
-    // 2. Mark enemies
-    for (int i = 0; i < MAX_ENEMIES; i++) {
-        if (g_enemies[i].prev_bot_active) {
-            tiles_dirty_mark_rect(g_enemies[i].prev_bot_x, g_enemies[i].prev_bot_y,
-                                  g_enemies[i].prev_bot_w, g_enemies[i].prev_bot_h, 1);
-            g_enemies[i].prev_bot_active = 0;
-        }
-    }
-    for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
-        if (g_death_particles[i].prev_bot_active) {
-            tiles_dirty_mark_rect(g_death_particles[i].prev_bot_x - 1, g_death_particles[i].prev_bot_y - 1, 4, 4, 1);
-            if (g_death_particles[i].prev_bot_has_shadow) {
-                tiles_dirty_mark_rect(g_death_particles[i].prev_bot_x - 1, g_death_particles[i].prev_bot_sy - 1, 4, 4, 1);
-                g_death_particles[i].prev_bot_has_shadow = 0;
-            }
-            g_death_particles[i].prev_bot_active = 0;
-        }
-    }
-    for (int i = 0; i < MAX_CASINGS; i++) {
-        if (g_casings[i].prev_active) {
-            tiles_dirty_mark_rect(g_casings[i].prev_cx - 2, g_casings[i].prev_cy - 2, 6, 6, 1);
-            g_casings[i].prev_active = 0;
-        }
-    }
-    for (int i = 0; i < MAX_BULLET_DARTS; i++) {
-        if (g_bullet_darts[i].prev_active) {
-            tiles_dirty_mark_rect(g_bullet_darts[i].prev_bx - 2, g_bullet_darts[i].prev_by - 2, 6, 6, 1);
-            g_bullet_darts[i].prev_active = 0;
-        }
-    }
-    for (int i = 0; i < MAX_BULLETS; i++) {
-        if (g_bullets[i].prev_active) {
-            tiles_dirty_mark_rect(g_bullets[i].prev_x - 1, g_bullets[i].prev_y - 1, 4, 4, 1);
-            g_bullets[i].prev_active = 0;
-        }
-    }
-    if (g_game.prev_drag_active) {
-        tiles_dirty_mark_rect(g_game.prev_drag_x - AMMO_CRATE_W / 2 - 1, g_game.prev_drag_y - AMMO_CRATE_H / 2 - 1, AMMO_CRATE_W + 2, AMMO_CRATE_H + 2, 1);
-        g_game.prev_drag_active = 0;
-    }
-
-    // Unified deduplicated restore:
-    tiles_dirty_restore(g_backbuffer, 1);
+    // 60 FPS Deduplicated Dirty Blocks (8x8):
+    // In VRAM double-buffering, restore the exact dirty blocks marked when this buffer was drawn 2 frames ago.
+    tiles_dirty_restore(g_backbuffer, 1, s_bot_fb_idx);
 }
 
 void renderer_draw_turret(const Turret *t, int is_selected) {
@@ -622,12 +570,12 @@ void renderer_draw_enemies_bottom(void) {
             g_enemies[i].prev_bot_active = 0;
             continue;
         }
+        int ex, ey, ew, eh;
         enemy_draw_sprite_to_buffer(g_backbuffer, gx, ly, g_enemies[i].variant,
                                    g_enemies[i].anim_frame, g_enemies[i].dir,
                                    (g_enemies[i].biting_target == 99),
-                                   &g_enemies[i].prev_bot_x, &g_enemies[i].prev_bot_y,
-                                   &g_enemies[i].prev_bot_w, &g_enemies[i].prev_bot_h);
-        g_enemies[i].prev_bot_active = 1;
+                                   &ex, &ey, &ew, &eh);
+        tiles_dirty_mark_rect(ex, ey, ew, eh, 1, s_bot_fb_idx);
         // Health bar if damaged
         if (g_enemies[i].hp < g_enemies[i].max_hp) {
             int bw = 14;
@@ -638,8 +586,7 @@ void renderer_draw_enemies_bottom(void) {
             if (fill > 0) {
                 renderer_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
             }
-            if (bx - 1 < g_enemies[i].prev_bot_x) g_enemies[i].prev_bot_x = bx - 1;
-            if (by - 1 < g_enemies[i].prev_bot_y) g_enemies[i].prev_bot_y = by - 1;
+            tiles_dirty_mark_rect(bx - 1, by - 1, bw + 2, 3, 1, s_bot_fb_idx);
         }
     }
 }
@@ -1262,6 +1209,7 @@ void renderer_draw_ui_sandbox(void) {
     }
 
     // Bottom control bar (y >= 148, h = 44)
+    tiles_dirty_mark_rect(0, 148, SCREEN_W, 44, 1, s_bot_fb_idx);
     renderer_fill_rect(0, 148, SCREEN_W, 44, COLOR_BLACK);
     renderer_draw_line(0, 148, SCREEN_W, 148, COLOR_IRON_BORDER);
 
@@ -1297,11 +1245,16 @@ void renderer_draw_ui_sandbox(void) {
 }
 
 void renderer_present(void) {
-    dmaCopyWords(3, g_backbuffer, VRAM_A, sizeof(g_backbuffer));
+    // Current draw buffer was s_bot_fb_idx (0=VRAM_A, 1=VRAM_B).
+    // Flip display to the buffer we just finished drawing:
+    videoSetMode(s_bot_fb_idx ? MODE_FB1 : MODE_FB0);
+    // Next frame will draw into the opposite buffer:
+    s_bot_fb_idx ^= 1;
+    g_backbuffer = s_bot_fb_idx ? (uint16_t *)VRAM_B : (uint16_t *)VRAM_A;
 }
 
 void top_screen_present(void) {
     if (s_top_vram) {
-        dmaCopyWords(1, g_top_backbuffer, s_top_vram, sizeof(g_top_backbuffer));
+        dmaCopyWords(1, g_top_backbuffer, s_top_vram, sizeof(s_top_backbuffer));
     }
 }
