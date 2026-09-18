@@ -2183,6 +2183,154 @@ ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer(uint16
     }
 }
 
+ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer8(
+    uint8_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking,
+    int *out_bx, int *out_by, int *out_bw, int *out_bh)
+{
+    if (!buffer || variant < 0 || variant >= ENEMY_VARIANT_COUNT) return;
+    const EnemyTypeDef *type = &g_enemy_types[variant];
+
+    int shadow_min_x = 0, shadow_min_y = 0, shadow_max_x = 0, shadow_max_y = 0;
+    int has_shadow = 0;
+
+    if (type->is_flying && type->flight_altitude > 0) {
+        has_shadow = 1;
+        int shadow_w = 12;
+        int shadow_h = 6;
+        shadow_min_x = cx - shadow_w;
+        shadow_max_x = cx + shadow_w;
+        shadow_min_y = cy - shadow_h;
+        shadow_max_y = cy + shadow_h;
+
+        int y_start = shadow_min_y < 0 ? 0 : shadow_min_y;
+        int y_end = shadow_max_y >= SCREEN_H ? SCREEN_H - 1 : shadow_max_y;
+
+        for (int y = y_start; y <= y_end; y++) {
+            int dy = y - cy;
+            int dx_bound = (shadow_w * shadow_w - (dy * dy * (shadow_w * shadow_w)) / (shadow_h * shadow_h));
+            if (dx_bound < 0) continue;
+            int dx = 0;
+            while ((dx + 1) * (dx + 1) <= dx_bound) dx++;
+            int x_start = (cx - dx < 0) ? 0 : cx - dx;
+            int x_end = (cx + dx >= SCREEN_W) ? SCREEN_W - 1 : cx + dx;
+
+            uint8_t *line = &buffer[y * SCREEN_W];
+            for (int px = x_start; px <= x_end; px++) {
+                line[px] = TOP_COLOR_DARK_GRAY;
+            }
+        }
+        cy -= type->flight_altitude;
+    }
+
+    int d = dir & 7;
+    int source_dir = d - 2;
+    if (source_dir < 0) source_dir = 0;
+    if (source_dir > 4) source_dir = 4;
+
+    const EnemyFrameDef *fd = 0;
+    if (is_attacking && type->attack_frame_count > 0) {
+        int f = frame;
+        if (f >= type->attack_frame_count) f %= type->attack_frame_count;
+        fd = &type->attack_frames[source_dir][f];
+    } else {
+        if (type->frame_count == 0) return;
+        int f = frame;
+        if (f >= type->frame_count) f %= type->frame_count;
+        fd = &type->frames[source_dir][f];
+    }
+
+    int w = fd->w;
+    int h = fd->h;
+    const uint8_t *src = fd->pixels;
+    if (!src || w == 0 || h == 0) return;
+
+    int ox = cx + fd->offset_x;
+    int oy = cy + fd->offset_y;
+
+    if (out_bx) {
+        int b_min_x = ox;
+        int b_min_y = oy;
+        int b_max_x = ox + w - 1;
+        int b_max_y = oy + h - 1;
+        if (has_shadow) {
+            if (shadow_min_x < b_min_x) b_min_x = shadow_min_x;
+            if (shadow_min_y < b_min_y) b_min_y = shadow_min_y;
+            if (shadow_max_x > b_max_x) b_max_x = shadow_max_x;
+            if (shadow_max_y > b_max_y) b_max_y = shadow_max_y;
+        }
+        *out_bx = b_min_x;
+        *out_by = b_min_y;
+        *out_bw = b_max_x - b_min_x + 1;
+        *out_bh = b_max_y - b_min_y + 1;
+    }
+
+    int quads = w >> 2;
+
+    // Fast path: fully on-screen interior sprite
+    if (ox >= 0 && ox + w <= SCREEN_W && oy >= 0 && oy + h <= SCREEN_H) {
+        if ((ox & 3) == 0) {
+            // 4-byte aligned: direct 32-bit quad stores!
+            for (int y = 0; y < h; y++) {
+                uint32_t *dst32 = (uint32_t *)&buffer[(oy + y) * SCREEN_W + ox];
+                const uint32_t *quad_src = (const uint32_t *)&src[y * w];
+                for (int q = 0; q < quads; q++) {
+                    uint32_t qval = quad_src[q];
+                    if (qval == 0) continue; // 4 transparent pixels skipped in 1 cycle!
+                    if ((qval & 0xFF) && (qval & 0xFF00) && (qval & 0xFF0000) && (qval & 0xFF000000)) {
+                        dst32[q] = qval; // 4 opaque pixels stored in 1 instruction!
+                    } else {
+                        uint8_t *d8 = (uint8_t *)&dst32[q];
+                        uint8_t i0 = qval & 0xFF;
+                        uint8_t i1 = (qval >> 8) & 0xFF;
+                        uint8_t i2 = (qval >> 16) & 0xFF;
+                        uint8_t i3 = (qval >> 24);
+                        if (i0) d8[0] = i0;
+                        if (i1) d8[1] = i1;
+                        if (i2) d8[2] = i2;
+                        if (i3) d8[3] = i3;
+                    }
+                }
+            }
+            return;
+        }
+
+        // Unaligned ox: word loads from src, byte stores to dst
+        for (int y = 0; y < h; y++) {
+            uint8_t *dst_row = &buffer[(oy + y) * SCREEN_W + ox];
+            const uint32_t *quad_src = (const uint32_t *)&src[y * w];
+            for (int q = 0; q < quads; q++) {
+                uint32_t qval = quad_src[q];
+                if (qval == 0) continue;
+                uint8_t i0 = qval & 0xFF;
+                uint8_t i1 = (qval >> 8) & 0xFF;
+                uint8_t i2 = (qval >> 16) & 0xFF;
+                uint8_t i3 = (qval >> 24);
+                int px = q << 2;
+                if (i0) dst_row[px]     = i0;
+                if (i1) dst_row[px + 1] = i1;
+                if (i2) dst_row[px + 2] = i2;
+                if (i3) dst_row[px + 3] = i3;
+            }
+        }
+        return;
+    }
+
+    // Clipping path for screen boundaries
+    int x_min = 0, x_max = w;
+    if (ox < 0) x_min = -ox;
+    if (ox + w > SCREEN_W) x_max = SCREEN_W - ox;
+    for (int y = 0; y < h; y++) {
+        int dst_y = oy + y;
+        if (dst_y < 0 || dst_y >= SCREEN_H) continue;
+        uint8_t *dst_row = &buffer[dst_y * SCREEN_W + ox];
+        const uint8_t *row_src = &src[y * w];
+        for (int x = x_min; x < x_max; x++) {
+            uint8_t idx = row_src[x];
+            if (idx) dst_row[x] = idx;
+        }
+    }
+}
+
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
     enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir, 0, NULL, NULL, NULL, NULL);
 }

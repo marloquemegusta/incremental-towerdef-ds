@@ -32,5 +32,6 @@ extern const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT];
 
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir);
 void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking, int *out_bx, int *out_by, int *out_bw, int *out_bh);
+void enemy_draw_sprite_to_buffer8(uint8_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking, int *out_bx, int *out_by, int *out_bw, int *out_bh);
 
 #endif // ENEMY_DATA_H
