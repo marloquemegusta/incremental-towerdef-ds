@@ -9,13 +9,13 @@
 #define ENEMY_MAX_FRAMES 9
 #define ENEMY_MAX_ATTACK_FRAMES 6
 
+// 8-bit Palettized Frame Definition
 typedef struct {
     uint8_t w;
     uint8_t h;
     int8_t offset_x;
     int8_t offset_y;
-    int8_t flip_ox;
-    const uint16_t *pixels;
+    const uint8_t *pixels;
 } EnemyFrameDef;
 
 typedef struct {
@@ -31,6 +31,7 @@ typedef struct {
     EnemyFrameDef attack_frames[ENEMY_MAX_DIRECTIONS][ENEMY_MAX_ATTACK_FRAMES];
 } EnemyTypeDef;
 
+extern const uint16_t g_enemy_palette[256];
 extern const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT];
 
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir);
