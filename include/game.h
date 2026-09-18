@@ -369,6 +369,8 @@ typedef struct {
     int prof_bot_enemy_ticks;
     int prof_bot_fx_ticks;
     int prof_bot_ui_ticks;
+    int prof_top_restore_ticks;
+    int prof_top_enemy_ticks;
 } GameContext;
 
 // Upgrades helper

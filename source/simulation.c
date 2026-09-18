@@ -1016,7 +1016,9 @@ void game_update_simulation(void) {
             for (int t = 0; t < MAX_TURRETS; t++) {
                 if (g_turrets[t].placed) {
                     int tdx = px - g_turrets[t].x;
+                    if (tdx > 14 || tdx < -14) continue;
                     int tdy = local_y - g_turrets[t].y;
+                    if (tdy > 14 || tdy < -14) continue;
                     if (tdx * tdx + tdy * tdy < (14 * 14)) {
                         hitting_turret = t;
                         break;
@@ -1080,8 +1082,7 @@ void game_update_simulation(void) {
                         int aodx = (odx < 0) ? -odx : odx;
                         if (aodx >= TO_FP(16)) continue;
 
-                        int dist_sq = (aodx >> FP_SHIFT) * (aodx >> FP_SHIFT) + (aody >> FP_SHIFT) * (aody >> FP_SHIFT);
-                        if (dist_sq < (16 * 16) && dist_sq > 0) {
+                        if (aodx + aody < TO_FP(20) && (aodx > 0 || aody > 0)) {
                             int push = TO_FP(1) / 2;
                             if (odx > 0) sep_force_x += push;
                             else if (odx < 0) sep_force_x -= push;
@@ -1178,14 +1179,15 @@ void game_update_simulation(void) {
         g_enemies[i].vy = spd;
         g_enemies[i].vx = sep_force_x;
 
-        int move_dir = enemy_direction_from_delta(g_enemies[i].x - old_x,
-                                                   g_enemies[i].y - old_y);
         int move_dx = g_enemies[i].x - old_x;
         int move_dy = g_enemies[i].y - old_y;
         int move_ax = (move_dx < 0) ? -move_dx : move_dx;
         int move_ay = (move_dy < 0) ? -move_dy : move_dy;
         int move_distance = move_ax + move_ay;
-        if (move_dir >= 0) g_enemies[i].dir = move_dir;
+        if ((i & 1) == (g_game.sim_ticks_elapsed & 1)) {
+            int move_dir = enemy_direction_from_delta(move_dx, move_dy);
+            if (move_dir >= 0) g_enemies[i].dir = move_dir;
+        }
 
         // Animation: Scourge flaps continuously in flight; terrestrial walk is distance-synchronized.
         if (g_enemies[i].variant == 0) {

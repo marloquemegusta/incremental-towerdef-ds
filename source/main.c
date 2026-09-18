@@ -131,10 +131,14 @@ int main(void) {
 
         // 2. Visual render Top Screen
         renderer_draw_battlefield_top();
+        uint16_t top_restore_t = timerElapsed(0);
         renderer_draw_splatters_top();
         renderer_draw_enemies_top();
+        uint16_t top_enemy_t = timerElapsed(0);
         renderer_draw_death_particles_top();
-        uint16_t top_t = timerElapsed(0);
+        uint16_t top_t = top_restore_t + top_enemy_t;
+        g_game.prof_top_restore_ticks = top_restore_t;
+        g_game.prof_top_enemy_ticks = top_enemy_t;
 
         // 3. Visual render Bottom Screen
         uint16_t bot_base_t = 0, bot_enemy_t = 0, bot_fx_t = 0, bot_ui_t = 0;
@@ -166,7 +170,7 @@ int main(void) {
             }
             bot_ui_t = timerElapsed(0);
         }
-        uint16_t bot_t = timerElapsed(0);
+        uint16_t bot_t = bot_base_t + bot_enemy_t + bot_fx_t + bot_ui_t;
         // Keep the phase counters instantaneous: they are deliberately useful
         // for spotting spikes in a single captured frame, while B remains the
         // one-second average shown in the main profiler row.
