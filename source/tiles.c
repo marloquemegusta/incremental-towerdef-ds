@@ -246,13 +246,11 @@ void tiles_stamp_splatter(int x, int y, int size, uint16_t color) {
     int sy = is_bottom ? (y - 192) : y;
     uint16_t *cache = is_bottom ? s_ground_bottom_cache : s_ground_top_cache;
     uint16_t *backbuf = is_bottom ? g_backbuffer : g_top_backbuffer;
-
     int r = (size <= 1) ? 2 : ((size == 2) ? 4 : ((size == 3) ? 6 : 9));
-    int x0 = x - r; if (x0 < 0) x0 = 0;
-    int y0 = sy - r; if (y0 < 0) y0 = 0;
-    int x1 = x + r; if (x1 >= SCREEN_W) x1 = SCREEN_W - 1;
-    int y1 = sy + r; if (y1 >= SCREEN_H) y1 = SCREEN_H - 1;
-
+    int x0 = (x - r < 0) ? 0 : x - r;
+    int y0 = (sy - r < 0) ? 0 : sy - r;
+    int x1 = (x + r >= SCREEN_W) ? SCREEN_W - 1 : x + r;
+    int y1 = (sy + r >= SCREEN_H) ? SCREEN_H - 1 : sy + r;
     for (int py = y0; py <= y1; py++) {
         int dy = py - sy;
         for (int px = x0; px <= x1; px++) {
