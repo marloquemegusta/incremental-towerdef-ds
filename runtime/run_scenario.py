@@ -132,7 +132,9 @@ def main() -> int:
             if capture_seq and capture_seq not in seq_indices:
                 seq_indices[capture_seq] = 0
             for f in range(frame_count):
+                lib.desmume_input_keypad_update(keypad)
                 lib.desmume_cycle(0)
+                lib.desmume_input_keypad_update(keypad)
                 if capture_seq and (f % capture_every == 0):
                     cname = f"{capture_seq}_{seq_indices[capture_seq]:04d}"
                     capture(lib, output / f"{cname}.png")
