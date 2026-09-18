@@ -2240,14 +2240,21 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
     },
 };
 
-void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking) {
+ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking, int *out_bx, int *out_by, int *out_bw, int *out_bh) {
     if (!buffer) return;
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
     const EnemyTypeDef *type = &g_enemy_types[variant];
 
-    // 1. Draw dynamic ground shadow for flying units
-    if (type->is_flying && type->flight_altitude > 0) {
+    int shadow_min_x = cx, shadow_min_y = cy, shadow_max_x = cx, shadow_max_y = cy;
+    int has_shadow = (type->is_flying && type->flight_altitude > 0);
+
+    // 1. Dynamic ground shadow for flying units (32-bit word accelerated)
+    if (has_shadow) {
         static const int8_t shadow_span[9] = { 4, 7, 9, 10, 10, 10, 9, 7, 4 };
+        shadow_min_x = cx - 10;
+        shadow_max_x = cx + 10;
+        shadow_min_y = cy - 4;
+        shadow_max_y = cy + 4;
         for (int dy = -4; dy <= 4; dy++) {
             int py = cy + dy;
             if (py < 0 || py >= SCREEN_H) continue;
@@ -2257,7 +2264,19 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
             if (x_start < 0) x_start = 0;
             if (x_end >= SCREEN_W) x_end = SCREEN_W - 1;
             uint16_t *line = &buffer[py * SCREEN_W];
-            for (int px = x_start; px <= x_end; px++) {
+            int px = x_start;
+            if (px & 1) {
+                line[px] = (line[px] >> 1) & 0x3DEF;
+                px++;
+            }
+            int words = (x_end - px + 1) >> 1;
+            uint32_t *p32 = (uint32_t *)&line[px];
+            for (int w_idx = 0; w_idx < words; w_idx++) {
+                uint32_t val = p32[w_idx];
+                p32[w_idx] = (val >> 1) & 0x3DEF3DEF;
+            }
+            px += (words << 1);
+            if (px <= x_end) {
                 line[px] = (line[px] >> 1) & 0x3DEF;
             }
         }
@@ -2269,21 +2288,23 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
     int d = dir & 7;
     if (d > 4) {
         flip_h = 1;
-        if (d == 5) source_dir = 3;      // SW mirrors SE
-        else if (d == 6) source_dir = 2; // W mirrors E
-        else source_dir = 1;              // NW mirrors NE
+        if (d == 5) source_dir = 3;
+        else if (d == 6) source_dir = 2;
+        else source_dir = 1;
     } else {
         source_dir = d;
     }
 
     const EnemyFrameDef *fd = 0;
     if (is_attacking && type->attack_frame_count > 0) {
-        frame %= type->attack_frame_count;
-        fd = &type->attack_frames[source_dir][frame];
+        int f = frame;
+        if (f >= type->attack_frame_count) f %= type->attack_frame_count;
+        fd = &type->attack_frames[source_dir][f];
     } else {
         if (type->frame_count == 0) return;
-        frame %= type->frame_count;
-        fd = &type->frames[source_dir][frame];
+        int f = frame;
+        if (f >= type->frame_count) f %= type->frame_count;
+        fd = &type->frames[source_dir][f];
     }
 
     int w = fd->w;
@@ -2293,18 +2314,47 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
 
     int ox = cx + (flip_h ? fd->flip_ox : fd->offset_x);
     int oy = cy + fd->offset_y;
+
+    if (out_bx) {
+        int b_min_x = ox;
+        int b_min_y = oy;
+        int b_max_x = ox + w - 1;
+        int b_max_y = oy + h - 1;
+        if (has_shadow) {
+            if (shadow_min_x < b_min_x) b_min_x = shadow_min_x;
+            if (shadow_min_y < b_min_y) b_min_y = shadow_min_y;
+            if (shadow_max_x > b_max_x) b_max_x = shadow_max_x;
+            if (shadow_max_y > b_max_y) b_max_y = shadow_max_y;
+        }
+        *out_bx = b_min_x;
+        *out_by = b_min_y;
+        *out_bw = b_max_x - b_min_x + 1;
+        *out_bh = b_max_y - b_min_y + 1;
+    }
+
     int x_min = 0;
     int x_max = w;
     if (ox < 0) x_min = -ox;
     if (ox + w > SCREEN_W) x_max = SCREEN_W - ox;
 
-    // Common case: ordinary, non-flipped sprites fully inside the screen.
-    // Avoid clipping arithmetic and coordinate bounds checks per row/pixel.
+    // Fast path: non-flipped interior sprite
     if (!flip_h && ox >= 0 && ox + w <= SCREEN_W && oy >= 0 && oy + h <= SCREEN_H) {
         for (int y = 0; y < h; y++) {
             uint16_t *dst_row = &buffer[(oy + y) * SCREEN_W + ox];
             const uint16_t *row_src = &src[y * w];
-            for (int x = 0; x < w; x++) {
+            int x = 0;
+            if (((uintptr_t)dst_row & 2) == 0) {
+                for (; x + 1 < w; x += 2) {
+                    uint32_t c32 = *(const uint32_t *)&row_src[x];
+                    if ((c32 & 0x80008000) == 0x80008000) {
+                        *(uint32_t *)&dst_row[x] = c32;
+                    } else {
+                        if (c32 & 0x8000) dst_row[x] = (uint16_t)c32;
+                        if (c32 & 0x80000000) dst_row[x + 1] = (uint16_t)(c32 >> 16);
+                    }
+                }
+            }
+            for (; x < w; x++) {
                 uint16_t col = row_src[x];
                 if (col & 0x8000) dst_row[x] = col;
             }
@@ -2333,5 +2383,5 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
 }
 
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
-    enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir, 0);
+    enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir, 0, NULL, NULL, NULL, NULL);
 }

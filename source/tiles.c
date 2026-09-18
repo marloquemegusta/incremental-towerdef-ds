@@ -219,6 +219,82 @@ static void generate_ground_to_buffer(uint16_t *buffer, int y_offset) {
     }
 }
 
+static uint32_t s_dirty_mask_top[DIRTY_GRID_H];
+static uint32_t s_dirty_mask_bot[DIRTY_GRID_H];
+
+void tiles_dirty_clear(int is_bottom) {
+    uint32_t *mask = is_bottom ? s_dirty_mask_bot : s_dirty_mask_top;
+    for (int i = 0; i < DIRTY_GRID_H; i++) mask[i] = 0;
+}
+
+void tiles_dirty_mark_rect(int x, int y, int w, int h, int is_bottom) {
+    if (w <= 0 || h <= 0) return;
+    int x0 = x;
+    int y0 = y;
+    int x1 = x + w - 1;
+    int y1 = y + h - 1;
+    if (x1 < 0 || y1 < 0 || x0 >= SCREEN_W || y0 >= SCREEN_H) return;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 >= SCREEN_W) x1 = SCREEN_W - 1;
+    if (y1 >= SCREEN_H) y1 = SCREEN_H - 1;
+
+    int bx0 = x0 >> 3;
+    int bx1 = x1 >> 3;
+    int by0 = y0 >> 3;
+    int by1 = y1 >> 3;
+
+    uint32_t col_mask;
+    if (bx1 - bx0 >= 31) {
+        col_mask = 0xFFFFFFFFU;
+    } else {
+        col_mask = ((1U << (bx1 - bx0 + 1)) - 1U) << bx0;
+    }
+
+    uint32_t *mask = is_bottom ? s_dirty_mask_bot : s_dirty_mask_top;
+    for (int by = by0; by <= by1; by++) {
+        mask[by] |= col_mask;
+    }
+}
+
+ITCM_CODE __attribute__((target("arm"))) void tiles_dirty_restore(uint16_t *dst_buffer, int is_bottom) {
+    if (!dst_buffer) return;
+    uint32_t *mask_array = is_bottom ? s_dirty_mask_bot : s_dirty_mask_top;
+    const uint16_t *src_cache = is_bottom ? s_ground_bottom_cache : s_ground_top_cache;
+
+    for (int by = 0; by < DIRTY_GRID_H; by++) {
+        uint32_t row_mask = mask_array[by];
+        if (!row_mask) continue;
+
+        int base_y = by << 3;
+        int bx = 0;
+        while (bx < DIRTY_GRID_W) {
+            if (!(row_mask & (1U << bx))) {
+                bx++;
+                continue;
+            }
+            int start_bx = bx;
+            while (bx < DIRTY_GRID_W && (row_mask & (1U << bx))) {
+                bx++;
+            }
+            int end_bx = bx;
+
+            int start_x = start_bx << 3;
+            int num_words = (end_bx - start_bx) << 2; // 8 px = 4 words
+
+            for (int line = 0; line < 8; line++) {
+                int y = base_y + line;
+                uint32_t *dst32 = (uint32_t *)&dst_buffer[y * SCREEN_W + start_x];
+                const uint32_t *src32 = (const uint32_t *)&src_cache[y * SCREEN_W + start_x];
+                for (int w = 0; w < num_words; w++) {
+                    dst32[w] = src32[w];
+                }
+            }
+        }
+        mask_array[by] = 0;
+    }
+}
+
 void tiles_restore_ground_rect(uint16_t *dst_buffer, int x, int y, int w, int h, int is_bottom) {
     if (!dst_buffer) return;
     const uint16_t *src_cache = is_bottom ? s_ground_bottom_cache : s_ground_top_cache;
@@ -414,7 +490,7 @@ void tiles_draw_central_bunker(uint16_t *buffer, int cx, int cy, uint64_t hp, ui
 }
 
 void tiles_draw_xenos_to_buffer(uint16_t *buffer, int cx, int cy, int dir, int anim_frame, int variant) {
-    enemy_draw_sprite_to_buffer(buffer, cx, cy, variant, anim_frame, dir, 0);
+    enemy_draw_sprite_to_buffer(buffer, cx, cy, variant, anim_frame, dir, 0, NULL, NULL, NULL, NULL);
 }
 
 void tiles_draw_turret_base(int cx, int cy, int is_selected) {

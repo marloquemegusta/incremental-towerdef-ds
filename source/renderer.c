@@ -9,74 +9,7 @@ uint16_t g_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 static u16 *s_top_vram = NULL;
 static int s_top_bg = 0;
 
-static void renderer_enemy_bounds(const Enemy *enemy, int cx, int cy,
-                                  int is_attacking, int *x, int *y,
-                                  int *w, int *h) {
-    int variant = enemy->variant;
-    if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
-    const EnemyTypeDef *type = &g_enemy_types[variant];
-    int dir = enemy->dir & 7;
-    int source_dir;
-    int flip_h = 0;
 
-    if (dir > 4) {
-        flip_h = 1;
-        source_dir = (dir == 5) ? 3 : ((dir == 6) ? 2 : 1);
-    } else {
-        source_dir = dir;
-    }
-
-    const EnemyFrameDef *frame = NULL;
-    int frame_count = is_attacking ? type->attack_frame_count : type->frame_count;
-    if (is_attacking && frame_count > 0) {
-        int frame_idx = enemy->anim_frame % frame_count;
-        if (frame_idx < 0) frame_idx += frame_count;
-        frame = &type->attack_frames[source_dir][frame_idx];
-    } else if (type->frame_count > 0) {
-        int frame_idx = enemy->anim_frame % type->frame_count;
-        if (frame_idx < 0) frame_idx += type->frame_count;
-        frame = &type->frames[source_dir][frame_idx];
-    }
-
-    if (!frame || frame->w == 0 || frame->h == 0) {
-        *x = cx - 1; *y = cy - 1; *w = 2; *h = 2;
-        return;
-    }
-
-    int min_x, min_y, max_x, max_y;
-    int ox = cx + (flip_h ? frame->flip_ox : frame->offset_x);
-    int oy = cy + frame->offset_y;
-    min_x = ox;
-    min_y = oy;
-    max_x = ox + frame->w - 1;
-    max_y = oy + frame->h - 1;
-
-    // Flying sprites also draw a ground shadow around the unshifted center.
-    if (type->is_flying && type->flight_altitude > 0) {
-        if (cx - 10 < min_x) min_x = cx - 10;
-        if (cy - 4 < min_y) min_y = cy - 4;
-        if (cx + 10 > max_x) max_x = cx + 10;
-        if (cy + 4 > max_y) max_y = cy + 4;
-    }
-
-    // Health bars are dynamic pixels too. Union their exact footprint with the
-    // sprite bounds so a damaged enemy cannot leave stale bar pixels behind.
-    if (enemy->hp < enemy->max_hp) {
-        int bar_x0 = cx - 8;
-        int bar_y0 = cy - 11;
-        int bar_x1 = cx + 7;
-        int bar_y1 = cy - 9;
-        if (bar_x0 < min_x) min_x = bar_x0;
-        if (bar_y0 < min_y) min_y = bar_y0;
-        if (bar_x1 > max_x) max_x = bar_x1;
-        if (bar_y1 > max_y) max_y = bar_y1;
-    }
-
-    *x = min_x;
-    *y = min_y;
-    *w = max_x - min_x + 1;
-    *h = max_y - min_y + 1;
-}
 
 #include "turret_data.h"
 
@@ -293,22 +226,21 @@ void top_draw_text(int x, int y, const char *str, uint16_t color) {
 }
 
 void renderer_draw_battlefield_top(void) {
-    // 60 FPS Dirty Rects: Erase previous frame's moving entities on top screen
+    // 60 FPS Deduplicated Dirty Blocks (8x8): Erase previous frame entities
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (g_enemies[i].prev_top_active) {
-            tiles_restore_ground_rect(g_top_backbuffer,
-                                     g_enemies[i].prev_top_x, g_enemies[i].prev_top_y,
-                                     g_enemies[i].prev_top_w, g_enemies[i].prev_top_h, 0);
+            tiles_dirty_mark_rect(g_enemies[i].prev_top_x, g_enemies[i].prev_top_y,
+                                  g_enemies[i].prev_top_w, g_enemies[i].prev_top_h, 0);
             g_enemies[i].prev_top_active = 0;
         }
     }
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
         if (g_death_particles[i].prev_top_active) {
-            tiles_restore_ground_rect(g_top_backbuffer,
-                                     g_death_particles[i].prev_top_x - 1, g_death_particles[i].prev_top_y - 1, 4, 4, 0);
+            tiles_dirty_mark_rect(g_death_particles[i].prev_top_x - 1, g_death_particles[i].prev_top_y - 1, 4, 4, 0);
             g_death_particles[i].prev_top_active = 0;
         }
     }
+    tiles_dirty_restore(g_top_backbuffer, 0);
 }
 
 
@@ -521,9 +453,9 @@ void renderer_draw_range_perimeter(void) {
 }
 
 void renderer_draw_battlefield_bottom(void) {
-    // 60 FPS Dirty Rects: Erase previous frame's moving entities on bottom screen
+    // 60 FPS Deduplicated Dirty Blocks (8x8): Erase previous frame entities on bottom screen
 
-    // 1. Restore turret cupola backgrounds before enemies are drawn
+    // 1. Mark turret cupola backgrounds
     int active_mask = 0;
     if (g_wall.active_turrets == 1) active_mask = (1 << 1);
     else if (g_wall.active_turrets == 2) active_mask = (1 << 1) | (1 << 2);
@@ -536,31 +468,22 @@ void renderer_draw_battlefield_bottom(void) {
         int sy = g_wall.screen_y + c_wall_sockets[s].y;
         int dest_x = sx - TURRET_PIVOT_X;
         int dest_y = sy - TURRET_PIVOT_Y;
-        tiles_restore_ground_rect(g_backbuffer, dest_x - 2, dest_y - 2, TURRET_SPRITE_W + 4, TURRET_SPRITE_H + 18, 1);
+        tiles_dirty_mark_rect(dest_x - 2, dest_y - 2, TURRET_SPRITE_W + 4, TURRET_SPRITE_H + 18, 1);
     }
 
-    // 2. Erase enemies
+    // 2. Mark enemies
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (g_enemies[i].prev_bot_active) {
-            int current_x = FROM_FP(g_enemies[i].x);
-            int current_y = FROM_FP(g_enemies[i].y) - 192;
-            // Static entities already have the same background underneath.
-            // Avoid restoring and redrawing their old dirty rectangle.
-            if (current_x == g_enemies[i].prev_bot_x &&
-                current_y == g_enemies[i].prev_bot_y) continue;
-            tiles_restore_ground_rect(g_backbuffer,
-                                     g_enemies[i].prev_bot_x, g_enemies[i].prev_bot_y,
-                                     g_enemies[i].prev_bot_w, g_enemies[i].prev_bot_h, 1);
+            tiles_dirty_mark_rect(g_enemies[i].prev_bot_x, g_enemies[i].prev_bot_y,
+                                  g_enemies[i].prev_bot_w, g_enemies[i].prev_bot_h, 1);
             g_enemies[i].prev_bot_active = 0;
         }
     }
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
         if (g_death_particles[i].prev_bot_active) {
-            tiles_restore_ground_rect(g_backbuffer,
-                                     g_death_particles[i].prev_bot_x - 1, g_death_particles[i].prev_bot_y - 1, 4, 4, 1);
+            tiles_dirty_mark_rect(g_death_particles[i].prev_bot_x - 1, g_death_particles[i].prev_bot_y - 1, 4, 4, 1);
             if (g_death_particles[i].prev_bot_has_shadow) {
-                tiles_restore_ground_rect(g_backbuffer,
-                                         g_death_particles[i].prev_bot_x - 1, g_death_particles[i].prev_bot_sy - 1, 4, 4, 1);
+                tiles_dirty_mark_rect(g_death_particles[i].prev_bot_x - 1, g_death_particles[i].prev_bot_sy - 1, 4, 4, 1);
                 g_death_particles[i].prev_bot_has_shadow = 0;
             }
             g_death_particles[i].prev_bot_active = 0;
@@ -568,26 +491,29 @@ void renderer_draw_battlefield_bottom(void) {
     }
     for (int i = 0; i < MAX_CASINGS; i++) {
         if (g_casings[i].prev_active) {
-            tiles_restore_ground_rect(g_backbuffer, g_casings[i].prev_cx - 2, g_casings[i].prev_cy - 2, 6, 6, 1);
+            tiles_dirty_mark_rect(g_casings[i].prev_cx - 2, g_casings[i].prev_cy - 2, 6, 6, 1);
             g_casings[i].prev_active = 0;
         }
     }
     for (int i = 0; i < MAX_BULLET_DARTS; i++) {
         if (g_bullet_darts[i].prev_active) {
-            tiles_restore_ground_rect(g_backbuffer, g_bullet_darts[i].prev_bx - 2, g_bullet_darts[i].prev_by - 2, 6, 6, 1);
+            tiles_dirty_mark_rect(g_bullet_darts[i].prev_bx - 2, g_bullet_darts[i].prev_by - 2, 6, 6, 1);
             g_bullet_darts[i].prev_active = 0;
         }
     }
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (g_bullets[i].prev_active) {
-            tiles_restore_ground_rect(g_backbuffer, g_bullets[i].prev_x - 1, g_bullets[i].prev_y - 1, 4, 4, 1);
+            tiles_dirty_mark_rect(g_bullets[i].prev_x - 1, g_bullets[i].prev_y - 1, 4, 4, 1);
             g_bullets[i].prev_active = 0;
         }
     }
     if (g_game.prev_drag_active) {
-        tiles_restore_ground_rect(g_backbuffer, g_game.prev_drag_x - AMMO_CRATE_W / 2 - 1, g_game.prev_drag_y - AMMO_CRATE_H / 2 - 1, AMMO_CRATE_W + 2, AMMO_CRATE_H + 2, 1);
+        tiles_dirty_mark_rect(g_game.prev_drag_x - AMMO_CRATE_W / 2 - 1, g_game.prev_drag_y - AMMO_CRATE_H / 2 - 1, AMMO_CRATE_W + 2, AMMO_CRATE_H + 2, 1);
         g_game.prev_drag_active = 0;
     }
+
+    // Unified deduplicated restore:
+    tiles_dirty_restore(g_backbuffer, 1);
 }
 
 void renderer_draw_turret(const Turret *t, int is_selected) {
@@ -660,7 +586,10 @@ void renderer_draw_enemies_top(void) {
         int gy = FROM_FP(g_enemies[i].y);
         enemy_draw_sprite_to_buffer(g_top_backbuffer, gx, gy, g_enemies[i].variant,
                                    g_enemies[i].anim_frame, g_enemies[i].dir,
-                                   (g_enemies[i].biting_target == 99));
+                                   (g_enemies[i].biting_target == 99),
+                                   &g_enemies[i].prev_top_x, &g_enemies[i].prev_top_y,
+                                   &g_enemies[i].prev_top_w, &g_enemies[i].prev_top_h);
+        g_enemies[i].prev_top_active = 1;
         // Health bar if damaged
         if (g_enemies[i].hp < g_enemies[i].max_hp) {
             int bw = 14;
@@ -671,16 +600,9 @@ void renderer_draw_enemies_top(void) {
             if (fill > 0) {
                 top_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
             }
+            if (bx - 1 < g_enemies[i].prev_top_x) g_enemies[i].prev_top_x = bx - 1;
+            if (by - 1 < g_enemies[i].prev_top_y) g_enemies[i].prev_top_y = by - 1;
         }
-
-        int ew, eh;
-        renderer_enemy_bounds(&g_enemies[i], gx, gy,
-                              g_enemies[i].biting_target == 99,
-                              &g_enemies[i].prev_top_x, &g_enemies[i].prev_top_y,
-                              &ew, &eh);
-        g_enemies[i].prev_top_w = ew;
-        g_enemies[i].prev_top_h = eh;
-        g_enemies[i].prev_top_active = 1;
     }
 }
 
@@ -702,7 +624,10 @@ void renderer_draw_enemies_bottom(void) {
         }
         enemy_draw_sprite_to_buffer(g_backbuffer, gx, ly, g_enemies[i].variant,
                                    g_enemies[i].anim_frame, g_enemies[i].dir,
-                                   (g_enemies[i].biting_target == 99));
+                                   (g_enemies[i].biting_target == 99),
+                                   &g_enemies[i].prev_bot_x, &g_enemies[i].prev_bot_y,
+                                   &g_enemies[i].prev_bot_w, &g_enemies[i].prev_bot_h);
+        g_enemies[i].prev_bot_active = 1;
         // Health bar if damaged
         if (g_enemies[i].hp < g_enemies[i].max_hp) {
             int bw = 14;
@@ -713,16 +638,9 @@ void renderer_draw_enemies_bottom(void) {
             if (fill > 0) {
                 renderer_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
             }
+            if (bx - 1 < g_enemies[i].prev_bot_x) g_enemies[i].prev_bot_x = bx - 1;
+            if (by - 1 < g_enemies[i].prev_bot_y) g_enemies[i].prev_bot_y = by - 1;
         }
-
-        int ew, eh;
-        renderer_enemy_bounds(&g_enemies[i], gx, ly,
-                              g_enemies[i].biting_target == 99,
-                              &g_enemies[i].prev_bot_x, &g_enemies[i].prev_bot_y,
-                              &ew, &eh);
-        g_enemies[i].prev_bot_w = ew;
-        g_enemies[i].prev_bot_h = eh;
-        g_enemies[i].prev_bot_active = 1;
     }
 }
 
@@ -1247,9 +1165,7 @@ void renderer_draw_ui_sandbox(void) {
     if (g_game.sandbox.profiler_compact) {
         // Keep only dynamic evidence in the low-overhead measurement mode.
         top_fill_rect(0, 108, SCREEN_W, 7, COLOR_IRON_PANEL);
-        snprintf(buf, sizeof(buf), "R:%d E:%d F:%d U:%d", g_game.prof_bot_base_ticks,
-                 g_game.prof_bot_enemy_ticks, g_game.prof_bot_fx_ticks,
-                 g_game.prof_bot_ui_ticks);
+        snprintf(buf, sizeof(buf), "TR:%d TE:%d R:%d E:%d", g_game.prof_top_restore_ticks, g_game.prof_top_enemy_ticks, g_game.prof_bot_base_ticks, g_game.prof_bot_enemy_ticks);
         top_draw_text(6, 108, buf, COLOR_WHITE);
         snprintf(buf, sizeof(buf), "Q:%d/%d/%d", g_game.prof_sep_checks,
                  g_game.prof_target_candidates, g_game.prof_collision_candidates);
