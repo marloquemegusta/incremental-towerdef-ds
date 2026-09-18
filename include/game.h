@@ -397,7 +397,7 @@ int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_
 void wall_spawn_casing(int x, int y, int dir_sign);
 int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y, int target_enemy_idx);
 extern uint16_t *g_backbuffer;
-extern uint16_t *g_top_backbuffer;
+extern uint8_t *g_top_backbuffer;
 
 // Math
 void math_init(void);
@@ -464,3 +464,34 @@ void renderer_present(void);
 void top_screen_present(void);
 
 #endif // GAME_H
+
+// Top screen 8-bit indexed palette constants (0..255)
+#define TOP_COLOR_TRANSPARENT    0
+#define TOP_C_CONC_BASE          131
+#define TOP_C_CONC_LIGHT         132
+#define TOP_C_CONC_DARK          133
+#define TOP_C_CONC_BEVEL         134
+#define TOP_C_JOINT              135
+#define TOP_C_GRASS_DEEP         136
+#define TOP_C_GRASS_MID          137
+#define TOP_C_GRASS_TALL         138
+#define TOP_C_OIL_DARK           139
+#define TOP_C_OIL_MID            140
+#define TOP_C_CRACK_LINE         141
+#define TOP_C_BAG_DARK           142
+#define TOP_C_BAG_MID            143
+#define TOP_C_BAG_HI             144
+#define TOP_C_DRAIN_GRATE        145
+#define TOP_C_DRAIN_HOLE         146
+
+#define TOP_COLOR_BLACK          200
+#define TOP_COLOR_WHITE          201
+#define TOP_COLOR_AMBER          202
+#define TOP_COLOR_LED_GREEN      203
+#define TOP_COLOR_LED_RED        204
+#define TOP_COLOR_IRON_LIGHT     205
+#define TOP_COLOR_IRON_PANEL     206
+#define TOP_COLOR_IRON_BORDER    207
+#define TOP_COLOR_PHOSPHOR_GREEN 208
+#define TOP_COLOR_BLOOD          209
+#define TOP_COLOR_DARK_GRAY      210

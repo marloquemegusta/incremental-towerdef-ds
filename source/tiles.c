@@ -175,6 +175,7 @@ static void generate_urban_sandbags(uint16_t *buf) {
     }
 }
 
+static uint8_t s_ground_top_cache8[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 static uint16_t s_ground_top_cache[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 static uint16_t s_ground_bottom_cache[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
 
@@ -267,38 +268,65 @@ void tiles_dirty_mark_rect(int x, int y, int w, int h, int is_bottom, int buf_id
     }
 }
 
-ITCM_CODE __attribute__((target("arm"))) void tiles_dirty_restore(uint16_t *dst_buffer, int is_bottom, int buf_idx) {
+ITCM_CODE __attribute__((target("arm"))) void tiles_dirty_restore(void *dst_buffer, int is_bottom, int buf_idx) {
     if (!dst_buffer) return;
     uint32_t *mask_array = is_bottom ? s_dirty_mask_bot[buf_idx & 1] : s_dirty_mask_top;
-    const uint16_t *src_cache = is_bottom ? s_ground_bottom_cache : s_ground_top_cache;
 
-    for (int by = 0; by < DIRTY_GRID_H; by++) {
-        uint32_t row_mask = mask_array[by];
-        if (!row_mask) continue;
+    if (is_bottom) {
+        uint16_t *dst16 = (uint16_t *)dst_buffer;
+        const uint16_t *src16 = s_ground_bottom_cache;
+        for (int by = 0; by < DIRTY_GRID_H; by++) {
+            uint32_t row_mask = mask_array[by];
+            if (!row_mask) continue;
 
-        int base_y = by << 3;
-        int bx = 0;
-        while (bx < DIRTY_GRID_W) {
-            if (!(row_mask & (1U << bx))) {
-                bx++;
-                continue;
+            int base_y = by << 3;
+            int bx = 0;
+            while (bx < DIRTY_GRID_W) {
+                if (!(row_mask & (1U << bx))) {
+                    bx++;
+                    continue;
+                }
+                int start_bx = bx;
+                while (bx < DIRTY_GRID_W && (row_mask & (1U << bx))) bx++;
+                int end_bx = bx;
+
+                int start_x = start_bx << 3;
+                int bytes = (end_bx - start_bx) * 16; // 8 px * 2 bytes = 16 bytes per block
+                for (int line = 0; line < 8; line++) {
+                    int y = base_y + line;
+                    memcpy(&dst16[y * SCREEN_W + start_x], &src16[y * SCREEN_W + start_x], bytes);
+                }
             }
-            int start_bx = bx;
-            while (bx < DIRTY_GRID_W && (row_mask & (1U << bx))) {
-                bx++;
-            }
-            int end_bx = bx;
-
-            int start_x = start_bx << 3;
-            int num_words = (end_bx - start_bx) << 2; // 8 px = 4 words
-
-            int bytes = num_words << 2;
-            for (int line = 0; line < 8; line++) {
-                int y = base_y + line;
-                memcpy(&dst_buffer[y * SCREEN_W + start_x], &src_cache[y * SCREEN_W + start_x], bytes);
-            }
+            mask_array[by] = 0;
         }
-        mask_array[by] = 0;
+    } else {
+        // 8-bit Top Screen: 8 bytes per block per line!
+        uint8_t *dst8 = (uint8_t *)dst_buffer;
+        const uint8_t *src8 = s_ground_top_cache8;
+        for (int by = 0; by < DIRTY_GRID_H; by++) {
+            uint32_t row_mask = mask_array[by];
+            if (!row_mask) continue;
+
+            int base_y = by << 3;
+            int bx = 0;
+            while (bx < DIRTY_GRID_W) {
+                if (!(row_mask & (1U << bx))) {
+                    bx++;
+                    continue;
+                }
+                int start_bx = bx;
+                while (bx < DIRTY_GRID_W && (row_mask & (1U << bx))) bx++;
+                int end_bx = bx;
+
+                int start_x = start_bx << 3;
+                int bytes = (end_bx - start_bx) * 8; // 8 px * 1 byte = 8 bytes per block (50% LESS DATA!)
+                for (int line = 0; line < 8; line++) {
+                    int y = base_y + line;
+                    memcpy(&dst8[y * SCREEN_W + start_x], &src8[y * SCREEN_W + start_x], bytes);
+                }
+            }
+            mask_array[by] = 0;
+        }
     }
 }
 
@@ -327,23 +355,26 @@ void tiles_restore_ground_rect(uint16_t *dst_buffer, int x, int y, int w, int h,
 void tiles_stamp_splatter(int x, int y, int size, uint16_t color) {
     int is_bottom = (y >= 192);
     int sy = is_bottom ? (y - 192) : y;
-    uint16_t *cache = is_bottom ? s_ground_bottom_cache : s_ground_top_cache;
     int r = (size <= 1) ? 2 : ((size == 2) ? 4 : ((size == 3) ? 6 : 9));
     int x0 = (x - r < 0) ? 0 : x - r;
     int y0 = (sy - r < 0) ? 0 : sy - r;
     int x1 = (x + r >= SCREEN_W) ? SCREEN_W - 1 : x + r;
     int y1 = (sy + r >= SCREEN_H) ? SCREEN_H - 1 : sy + r;
+    uint8_t col8 = (color == COLOR_XENOS_ICHOR) ? TOP_COLOR_LED_GREEN : TOP_COLOR_BLOOD;
     for (int py = y0; py <= y1; py++) {
         int dy = py - sy;
         for (int px = x0; px <= x1; px++) {
             int dx = px - x;
             if (dx * dx + dy * dy <= r * r) {
-                cache[py * SCREEN_W + px] = color;
                 if (is_bottom) {
+                    s_ground_bottom_cache[py * SCREEN_W + px] = color;
                     ((uint16_t *)VRAM_A)[py * SCREEN_W + px] = color;
                     ((uint16_t *)VRAM_B)[py * SCREEN_W + px] = color;
-                } else if (g_top_backbuffer) {
-                    g_top_backbuffer[py * SCREEN_W + px] = color;
+                } else {
+                    s_ground_top_cache8[py * SCREEN_W + px] = col8;
+                    if (g_top_backbuffer) {
+                        g_top_backbuffer[py * SCREEN_W + px] = col8;
+                    }
                 }
             }
         }
@@ -352,7 +383,7 @@ void tiles_stamp_splatter(int x, int y, int size, uint16_t color) {
 
 void tiles_full_screen_refresh(void) {
     if (g_top_backbuffer) {
-        dmaCopyWords(2, s_ground_top_cache, g_top_backbuffer, SCREEN_W * SCREEN_H * sizeof(uint16_t));
+        dmaCopyWords(2, s_ground_top_cache8, g_top_backbuffer, (SCREEN_W * SCREEN_H * sizeof(uint8_t)) / 4);
     }
     dmaCopyWords(2, s_ground_bottom_cache, (void *)VRAM_A, SCREEN_W * SCREEN_H * sizeof(uint16_t));
     dmaCopyWords(2, s_ground_bottom_cache, (void *)VRAM_B, SCREEN_W * SCREEN_H * sizeof(uint16_t));
@@ -421,6 +452,31 @@ void tiles_init(void) {
     }
 
     // Initial full copy to backbuffers
+    
+    // Build 8-bit top ground cache from 16-bit cache
+    for (int y = 0; y < SCREEN_H; y++) {
+        for (int x = 0; x < SCREEN_W; x++) {
+            uint16_t c16 = s_ground_top_cache[y * SCREEN_W + x];
+            uint8_t idx = TOP_C_CONC_BASE;
+            if (c16 == C_CONC_LIGHT) idx = TOP_C_CONC_LIGHT;
+            else if (c16 == C_CONC_DARK) idx = TOP_C_CONC_DARK;
+            else if (c16 == C_CONC_BEVEL) idx = TOP_C_CONC_BEVEL;
+            else if (c16 == C_JOINT) idx = TOP_C_JOINT;
+            else if (c16 == C_GRASS_DEEP) idx = TOP_C_GRASS_DEEP;
+            else if (c16 == C_GRASS_MID) idx = TOP_C_GRASS_MID;
+            else if (c16 == C_GRASS_TALL) idx = TOP_C_GRASS_TALL;
+            else if (c16 == C_OIL_DARK) idx = TOP_C_OIL_DARK;
+            else if (c16 == C_OIL_MID) idx = TOP_C_OIL_MID;
+            else if (c16 == C_CRACK_LINE) idx = TOP_C_CRACK_LINE;
+            else if (c16 == C_BAG_DARK) idx = TOP_C_BAG_DARK;
+            else if (c16 == C_BAG_MID) idx = TOP_C_BAG_MID;
+            else if (c16 == C_BAG_HI) idx = TOP_C_BAG_HI;
+            else if (c16 == C_DRAIN_GRATE) idx = TOP_C_DRAIN_GRATE;
+            else if (c16 == C_DRAIN_HOLE) idx = TOP_C_DRAIN_HOLE;
+            s_ground_top_cache8[y * SCREEN_W + x] = idx;
+        }
+    }
+
     tiles_full_screen_refresh();
 }
 

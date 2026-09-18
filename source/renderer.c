@@ -4,8 +4,8 @@
 
 // Hardware VRAM backbuffers
 uint16_t *g_backbuffer = NULL;
-static uint16_t s_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4)));
-uint16_t *g_top_backbuffer = s_top_backbuffer;
+static uint8_t s_top_backbuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(4))); // 48 KB 8-bit backbuffer!
+uint8_t *g_top_backbuffer = s_top_backbuffer;
 static int s_bot_fb_idx = 1; // Start drawing into VRAM_B while FB0 displays VRAM_A
 
 static u16 *s_top_vram = NULL;
@@ -88,15 +88,49 @@ void renderer_init(void) {
     vramSetBankB(VRAM_B_LCD);
     videoSetMode(MODE_FB0); // Initially display VRAM_A
 
-    // 2. Top Screen: Sub engine 16-bit Bitmap Mode 5
+    // 2. Top Screen: Sub engine Native 8-bit Mode 5 (BgType_Bmp8)
     videoSetModeSub(MODE_5_2D);
     vramSetBankC(VRAM_C_SUB_BG);
-    s_top_bg = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
+    s_top_bg = bgInitSub(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
     s_top_vram = (u16 *)bgGetGfxPtr(s_top_bg);
 
-    s_bot_fb_idx = 1; // Draw to VRAM_B first while VRAM_A is displayed
+    // Setup Sub BG 256-color palette
+    for (int i = 0; i < 256; i++) {
+        BG_PALETTE_SUB[i] = g_enemy_palette[i];
+    }
+    BG_PALETTE_SUB[TOP_COLOR_TRANSPARENT]    = 0;
+    BG_PALETTE_SUB[TOP_C_CONC_BASE]          = RGB15(8, 8, 10);
+    BG_PALETTE_SUB[TOP_C_CONC_LIGHT]         = RGB15(10, 11, 12);
+    BG_PALETTE_SUB[TOP_C_CONC_DARK]          = RGB15(5, 6, 7);
+    BG_PALETTE_SUB[TOP_C_CONC_BEVEL]         = RGB15(13, 14, 16);
+    BG_PALETTE_SUB[TOP_C_JOINT]              = RGB15(4, 4, 5);
+    BG_PALETTE_SUB[TOP_C_GRASS_DEEP]         = RGB15(4, 7, 4);
+    BG_PALETTE_SUB[TOP_C_GRASS_MID]          = RGB15(8, 12, 6);
+    BG_PALETTE_SUB[TOP_C_GRASS_TALL]         = RGB15(11, 17, 7);
+    BG_PALETTE_SUB[TOP_C_OIL_DARK]           = RGB15(2, 2, 3);
+    BG_PALETTE_SUB[TOP_C_OIL_MID]            = RGB15(4, 4, 4);
+    BG_PALETTE_SUB[TOP_C_CRACK_LINE]         = RGB15(2, 2, 3);
+    BG_PALETTE_SUB[TOP_C_BAG_DARK]           = RGB15(7, 6, 4);
+    BG_PALETTE_SUB[TOP_C_BAG_MID]            = RGB15(14, 12, 8);
+    BG_PALETTE_SUB[TOP_C_BAG_HI]             = RGB15(20, 17, 12);
+    BG_PALETTE_SUB[TOP_C_DRAIN_GRATE]        = RGB15(3, 3, 3);
+    BG_PALETTE_SUB[TOP_C_DRAIN_HOLE]         = RGB15(0, 0, 0);
+
+    BG_PALETTE_SUB[TOP_COLOR_BLACK]          = RGB15(0, 0, 0);
+    BG_PALETTE_SUB[TOP_COLOR_WHITE]          = RGB15(31, 31, 31);
+    BG_PALETTE_SUB[TOP_COLOR_AMBER]          = RGB15(31, 22, 2);
+    BG_PALETTE_SUB[TOP_COLOR_LED_GREEN]      = RGB15(2, 31, 4);
+    BG_PALETTE_SUB[TOP_COLOR_LED_RED]        = RGB15(31, 2, 2);
+    BG_PALETTE_SUB[TOP_COLOR_IRON_LIGHT]     = RGB15(16, 17, 18);
+    BG_PALETTE_SUB[TOP_COLOR_IRON_PANEL]     = RGB15(10, 11, 12);
+    BG_PALETTE_SUB[TOP_COLOR_IRON_BORDER]    = RGB15(6, 6, 7);
+    BG_PALETTE_SUB[TOP_COLOR_PHOSPHOR_GREEN] = RGB15(2, 31, 6);
+    BG_PALETTE_SUB[TOP_COLOR_BLOOD]          = RGB15(16, 2, 8);
+    BG_PALETTE_SUB[TOP_COLOR_DARK_GRAY]      = RGB15(6, 6, 7);
+
+    s_bot_fb_idx = 1;
     g_backbuffer = (uint16_t *)VRAM_B;
-    g_top_backbuffer = s_top_backbuffer; // RAM backbuffer avoids VRAM scanout contention!
+    g_top_backbuffer = s_top_backbuffer;
 
     // 3. Asset generator
     tiles_init();
@@ -120,7 +154,7 @@ void renderer_draw_pixel(int x, int y, uint16_t color) {
     }
 }
 
-void top_draw_pixel(int x, int y, uint16_t color) {
+void top_draw_pixel(int x, int y, uint8_t color) {
     if (x >= 0 && x < SCREEN_W && y >= 0 && y < SCREEN_H) {
         g_top_backbuffer[y * SCREEN_W + x] = color;
     }
@@ -150,16 +184,14 @@ void renderer_fill_rect(int x, int y, int w, int h, uint16_t color) {
     }
 }
 
-void top_fill_rect(int x, int y, int w, int h, uint16_t color) {
+void top_fill_rect(int x, int y, int w, int h, uint8_t color) {
     int x0 = (x < 0) ? 0 : x;
     int y0 = (y < 0) ? 0 : y;
     int x1 = (x + w > SCREEN_W) ? SCREEN_W : (x + w);
     int y1 = (y + h > SCREEN_H) ? SCREEN_H : (y + h);
     for (int j = y0; j < y1; j++) {
-        uint16_t *line = &g_top_backbuffer[j * SCREEN_W];
-        for (int i = x0; i < x1; i++) {
-            line[i] = color;
-        }
+        uint8_t *line = &g_top_backbuffer[j * SCREEN_W];
+        memset(&line[x0], color, x1 - x0);
     }
 }
 
@@ -211,7 +243,7 @@ void renderer_draw_text(int x, int y, const char *str, uint16_t color) {
     }
 }
 
-void top_draw_text(int x, int y, const char *str, uint16_t color) {
+void top_draw_text(int x, int y, const char *str, uint8_t color) {
     while (*str) {
         char c = *str++;
         if (c >= 'a' && c <= 'z') c = c - 'a' + 'A';
@@ -532,21 +564,21 @@ void renderer_draw_enemies_top(void) {
         int i = visible_indices[idx];
         int gx = FROM_FP(g_enemies[i].x);
         int gy = FROM_FP(g_enemies[i].y);
-        enemy_draw_sprite_to_buffer(g_top_backbuffer, gx, gy, g_enemies[i].variant,
-                                   g_enemies[i].anim_frame, g_enemies[i].dir,
-                                   (g_enemies[i].biting_target == 99),
-                                   &g_enemies[i].prev_top_x, &g_enemies[i].prev_top_y,
-                                   &g_enemies[i].prev_top_w, &g_enemies[i].prev_top_h);
+        enemy_draw_sprite_to_buffer8(g_top_backbuffer, gx, gy, g_enemies[i].variant,
+                                    g_enemies[i].anim_frame, g_enemies[i].dir,
+                                    (g_enemies[i].biting_target == 99),
+                                    &g_enemies[i].prev_top_x, &g_enemies[i].prev_top_y,
+                                    &g_enemies[i].prev_top_w, &g_enemies[i].prev_top_h);
         g_enemies[i].prev_top_active = 1;
         // Health bar if damaged
         if (g_enemies[i].hp < g_enemies[i].max_hp) {
             int bw = 14;
             int bx = gx - bw / 2;
             int by = gy - 10;
-            top_fill_rect(bx - 1, by - 1, bw + 2, 3, COLOR_BLACK);
+            top_fill_rect(bx - 1, by - 1, bw + 2, 3, TOP_COLOR_BLACK);
             int fill = (g_enemies[i].max_hp > 0) ? (int)((g_enemies[i].hp * bw) / g_enemies[i].max_hp) : 0;
             if (fill > 0) {
-                top_fill_rect(bx, by, fill, 1, COLOR_LED_RED);
+                top_fill_rect(bx, by, fill, 1, TOP_COLOR_LED_RED);
             }
             if (bx - 1 < g_enemies[i].prev_top_x) g_enemies[i].prev_top_x = bx - 1;
             if (by - 1 < g_enemies[i].prev_top_y) g_enemies[i].prev_top_y = by - 1;
@@ -664,27 +696,27 @@ void renderer_draw_death_particles_bottom(void) {
 
 void renderer_draw_ui_wave(void) {
     // Top HUD banner
-    top_fill_rect(0, 0, SCREEN_W, 28, COLOR_BLACK);
+    top_fill_rect(0, 0, SCREEN_W, 28, TOP_COLOR_BLACK);
     char buf[64];
     snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
-    top_draw_text(6, 2, buf, COLOR_AMBER);
+    top_draw_text(6, 2, buf, TOP_COLOR_AMBER);
 
     int sec_left = g_game.wave_timer / 60;
     int m = sec_left / 60;
     int s = sec_left % 60;
     snprintf(buf, sizeof(buf), "TIME: %d:%02d", m, s);
-    top_draw_text(74, 2, buf, COLOR_WHITE);
+    top_draw_text(74, 2, buf, TOP_COLOR_WHITE);
 
     char scrap_buf[32];
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
-    top_draw_text(165, 2, buf, COLOR_PHOSPHOR_GREEN);
+    top_draw_text(165, 2, buf, TOP_COLOR_PHOSPHOR_GREEN);
 
     // Profiler overlay (ALWAYS visible on row 2)
     snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d E:%d",
              g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
              g_game.prof_pres_ticks, g_game.prof_sim_ticks, g_game.prof_enemies_active);
-    top_draw_text(6, 10, buf, COLOR_WHITE);
+    top_draw_text(6, 10, buf, TOP_COLOR_WHITE);
 
     // Peak alert / telegraphing on row 3 (does NOT cover profiler stats)
     if (g_game.wave_timer <= 2400 && g_game.wave_timer > 1800) {
@@ -725,21 +757,21 @@ void renderer_draw_ui_prep(void) {
 
 void renderer_draw_ui_pause(void) {
     // Top HUD banner
-    top_fill_rect(0, 0, SCREEN_W, 28, COLOR_BLACK);
+    top_fill_rect(0, 0, SCREEN_W, 28, TOP_COLOR_BLACK);
     char buf[64];
     snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
-    top_draw_text(6, 4, buf, COLOR_AMBER);
-    top_draw_text(90, 4, "[PAUSA]", COLOR_WHITE);
+    top_draw_text(6, 4, buf, TOP_COLOR_AMBER);
+    top_draw_text(90, 4, "[PAUSA]", TOP_COLOR_WHITE);
 
     char scrap_buf[32];
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
-    top_draw_text(160, 4, buf, COLOR_PHOSPHOR_GREEN);
+    top_draw_text(160, 4, buf, TOP_COLOR_PHOSPHOR_GREEN);
 
     snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d E:%d",
              g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
              g_game.prof_pres_ticks, g_game.prof_sim_ticks, g_game.prof_enemies_active);
-    top_draw_text(6, 16, buf, COLOR_WHITE);
+    top_draw_text(6, 16, buf, TOP_COLOR_WHITE);
 
     int is_fresh = (g_game.wave_timer >= STAGE_DURATION_FRAMES || g_game.enemies_spawned == 0);
 
@@ -1095,33 +1127,33 @@ void renderer_draw_ui_calibration(void) {
 void renderer_draw_ui_sandbox(void) {
     // --- TOP SCREEN: Telemetry & Config HUD ---
     // Keep the battlefield and spawned enemies underneath the diagnostic HUD.
-    top_fill_rect(0, 0, SCREEN_W, 20, COLOR_BLACK);
+    top_fill_rect(0, 0, SCREEN_W, 20, TOP_COLOR_BLACK);
     for (int x = 0; x < SCREEN_W; x++) {
-        top_draw_pixel(x, 20, COLOR_PHOSPHOR_GREEN);
+        top_draw_pixel(x, 20, TOP_COLOR_PHOSPHOR_GREEN);
     }
     char buf[48];
     snprintf(buf, sizeof(buf), "FPS:%d T:%d B:%d P:%d S:%d E:%d",
              g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
              g_game.prof_pres_ticks, g_game.prof_sim_ticks,
              g_game.prof_enemies_active);
-    top_draw_text(4, 1, buf, COLOR_WHITE);
-    top_draw_text(4, 9, "DEBUG SANDBOX", COLOR_AMBER);
+    top_draw_text(4, 1, buf, TOP_COLOR_WHITE);
+    top_draw_text(4, 9, "DEBUG SANDBOX", TOP_COLOR_AMBER);
     top_draw_text(180, 9, g_game.sandbox.run_sim ? "RUN" : "PAUSE",
-                  g_game.sandbox.run_sim ? COLOR_LED_GREEN : COLOR_AMBER);
+                  g_game.sandbox.run_sim ? TOP_COLOR_LED_GREEN : TOP_COLOR_AMBER);
 
     if (g_game.sandbox.profiler_compact) {
         // Keep only dynamic evidence in the low-overhead measurement mode.
-        top_fill_rect(0, 108, SCREEN_W, 7, COLOR_IRON_PANEL);
+        top_fill_rect(0, 108, SCREEN_W, 7, TOP_COLOR_IRON_PANEL);
         snprintf(buf, sizeof(buf), "TR:%d TE:%d R:%d E:%d", g_game.prof_top_restore_ticks, g_game.prof_top_enemy_ticks, g_game.prof_bot_base_ticks, g_game.prof_bot_enemy_ticks);
-        top_draw_text(6, 108, buf, COLOR_WHITE);
+        top_draw_text(6, 108, buf, TOP_COLOR_WHITE);
         snprintf(buf, sizeof(buf), "Q:%d/%d/%d", g_game.prof_sep_checks,
                  g_game.prof_target_candidates, g_game.prof_collision_candidates);
-        top_draw_text(154, 108, buf, COLOR_AMBER);
-        top_fill_rect(0, 176, SCREEN_W, 16, COLOR_IRON_PANEL);
+        top_draw_text(154, 108, buf, TOP_COLOR_AMBER);
+        top_fill_rect(0, 176, SCREEN_W, 16, TOP_COLOR_IRON_PANEL);
         snprintf(buf, sizeof(buf), "ALIVE:%d TOTAL:%d", g_game.enemies_alive, g_game.sandbox.spawn_count);
-        top_draw_text(12, 180, buf, COLOR_PHOSPHOR_GREEN);
+        top_draw_text(12, 180, buf, TOP_COLOR_PHOSPHOR_GREEN);
         snprintf(buf, sizeof(buf), "H:%d", g_game.sandbox.last_keys_held & 0x0FFF);
-        top_draw_text(214, 180, buf, COLOR_AMBER);
+        top_draw_text(214, 180, buf, TOP_COLOR_AMBER);
         renderer_fill_rect(0, 148, SCREEN_W, 44, COLOR_BLACK);
         return;
     }
@@ -1136,8 +1168,8 @@ void renderer_draw_ui_sandbox(void) {
         uint16_t val_col = is_sel ? COLOR_AMBER : COLOR_PHOSPHOR_GREEN;
 
         if (is_sel) {
-            top_fill_rect(2, y - 1, SCREEN_W - 4, 13, COLOR_IRON_PANEL);
-            top_draw_text(4, y + 2, ">", COLOR_AMBER);
+            top_fill_rect(2, y - 1, SCREEN_W - 4, 13, TOP_COLOR_IRON_PANEL);
+            top_draw_text(4, y + 2, ">", TOP_COLOR_AMBER);
         }
 
         top_draw_text(12, y + 2, labels[r], row_col);
@@ -1173,32 +1205,32 @@ void renderer_draw_ui_sandbox(void) {
 
     // Sandbox-local profiler row; the normal battlefield HUD is covered by
     // this diagnostic panel, so repeat the phase timings here as evidence.
-    top_fill_rect(0, 108, SCREEN_W, 7, COLOR_IRON_PANEL);
+    top_fill_rect(0, 108, SCREEN_W, 7, TOP_COLOR_IRON_PANEL);
     snprintf(buf, sizeof(buf), "R:%d E:%d F:%d U:%d", g_game.prof_bot_base_ticks,
              g_game.prof_bot_enemy_ticks, g_game.prof_bot_fx_ticks,
              g_game.prof_bot_ui_ticks);
-    top_draw_text(6, 108, buf, COLOR_WHITE);
-    top_fill_rect(210, 115, 46, 7, COLOR_BLACK);
-    top_draw_text(214, 116, g_game.sandbox.separation_enabled ? "SEP ON" : "SEP OFF", COLOR_AMBER);
+    top_draw_text(6, 108, buf, TOP_COLOR_WHITE);
+    top_fill_rect(210, 115, 46, 7, TOP_COLOR_BLACK);
+    top_draw_text(214, 116, g_game.sandbox.separation_enabled ? "SEP ON" : "SEP OFF", TOP_COLOR_AMBER);
     snprintf(buf, sizeof(buf), "Q:%d/%d/%d", g_game.prof_sep_checks,
              g_game.prof_target_candidates, g_game.prof_collision_candidates);
-    top_draw_text(154, 108, buf, COLOR_AMBER);
+    top_draw_text(154, 108, buf, TOP_COLOR_AMBER);
 
     // Bottom telemetry stats on top screen
     for (int x = 0; x < SCREEN_W; x++) {
-        top_draw_pixel(x, 114, COLOR_IRON_BORDER);
+        top_draw_pixel(x, 114, TOP_COLOR_IRON_BORDER);
     }
-    top_draw_text(8, 120, "CONTROLS:", COLOR_AMBER);
-    top_draw_text(12, 132, "TOUCH: Drop Enemy at pos", COLOR_IRON_LIGHT);
-    top_draw_text(12, 144, "D-PAD: Select & Tune params", COLOR_IRON_LIGHT);
-    top_draw_text(12, 156, "START: Run/Pause  Y: Step 1F", COLOR_IRON_LIGHT);
-    top_draw_text(12, 168, "X: Clear Entities L+SEL: Exit", COLOR_IRON_LIGHT);
+    top_draw_text(8, 120, "CONTROLS:", TOP_COLOR_AMBER);
+    top_draw_text(12, 132, "TOUCH: Drop Enemy at pos", TOP_COLOR_IRON_LIGHT);
+    top_draw_text(12, 144, "D-PAD: Select & Tune params", TOP_COLOR_IRON_LIGHT);
+    top_draw_text(12, 156, "START: Run/Pause  Y: Step 1F", TOP_COLOR_IRON_LIGHT);
+    top_draw_text(12, 168, "X: Clear Entities L+SEL: Exit", TOP_COLOR_IRON_LIGHT);
 
-    top_fill_rect(0, 176, SCREEN_W, 16, COLOR_IRON_PANEL);
+    top_fill_rect(0, 176, SCREEN_W, 16, TOP_COLOR_IRON_PANEL);
     snprintf(buf, sizeof(buf), "ALIVE:%d TOTAL:%d", g_game.enemies_alive, g_game.sandbox.spawn_count);
-    top_draw_text(12, 180, buf, COLOR_PHOSPHOR_GREEN);
+    top_draw_text(12, 180, buf, TOP_COLOR_PHOSPHOR_GREEN);
     snprintf(buf, sizeof(buf), "H:%d", g_game.sandbox.last_keys_held & 0x0FFF);
-    top_draw_text(214, 180, buf, COLOR_AMBER);
+    top_draw_text(214, 180, buf, TOP_COLOR_AMBER);
 
     // --- BOTTOM SCREEN: Battlefield Overlay & Touch Control Bar ---
     // Turret range circle preview
@@ -1219,7 +1251,7 @@ void renderer_draw_ui_sandbox(void) {
     renderer_draw_text(12, 157, "CLEAR", COLOR_WHITE);
 
     // [RUN / PAUSE] button (54..110)
-    uint16_t run_btn_bg = g_game.sandbox.run_sim ? COLOR_LED_GREEN : COLOR_AMBER;
+    uint16_t run_btn_bg = g_game.sandbox.run_sim ? TOP_COLOR_LED_GREEN : TOP_COLOR_AMBER;
     renderer_fill_rect(54, 152, 56, 18, run_btn_bg);
     renderer_draw_rect(54, 152, 56, 18, COLOR_WHITE);
     renderer_draw_text(60, 157, g_game.sandbox.run_sim ? "RUNNING" : "PAUSED", COLOR_BLACK);
@@ -1255,6 +1287,7 @@ void renderer_present(void) {
 
 void top_screen_present(void) {
     if (s_top_vram) {
+        // Fast 48 KB transfer: only 12,288 words instead of 24,576! (Cuts P in half!)
         dmaCopyWords(1, g_top_backbuffer, s_top_vram, sizeof(s_top_backbuffer));
     }
 }
