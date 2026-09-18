@@ -2264,18 +2264,16 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
         cy -= type->flight_altitude;
     }
 
-    int source_dir = 0;
+    int source_dir;
     int flip_h = 0;
-    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
-        int d = dir & 7;
-        if (d > 4) {
-            flip_h = 1;
-            if (d == 5) source_dir = 3;      // SW mirrors SE
-            else if (d == 6) source_dir = 2; // W mirrors E
-            else if (d == 7) source_dir = 1; // NW mirrors NE
-        } else {
-            source_dir = d;
-        }
+    int d = dir & 7;
+    if (d > 4) {
+        flip_h = 1;
+        if (d == 5) source_dir = 3;      // SW mirrors SE
+        else if (d == 6) source_dir = 2; // W mirrors E
+        else source_dir = 1;              // NW mirrors NE
+    } else {
+        source_dir = d;
     }
 
     const EnemyFrameDef *fd = 0;
@@ -2293,67 +2291,28 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
     const uint16_t *src = fd->pixels;
     if (!src || w == 0 || h == 0) return;
 
-    int ox;
-    int oy;
-    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
-        ox = cx + (flip_h ? fd->flip_ox : fd->offset_x);
-        oy = cy + fd->offset_y;
-    } else {
-        ox = cx - (w / 2);
-        oy = cy - (h / 2);
-    }
+    int ox = cx + (flip_h ? fd->flip_ox : fd->offset_x);
+    int oy = cy + fd->offset_y;
+    int x_min = 0;
+    int x_max = w;
+    if (ox < 0) x_min = -ox;
+    if (ox + w > SCREEN_W) x_max = SCREEN_W - ox;
 
-    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
-        int x_min = 0;
-        int x_max = w;
-        if (ox < 0) x_min = -ox;
-        if (ox + w > SCREEN_W) x_max = SCREEN_W - ox;
-
-        for (int y = 0; y < h; y++) {
-            int dst_y = oy + y;
-            if (dst_y < 0 || dst_y >= SCREEN_H) continue;
-            uint16_t *dst_row = &buffer[dst_y * SCREEN_W + ox];
-            const uint16_t *row_src = &src[y * w];
-            if (!flip_h) {
-                for (int x = x_min; x < x_max; x++) {
-                    uint16_t col = row_src[x];
-                    if (col & 0x8000) dst_row[x] = col;
-                }
-            } else {
-                int w_minus_1 = w - 1;
-                for (int x = x_min; x < x_max; x++) {
-                    uint16_t col = row_src[w_minus_1 - x];
-                    if (col & 0x8000) dst_row[x] = col;
-                }
+    for (int y = 0; y < h; y++) {
+        int dst_y = oy + y;
+        if (dst_y < 0 || dst_y >= SCREEN_H) continue;
+        uint16_t *dst_row = &buffer[dst_y * SCREEN_W + ox];
+        const uint16_t *row_src = &src[y * w];
+        if (!flip_h) {
+            for (int x = x_min; x < x_max; x++) {
+                uint16_t col = row_src[x];
+                if (col & 0x8000) dst_row[x] = col;
             }
-        }
-    } else {
-        static const int direction_angles[8] = { 192, 224, 0, 32, 64, 96, 128, 160 };
-        int angle = direction_angles[dir & 7];
-        int c = fixed_cos(angle);
-        int s = fixed_sin(angle);
-        int rw = w + h;
-        int rh = rw;
-        int rox = cx - (rw / 2);
-        int roy = cy - (rh / 2);
-        int src_cx = w / 2;
-        int src_cy = h / 2;
-
-        for (int y = 0; y < rh; y++) {
-            int dst_y = roy + y;
-            if (dst_y < 0 || dst_y >= SCREEN_H) continue;
-            for (int x = 0; x < rw; x++) {
-                int draw_x = rox + x;
-                if (draw_x < 0 || draw_x >= SCREEN_W) continue;
-                int dx = x - (rw / 2);
-                int dy = y - (rh / 2);
-                int sx = ((dx * c) + (dy * s)) >> 8;
-                int sy = ((-dx * s) + (dy * c)) >> 8;
-                sx += src_cx;
-                sy += src_cy;
-                if (sx < 0 || sx >= w || sy < 0 || sy >= h) continue;
-                uint16_t col = src[sy * w + sx];
-                if (col & 0x8000) buffer[dst_y * SCREEN_W + draw_x] = col;
+        } else {
+            int w_minus_1 = w - 1;
+            for (int x = x_min; x < x_max; x++) {
+                uint16_t col = row_src[w_minus_1 - x];
+                if (col & 0x8000) dst_row[x] = col;
             }
         }
     }

@@ -16,16 +16,14 @@ static void renderer_enemy_bounds(const Enemy *enemy, int cx, int cy,
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
     const EnemyTypeDef *type = &g_enemy_types[variant];
     int dir = enemy->dir & 7;
-    int source_dir = 0;
+    int source_dir;
     int flip_h = 0;
 
-    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
-        if (dir > 4) {
-            flip_h = 1;
-            source_dir = (dir == 5) ? 3 : ((dir == 6) ? 2 : 1);
-        } else {
-            source_dir = dir;
-        }
+    if (dir > 4) {
+        flip_h = 1;
+        source_dir = (dir == 5) ? 3 : ((dir == 6) ? 2 : 1);
+    } else {
+        source_dir = dir;
     }
 
     const EnemyFrameDef *frame = NULL;
@@ -46,21 +44,12 @@ static void renderer_enemy_bounds(const Enemy *enemy, int cx, int cy,
     }
 
     int min_x, min_y, max_x, max_y;
-    if (type->render_mode == ENEMY_RENDER_DIRECTIONAL) {
-        int ox = cx + (flip_h ? frame->flip_ox : frame->offset_x);
-        int oy = cy + frame->offset_y;
-        min_x = ox;
-        min_y = oy;
-        max_x = ox + frame->w - 1;
-        max_y = oy + frame->h - 1;
-    } else {
-        int size = frame->w + frame->h;
-        int draw_cy = cy - ((type->is_flying) ? type->flight_altitude : 0);
-        min_x = cx - size / 2;
-        min_y = draw_cy - size / 2;
-        max_x = min_x + size - 1;
-        max_y = min_y + size - 1;
-    }
+    int ox = cx + (flip_h ? frame->flip_ox : frame->offset_x);
+    int oy = cy + frame->offset_y;
+    min_x = ox;
+    min_y = oy;
+    max_x = ox + frame->w - 1;
+    max_y = oy + frame->h - 1;
 
     // Flying sprites also draw a ground shadow around the unshifted center.
     if (type->is_flying && type->flight_altitude > 0) {
@@ -68,6 +57,19 @@ static void renderer_enemy_bounds(const Enemy *enemy, int cx, int cy,
         if (cy - 4 < min_y) min_y = cy - 4;
         if (cx + 10 > max_x) max_x = cx + 10;
         if (cy + 4 > max_y) max_y = cy + 4;
+    }
+
+    // Health bars are dynamic pixels too. Union their exact footprint with the
+    // sprite bounds so a damaged enemy cannot leave stale bar pixels behind.
+    if (enemy->hp < enemy->max_hp) {
+        int bar_x0 = cx - 8;
+        int bar_y0 = cy - 11;
+        int bar_x1 = cx + 7;
+        int bar_y1 = cy - 9;
+        if (bar_x0 < min_x) min_x = bar_x0;
+        if (bar_y0 < min_y) min_y = bar_y0;
+        if (bar_x1 > max_x) max_x = bar_x1;
+        if (bar_y1 > max_y) max_y = bar_y1;
     }
 
     *x = min_x;
@@ -797,9 +799,9 @@ void renderer_draw_ui_wave(void) {
     top_draw_text(165, 2, buf, COLOR_PHOSPHOR_GREEN);
 
     // Profiler overlay (ALWAYS visible on row 2)
-    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d",
+    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d E:%d",
              g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
-             g_game.prof_pres_ticks, g_game.prof_sim_ticks);
+             g_game.prof_pres_ticks, g_game.prof_sim_ticks, g_game.prof_enemies_active);
     top_draw_text(6, 10, buf, COLOR_WHITE);
 
     // Peak alert / telegraphing on row 3 (does NOT cover profiler stats)
@@ -852,9 +854,9 @@ void renderer_draw_ui_pause(void) {
     snprintf(buf, sizeof(buf), "SCRAP: %s", scrap_buf);
     top_draw_text(160, 4, buf, COLOR_PHOSPHOR_GREEN);
 
-    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d",
+    snprintf(buf, sizeof(buf), "FPS:%2d T:%d B:%d P:%d S:%d E:%d",
              g_game.prof_fps, g_game.prof_top_ticks, g_game.prof_bot_ticks,
-             g_game.prof_pres_ticks, g_game.prof_sim_ticks);
+             g_game.prof_pres_ticks, g_game.prof_sim_ticks, g_game.prof_enemies_active);
     top_draw_text(6, 16, buf, COLOR_WHITE);
 
     int is_fresh = (g_game.wave_timer >= STAGE_DURATION_FRAMES || g_game.enemies_spawned == 0);
