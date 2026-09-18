@@ -292,13 +292,10 @@ ITCM_CODE __attribute__((target("arm"))) void tiles_dirty_restore(uint16_t *dst_
             int start_x = start_bx << 3;
             int num_words = (end_bx - start_bx) << 2; // 8 px = 4 words
 
+            int bytes = num_words << 2;
             for (int line = 0; line < 8; line++) {
                 int y = base_y + line;
-                uint32_t *dst32 = (uint32_t *)&dst_buffer[y * SCREEN_W + start_x];
-                const uint32_t *src32 = (const uint32_t *)&src_cache[y * SCREEN_W + start_x];
-                for (int w = 0; w < num_words; w++) {
-                    dst32[w] = src32[w];
-                }
+                memcpy(&dst_buffer[y * SCREEN_W + start_x], &src_cache[y * SCREEN_W + start_x], bytes);
             }
         }
         mask_array[by] = 0;
