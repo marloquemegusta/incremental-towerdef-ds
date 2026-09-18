@@ -159,6 +159,10 @@ int main(void) {
                 s_sum_sim = s_sum_top = s_sum_bot = s_sum_pres = 0;
                 s_prof_frames = 0;
             }
+            g_game.prof_enemies_active = 0;
+            for (int i = 0; i < MAX_ENEMIES; i++) {
+                if (g_enemies[i].active) g_game.prof_enemies_active++;
+            }
         }
     }
 

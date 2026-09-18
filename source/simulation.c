@@ -7,13 +7,40 @@ GameContext g_game;
 Turret g_turrets[MAX_TURRETS];
 Enemy g_enemies[MAX_ENEMIES];
 Bullet g_bullets[MAX_BULLETS];
-Splatter g_splatters[MAX_SPLATTERS];
 DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
 
 #include <stdio.h>
 #include <fat.h>
 
 GameBalanceConfig g_balance;
+
+// A 16 px grid is wider than the separation radius. It turns the old
+// all-pairs search into a query of the enemy's own cell and eight neighbours.
+#define ENEMY_GRID_CELL_SIZE 16
+#define ENEMY_GRID_W (SCREEN_W / ENEMY_GRID_CELL_SIZE)
+#define ENEMY_GRID_H ((FIELD_H + ENEMY_GRID_CELL_SIZE - 1) / ENEMY_GRID_CELL_SIZE)
+static int s_enemy_grid_heads[ENEMY_GRID_W * ENEMY_GRID_H];
+static int s_enemy_grid_next[MAX_ENEMIES];
+
+static void enemy_grid_build(void) {
+    for (int cell = 0; cell < ENEMY_GRID_W * ENEMY_GRID_H; cell++) {
+        s_enemy_grid_heads[cell] = -1;
+    }
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        if (!g_enemies[i].active) continue;
+        int x = FROM_FP(g_enemies[i].x);
+        int y = FROM_FP(g_enemies[i].y);
+        int cell_x = x / ENEMY_GRID_CELL_SIZE;
+        int cell_y = y / ENEMY_GRID_CELL_SIZE;
+        if (cell_x < 0) cell_x = 0;
+        if (cell_x >= ENEMY_GRID_W) cell_x = ENEMY_GRID_W - 1;
+        if (cell_y < 0) cell_y = 0;
+        if (cell_y >= ENEMY_GRID_H) cell_y = ENEMY_GRID_H - 1;
+        int cell = cell_y * ENEMY_GRID_W + cell_x;
+        s_enemy_grid_next[i] = s_enemy_grid_heads[cell];
+        s_enemy_grid_heads[cell] = i;
+    }
+}
 
 static const GameBalanceConfig s_default_balance = {
     .stages = {
@@ -133,23 +160,8 @@ int game_is_pos_valid(int x, int y) {
 
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration) {
     if (x < 2 || x >= SCREEN_W - 2 || y < 2 || y >= FIELD_H - 2) return;
-
-    int best_slot = -1;
-    for (int i = 0; i < MAX_SPLATTERS; i++) {
-        if (g_splatters[i].life <= 0) {
-            best_slot = i;
-            break;
-        }
-    }
-    if (best_slot < 0) best_slot = rand() % MAX_SPLATTERS;
-
-    g_splatters[best_slot].x = x;
-    g_splatters[best_slot].y = y;
-    g_splatters[best_slot].color = color;
-    g_splatters[best_slot].size = size;
-    g_splatters[best_slot].life = duration;
-    g_splatters[best_slot].max_life = duration;
-
+    // Blood is persistent in the ground cache; duration is retained for API compatibility.
+    (void)duration;
     tiles_stamp_splatter(x, y, size, color);
 }
 
@@ -794,7 +806,6 @@ void game_init(void) {
     memset(g_turrets, 0, sizeof(g_turrets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_bullets, 0, sizeof(g_bullets));
-    memset(g_splatters, 0, sizeof(g_splatters));
     memset(g_death_particles, 0, sizeof(g_death_particles));
 
     wall_init();
@@ -933,12 +944,7 @@ void game_update_simulation(void) {
         }
     }
 
-    // 2. Splatters life
-    for (int i = 0; i < MAX_SPLATTERS; i++) {
-        if (g_splatters[i].life > 0) g_splatters[i].life--;
-    }
-
-    // 3. Death particles
+    // 2. Death particles
     for (int i = 0; i < MAX_DEATH_PARTICLES; i++) {
         if (!g_death_particles[i].active) continue;
         g_death_particles[i].x += g_death_particles[i].vx;
@@ -960,7 +966,11 @@ void game_update_simulation(void) {
         }
     }
 
-    // 4. Update Enemies (Descending vertically and converging towards central bunker at x=128, y=360)
+    // Snapshot positions for the local separation broad-phase. New spawns do
+    // not need separation until their first movement tick.
+    enemy_grid_build();
+
+    // 3. Update Enemies (Descending vertically and converging towards central bunker at x=128, y=360)
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
 
@@ -1020,20 +1030,33 @@ void game_update_simulation(void) {
         // 4b. Soft separation repulsion between nearby marching enemies
         int sep_force_x = 0;
         if (py < 336 && ((i & 1) == (g_game.sim_ticks_elapsed & 1))) {
-            for (int j = 0; j < MAX_ENEMIES; j++) {
-                if (i == j || !g_enemies[j].active) continue;
-                int ody = ey - g_enemies[j].y;
-                int aody = (ody < 0) ? -ody : ody;
-                if (aody >= TO_FP(16)) continue;
-                int odx = ex - g_enemies[j].x;
-                int aodx = (odx < 0) ? -odx : odx;
-                if (aodx >= TO_FP(16)) continue;
+            int cell_x = px / ENEMY_GRID_CELL_SIZE;
+            int cell_y = py / ENEMY_GRID_CELL_SIZE;
+            if (cell_x < 0) cell_x = 0;
+            if (cell_x >= ENEMY_GRID_W) cell_x = ENEMY_GRID_W - 1;
+            if (cell_y < 0) cell_y = 0;
+            if (cell_y >= ENEMY_GRID_H) cell_y = ENEMY_GRID_H - 1;
+            for (int near_y = cell_y - 1; near_y <= cell_y + 1; near_y++) {
+                if (near_y < 0 || near_y >= ENEMY_GRID_H) continue;
+                for (int near_x = cell_x - 1; near_x <= cell_x + 1; near_x++) {
+                    if (near_x < 0 || near_x >= ENEMY_GRID_W) continue;
+                    int cell = near_y * ENEMY_GRID_W + near_x;
+                    for (int j = s_enemy_grid_heads[cell]; j >= 0; j = s_enemy_grid_next[j]) {
+                        if (i == j || !g_enemies[j].active) continue;
+                        int ody = ey - g_enemies[j].y;
+                        int aody = (ody < 0) ? -ody : ody;
+                        if (aody >= TO_FP(16)) continue;
+                        int odx = ex - g_enemies[j].x;
+                        int aodx = (odx < 0) ? -odx : odx;
+                        if (aodx >= TO_FP(16)) continue;
 
-                int dist_sq = (aodx >> FP_SHIFT) * (aodx >> FP_SHIFT) + (aody >> FP_SHIFT) * (aody >> FP_SHIFT);
-                if (dist_sq < (16 * 16) && dist_sq > 0) {
-                    int push = TO_FP(1) / 2;
-                    if (odx > 0) sep_force_x += push;
-                    else if (odx < 0) sep_force_x -= push;
+                        int dist_sq = (aodx >> FP_SHIFT) * (aodx >> FP_SHIFT) + (aody >> FP_SHIFT) * (aody >> FP_SHIFT);
+                        if (dist_sq < (16 * 16) && dist_sq > 0) {
+                            int push = TO_FP(1) / 2;
+                            if (odx > 0) sep_force_x += push;
+                            else if (odx < 0) sep_force_x -= push;
+                        }
+                    }
                 }
             }
         }
@@ -1709,7 +1732,7 @@ static void calib_commit_changes(void) {
         if (g_enemies[e].active) {
             int v = g_enemies[e].variant;
             if (v >= 0 && v < ENEMY_VARIANT_COUNT) {
-                g_enemies[e].speed = TO_FP(g_balance.enemy_speed[v]);
+            g_enemies[e].speed = g_balance.enemy_speed[v];
             }
         }
     }

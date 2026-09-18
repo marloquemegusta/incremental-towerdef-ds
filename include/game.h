@@ -14,7 +14,6 @@
 
 #define MAX_ENEMIES 384
 #define MAX_BULLETS 64
-#define MAX_SPLATTERS 256
 #define MAX_DEATH_PARTICLES 256
 #define MAX_TURRETS 4
 #define MAX_CASINGS 64
@@ -74,7 +73,7 @@ typedef struct {
     uint64_t max_hp;
     uint64_t incoming_damage; // Anti-overkill virtual health damage in flight
     int active;
-    int speed;           // Q8 speed
+    int speed;           // Integer pixels per second; converted to Q8 per simulation tick
     int variant;         // 0..5 (Biocaste Tier)
     int dir;             // 8-way compass: N, NE, E, SE, S, SW, W, NW
     int anim_frame;
@@ -137,14 +136,6 @@ typedef struct {
     int prev_x, prev_y;
     int prev_active;
 } Bullet;
-
-typedef struct {
-    int x, y;       // Global coordinates [0..255, 0..383]
-    int life;
-    int max_life;
-    int size;
-    uint16_t color;
-} Splatter;
 
 typedef struct {
     int x, y;       // Q8 global coordinates
@@ -366,6 +357,7 @@ typedef struct {
     int prof_top_ticks;
     int prof_bot_ticks;
     int prof_pres_ticks;
+    int prof_enemies_active;
 } GameContext;
 
 // Upgrades helper
@@ -379,7 +371,6 @@ extern Turret g_turrets[MAX_TURRETS];
 #define g_turret g_turrets[0]
 extern Enemy g_enemies[MAX_ENEMIES];
 extern Bullet g_bullets[MAX_BULLETS];
-extern Splatter g_splatters[MAX_SPLATTERS];
 extern DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
 extern WallPlatform g_wall;
 extern CasingParticle g_casings[MAX_CASINGS];
