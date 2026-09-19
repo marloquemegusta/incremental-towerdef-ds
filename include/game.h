@@ -56,6 +56,9 @@
 #define COLOR_XENOS_EYE      (RGB15(31, 5, 4) | BIT(15))
 #define COLOR_XENOS_ICHOR    (RGB15(8, 31, 6) | BIT(15))
 #define COLOR_BLOOD_DARK     (RGB15(16, 2, 8) | BIT(15))
+#define COLOR_XENOS_GORE_CORE (RGB15(25, 9, 28) | BIT(15))
+#define COLOR_XENOS_GORE_MID  (RGB15(15, 3, 17) | BIT(15))
+#define COLOR_XENOS_GORE_DARK (RGB15(5, 1, 7) | BIT(15))
 
 // UI / Phosphor
 #define COLOR_PHOSPHOR_GREEN (RGB15(6, 31, 10) | BIT(15))
@@ -500,3 +503,6 @@ void top_screen_present(void);
 #define TOP_COLOR_PHOSPHOR_GREEN 208
 #define TOP_COLOR_BLOOD          209
 #define TOP_COLOR_DARK_GRAY      210
+#define TOP_COLOR_XENOS_GORE_CORE 211
+#define TOP_COLOR_XENOS_GORE_MID  212
+#define TOP_COLOR_XENOS_GORE_DARK 213

@@ -167,9 +167,9 @@ int game_is_pos_valid(int x, int y) {
 
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration) {
     if (x < 2 || x >= SCREEN_W - 2 || y < 2 || y >= FIELD_H - 2) return;
-    // Blood is persistent in the ground cache; duration is retained for API compatibility.
     (void)duration;
-    tiles_stamp_splatter(x, y, size, color);
+    (void)color;
+    tiles_stamp_splatter_directional(x, y, size, 0, 0, 0);
 }
 
 void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
@@ -179,32 +179,31 @@ void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
     int particle_count = 18 + variant * 4;
     if (particle_count > 48) particle_count = 48;
 
-    uint16_t col_primary   = (variant == 0 || variant == 3) ? COLOR_XENOS_ICHOR : COLOR_BLOOD_DARK;
-    uint16_t col_secondary = COLOR_XENOS_FLESH;
+    uint16_t col_primary   = COLOR_XENOS_GORE_MID;
+    uint16_t col_secondary = COLOR_XENOS_GORE_CORE;
     uint16_t col_chitin    = COLOR_XENOS_CHITIN;
-    uint16_t col_ichor     = COLOR_XENOS_ICHOR;
+    uint16_t col_ichor     = COLOR_XENOS_GORE_CORE;
 
-    // Proportional puddle on ground (lasts 900-1200 frames, ~15-20s):
-    // size 1: Small (Scourge, Zergling) ~ 8x5 px
-    // size 2: Medium (Hydralisk, Mutalisk, Defiler) ~ 14x7 px
-    // size 3: Large (Lurker, Guardian) ~ 20x9 px
-    // size 4: Colossus (Ultralisk) ~ 30x13 px
+    // Proportional organic puddle on ground:
+    // size 1: Small (Scourge, Zergling)
+    // size 2: Medium (Hydralisk, Mutalisk, Defiler)
+    // size 3: Large (Lurker, Guardian)
+    // size 4: Colossus (Ultralisk)
     int pool_size = 1;
     if (variant >= 2 && variant <= 4) pool_size = 2;
     else if (variant >= 5 && variant <= 6) pool_size = 3;
     else if (variant >= 7) pool_size = 4;
 
-    game_add_splatter_ex(x, y, col_primary, pool_size, 900 + (rand() % 300));
+    tiles_stamp_splatter_directional(x, y, pool_size, bvx, bvy, variant);
 
-    // Satellite splatter droplets around the pool
-    int satellite_count = 2 + pool_size * 2;
+    // Ambient satellite splatter droplets around the pool
+    int satellite_count = 2 + pool_size;
     for (int d = 0; d < satellite_count; d++) {
         int ang = rand() % 256;
-        int dist = (rand() % (pool_size * 3 + 3)) + 3;
+        int dist = (rand() % (pool_size * 3 + 2)) + 3;
         int dx = (fixed_cos(ang) * dist) >> 8;
         int dy = (fixed_sin(ang) * dist) >> 8;
-        uint16_t d_col = (rand() % 2 == 0) ? col_secondary : col_ichor;
-        game_add_splatter_ex(x + dx, y + dy, d_col, 0, 700 + (rand() % 300));
+        tiles_stamp_splatter_directional(x + dx, y + dy, 0, bvx / 2, bvy / 2, variant);
     }
 
     // Airborne ballistic particles: LOCAL EXPLOSION with 1 or 2 shrapnel flung far
@@ -1040,7 +1039,7 @@ void game_update_simulation(void) {
             int px = FROM_FP(g_death_particles[i].x);
             int py = FROM_FP(g_death_particles[i].y);
             if (px >= 2 && px < SCREEN_W - 2 && py >= 2 && py < FIELD_H - 2) {
-                game_add_splatter_ex(px, py, g_death_particles[i].color, g_death_particles[i].size, 300);
+                tiles_stamp_splatter_directional(px, py, g_death_particles[i].size, g_death_particles[i].vx, g_death_particles[i].vy, 0);
             }
             g_death_particles[i].active = 0;
         }
