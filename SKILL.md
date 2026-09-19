@@ -105,6 +105,15 @@ Do not declare the loop complete while a known visual defect remains. Explain
 what each capture proves. Use a close-up when the affected surface is too small
 to judge at native resolution.
 
+### Prohibition of Synthetic Offline Mockups
+All gameplay simulations, combat animations, and scene/tile mockups MUST be executed
+directly inside the real game engine by compiling the ROM (`scripts/build-project.ps1`)
+and running a headless DeSmuME scenario (`scripts/run-scenario.ps1`). Generating
+mockups, gameplay animations, or preview GIFs via offline scripts (PIL, Python canvas,
+or synthetic frame compositors) outside the compiled binary is strictly prohibited.
+Evidence must always reflect the actual ARM9 C engine, simulation physics, particles,
+and rendering pipeline.
+
 ## GDB and runtime diagnostics
 
 Use `scripts/validate-gdb.ps1 -RomPath <rom>` only for a concrete diagnostic hypothesis. The
