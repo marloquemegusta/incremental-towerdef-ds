@@ -1,9 +1,9 @@
 upgrade_id,name,max_level,cost_0,cost_1,cost_2,cost_3,cost_4
-0,caliber,5,15,25,40,65,100
-1,firerate,5,20,30,45,70,110
-2,mag_size,5,15,25,35,55,85
-3,bio_harvest,5,25,40,65,105,170
-4,conveyor,3,50,90,160,,
-5,auto_target,2,100,350,,,
-6,extra_turrets,3,200,400,800,1600,
-7,range,5,30,60,120,240,480
+0,caliber,5,15,35,80,180,
+1,firerate,5,15,30,65,140,
+2,mag_size,5,10,20,45,90,
+3,bio_harvest,2,12,35,,,
+4,conveyor,4,25,50,120,250,
+5,auto_target,2,20,80,,,
+6,extra_turrets,2,150,400,,,
+7,range,4,20,45,90,180,

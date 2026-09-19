@@ -1,4 +1,4 @@
-﻿# DESIGN.md - Especificación de Diseño Canónico: TowerDS (Nintendo DS)
+# DESIGN.md - Especificación de Diseño Canónico: TowerDS (Nintendo DS)
 
 Documento canónico vivo de visión de juego, arquitectura de simulación balística, economía incremental, sistema de muralla modular y registro de decisiones para **TowerDS** en Nintendo DS.
 
@@ -69,6 +69,11 @@ Inspirado en la filosofía de diseño de *Factorio*: **"Una tarea que al princip
 | **Fase 2: Foco** | Apuntar manualmente a cada amenaza prioritaria. | Mezcla de tanques con enjambre: balas desperdiciadas. | **Cogitador Balístico:** Auto-adquisición del más cercano/peligroso con override táctil. | *"La muralla se defiende sola."* |
 | **Fase 3: Looting** | Tocar cada Núcleo/Chatarra antes de que caduque (6s). | Mueren 100 bichos/min: pantalla saturada de drops. | **Recolector Magnético / Servocráneos:** Absorción automática en radio creciente. | *"El dinero entra solo a la caja."* |
 | **Fase 4: Daño** | Frotar la muralla para extinguir fuegos y soldar brechas. | Múltiples brechas simultáneas drenan la vida máxima. | **Servomantenimiento:** Reparación pasiva de HP/s y extinción automática. | *"Fortaleza indestructible."* |
+
+### A. Techo Biomecánico y Estándar de Balance (Nintendo DS)
+- **Axioma de Fatiga:** La pantalla táctil resistiva de la DS limita la cadencia humana precisa y cómoda a **2 a 3 pulsaciones por segundo ($2.0 - 3.0\text{ taps/s}$)**.
+- **Regla Inviolable de Balance:** Ninguna horda o etapa sin automatización debe exigir más de $3.0\text{ taps/s}$. Si un pico supera ese valor, debe ser resoluble adquiriendo mejoras de Daño (reducción de balas por baja) o Automatización temprana (*Gatillo Continuo / Hold*).
+- **Documento Canónico de Referencia:** Ver [`docs/BALANCE_DATA.md`](docs/BALANCE_DATA.md) para el desglose matemático formal de presupuestos de Chatarra, demandas de DPS y la tasa de pulsaciones requerida.
 
 ---
 
