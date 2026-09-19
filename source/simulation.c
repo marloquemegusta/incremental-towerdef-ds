@@ -2,6 +2,7 @@
 #include "enemy_data.h"
 #include "tiles.h"
 #include "turret_data.h"
+#include "audio.h"
 
 GameContext g_game;
 Turret g_turrets[MAX_TURRETS];
@@ -523,6 +524,10 @@ void wall_fire_at_target(int target_x, int target_y, int enemy_idx) {
         wall_spawn_casing(dx, dy, (barrel == 0 ? -1 : 1));
         g_wall.muzzle_flash_timer[s] = 2;
         g_wall.muzzle_flash_barrel[s] = barrel;
+
+        // Reproducir sonido de disparo visceral con paneo estéreo espacial (0 a 127)
+        int pan = (sx * 127) / SCREEN_W;
+        audio_play_shot(pan);
 
         if (enemy_idx >= 0 && enemy_idx < MAX_ENEMIES) {
             g_enemies[enemy_idx].incoming_damage += g_wall.damage;
