@@ -727,11 +727,14 @@ void renderer_draw_ui_wave(void) {
     if (g_game.wave_timer <= 2400 && g_game.wave_timer > 1800) {
         int peak_sec = (g_game.wave_timer - 1800) / 60;
         snprintf(buf, sizeof(buf), "! ALERTA PICO EN %ds !", peak_sec + 1);
-        uint16_t col = (g_game.sim_ticks_elapsed & 8) ? COLOR_AMBER : COLOR_WHITE;
+        uint8_t col = (g_game.sim_ticks_elapsed & 8) ? TOP_COLOR_AMBER : TOP_COLOR_WHITE;
         top_draw_text(68, 19, buf, col);
     } else if (g_game.wave_timer <= 1800 && g_game.wave_timer > 0) {
-        uint16_t col = (g_game.sim_ticks_elapsed & 12) ? COLOR_LED_RED : COLOR_AMBER;
+        uint8_t col = (g_game.sim_ticks_elapsed & 12) ? TOP_COLOR_LED_RED : TOP_COLOR_AMBER;
         top_draw_text(58, 19, "!! PICO DE ETAPA ACTIVO !!", col);
+    } else if (g_game.wave_timer <= 0) {
+        snprintf(buf, sizeof(buf), "! LIMPIAR REMANENTES: %d !", g_game.enemies_alive);
+        top_draw_text(52, 19, buf, TOP_COLOR_PHOSPHOR_GREEN);
     }
 
     // If currently dragging ammo crate
@@ -767,7 +770,11 @@ void renderer_draw_ui_pause(void) {
     char buf[64];
     snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
     top_draw_text(6, 4, buf, TOP_COLOR_AMBER);
-    top_draw_text(90, 4, "[PAUSA]", TOP_COLOR_WHITE);
+    if (g_game.stage_completed_flag) {
+        top_draw_text(74, 4, "! ETAPA SUPERADA !", TOP_COLOR_PHOSPHOR_GREEN);
+    } else {
+        top_draw_text(90, 4, "[PAUSA]", TOP_COLOR_WHITE);
+    }
 
     char scrap_buf[32];
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
@@ -781,8 +788,22 @@ void renderer_draw_ui_pause(void) {
 
     int is_fresh = (g_game.wave_timer >= STAGE_DURATION_FRAMES || g_game.enemies_spawned == 0);
 
-    // Prompt banner on battlefield road
-    renderer_draw_text(24, 128, "TOCA UN BOTON O PULSA START", COLOR_AMBER);
+    // Bunker status and repair banner (x: 10..246, y: 114..138)
+    if (g_wall.hp < g_wall.max_hp) {
+        renderer_fill_rect(10, 114, 236, 24, COLOR_IRON_PANEL);
+        uint16_t rep_border = (g_game.scrap >= 30) ? COLOR_PHOSPHOR_GREEN : COLOR_AMBER;
+        renderer_draw_rect(10, 114, 236, 24, rep_border);
+
+        char hp_buf[32];
+        snprintf(hp_buf, sizeof(hp_buf), "BUNKER: %d/%d HP", (int)g_wall.hp, (int)g_wall.max_hp);
+        uint16_t hp_col = (g_wall.hp <= 35) ? COLOR_LED_RED : COLOR_AMBER;
+        renderer_draw_text(16, 122, hp_buf, hp_col);
+
+        uint16_t rep_txt_col = (g_game.scrap >= 30) ? COLOR_PHOSPHOR_GREEN : RGB15(15, 15, 17) | BIT(15);
+        renderer_draw_text(126, 122, "[REPARAR +25: 30$]", rep_txt_col);
+    } else {
+        renderer_draw_text(20, 124, "BUNKER: 100/100 HP  [INTEGRIDAD OPTIMA]", COLOR_PHOSPHOR_GREEN);
+    }
 
     // 1. [TIENDA] Button (x: 10..84, y: 146..182)
     renderer_fill_rect(10, 146, 74, 36, COLOR_IRON_PANEL);
@@ -799,7 +820,10 @@ void renderer_draw_ui_pause(void) {
     // 3. [JUGAR / REANUDAR] Button (x: 170..246, y: 146..182)
     renderer_fill_rect(170, 146, 76, 36, COLOR_LED_GREEN);
     renderer_draw_rect(170, 146, 76, 36, COLOR_WHITE);
-    if (is_fresh) {
+    if (g_game.stage_completed_flag) {
+        renderer_draw_text(176, 154, "SIGUIENTE", COLOR_BLACK);
+        renderer_draw_text(186, 168, "ETAPA", COLOR_BLACK);
+    } else if (is_fresh) {
         renderer_draw_text(186, 154, "INICIAR", COLOR_BLACK);
         renderer_draw_text(184, 168, "COMBATE", COLOR_BLACK);
     } else {
@@ -1082,17 +1106,18 @@ void renderer_draw_ui_calibration(void) {
     if (s >= STAGE_COUNT) s = STAGE_COUNT - 1;
     const StageConfig *st = &g_balance.stages[s];
 
-    static const char *stage_row_labels[7] = {
+    static const char *stage_row_labels[8] = {
         "1. ZERG BASE DELAY",
         "2. SCOURGE BASE DEL",
         "3. HYDRA BASE DELAY",
         "4. ZERG PEAK DELAY",
         "5. SCOURGE PEAK DEL",
         "6. HYDRA PEAK DELAY",
-        "7. STAGE REWARD $"
+        "7. ULTRA PEAK DELAY",
+        "8. STAGE REWARD $"
     };
 
-    for (int r = 0; r < 7; r++) {
+    for (int r = 0; r < 8; r++) {
         int val = 0;
         switch (r) {
             case 0: val = st->zergling_delay_base; break;
@@ -1101,19 +1126,20 @@ void renderer_draw_ui_calibration(void) {
             case 3: val = st->zergling_delay_peak; break;
             case 4: val = st->scourge_delay_peak; break;
             case 5: val = st->hydralisk_delay_peak; break;
-            case 6: val = st->stage_reward_scrap; break;
+            case 6: val = st->ultralisk_delay_peak; break;
+            case 7: val = st->stage_reward_scrap; break;
         }
 
-        int y = 38 + r * 16;
+        int y = 36 + r * 14;
         int is_sel = (g_game.calib_row == r);
         uint16_t row_bg = is_sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL;
         uint16_t row_border = is_sel ? COLOR_AMBER : COLOR_IRON_BORDER;
         uint16_t txt_col = is_sel ? COLOR_WHITE : RGB15(20, 20, 22) | BIT(15);
 
-        renderer_fill_rect(6, y, 244, 14, row_bg);
-        renderer_draw_rect(6, y, 244, 14, row_border);
+        renderer_fill_rect(6, y, 244, 13, row_bg);
+        renderer_draw_rect(6, y, 244, 13, row_border);
 
-        renderer_draw_text(10, y + 3, stage_row_labels[r], txt_col);
+        renderer_draw_text(10, y + 2, stage_row_labels[r], txt_col);
 
         snprintf(buf, sizeof(buf), "%d", val);
         renderer_draw_text(144, y + 3, buf, COLOR_PHOSPHOR_GREEN);

@@ -255,7 +255,7 @@ typedef struct {
 #define STAGE_DURATION_FRAMES (120 * 60) // 7200 frames = 2 minutes
 #define STAGE_PEAK_START_FRAME (90 * 60)  // 5400 frames = 1m 30s (when timer <= 1800)
 
-// Configuration for each 2-minute Stage (7 parameters exposed in calibration)
+// Configuration for each 2-minute Stage (8 parameters exposed in calibration)
 typedef struct {
     int zergling_delay_base;   // 1. Zergling delay during 0:00 - 1:30 (frames, 0 = disabled)
     int scourge_delay_base;    // 2. Scourge delay during 0:00 - 1:30
@@ -263,7 +263,8 @@ typedef struct {
     int zergling_delay_peak;   // 4. Zergling delay during peak (1:30 - 2:00)
     int scourge_delay_peak;    // 5. Scourge delay during peak
     int hydralisk_delay_peak;  // 6. Hydralisk delay during peak
-    int stage_reward_scrap;    // 7. Scrap reward upon completing the stage
+    int ultralisk_delay_peak;  // 7. Ultralisk delay during peak (frames, 0 = disabled)
+    int stage_reward_scrap;    // 8. Scrap reward upon completing the stage
 } StageConfig;
 
 typedef struct {
@@ -281,7 +282,7 @@ typedef struct {
     int bunker_start_hp;
     int conveyor_reload_interval[5];
     uint64_t range_upgrade_costs[5];
-    uint32_t magic;                  // 0x544F5733 ("TOW3")
+    uint32_t magic;                  // 0x544F5734 ("TOW4")
 } GameBalanceConfig;
 
 extern GameBalanceConfig g_balance;
@@ -344,6 +345,8 @@ typedef struct {
     int spawn_timer_zergling;
     int spawn_timer_scourge;
     int spawn_timer_hydra;
+    int spawn_timer_ultra;
+    int stage_completed_flag;
 
     // Calibration UI navigation
     int calib_row;               // Selected row within active page
