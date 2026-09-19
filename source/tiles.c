@@ -352,34 +352,163 @@ void tiles_restore_ground_rect(uint16_t *dst_buffer, int x, int y, int w, int h,
     }
 }
 
-void tiles_stamp_splatter(int x, int y, int size, uint16_t color) {
+static inline void stamp_ground_pixel(int px, int py, uint16_t c16, uint8_t c8) {
+    if (px < 0 || px >= SCREEN_W) return;
+    int is_bottom = (py >= 192);
+    int sy = is_bottom ? (py - 192) : py;
+    if (sy < 0 || sy >= SCREEN_H) return;
+    if (is_bottom) {
+        s_ground_bottom_cache[sy * SCREEN_W + px] = c16;
+        ((uint16_t *)VRAM_A)[sy * SCREEN_W + px] = c16;
+        ((uint16_t *)VRAM_B)[sy * SCREEN_W + px] = c16;
+    } else {
+        s_ground_top_cache8[sy * SCREEN_W + px] = c8;
+        if (g_top_backbuffer) {
+            g_top_backbuffer[sy * SCREEN_W + px] = c8;
+        }
+    }
+}
+
+void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, int variant) {
+    (void)variant;
     int is_bottom = (y >= 192);
     int sy = is_bottom ? (y - 192) : y;
-    int r = (size <= 1) ? 2 : ((size == 2) ? 4 : ((size == 3) ? 6 : 9));
-    int x0 = (x - r < 0) ? 0 : x - r;
-    int y0 = (sy - r < 0) ? 0 : sy - r;
-    int x1 = (x + r >= SCREEN_W) ? SCREEN_W - 1 : x + r;
-    int y1 = (sy + r >= SCREEN_H) ? SCREEN_H - 1 : sy + r;
-    uint8_t col8 = (color == COLOR_XENOS_ICHOR) ? TOP_COLOR_LED_GREEN : TOP_COLOR_BLOOD;
+    if (x < 2 || x >= SCREEN_W - 2 || sy < 2 || sy >= SCREEN_H - 2) return;
+
+    // Radius configurations based on size
+    int r_base = (size <= 0) ? 2 : ((size == 1) ? 4 : ((size == 2) ? 7 : ((size == 3) ? 10 : 14)));
+
+    // Micro-droplets (size 0) from airborne particles landing
+    if (size <= 0) {
+        stamp_ground_pixel(x, y, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
+        int off_x = (rand() % 3) - 1;
+        int off_y = (rand() % 3) - 1;
+        if (off_x != 0 || off_y != 0) {
+            stamp_ground_pixel(x + off_x, y + off_y, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
+        }
+        return;
+    }
+
+    // Direction vector from bullet velocity
+    int len_sq = (bvx * bvx + bvy * bvy) >> 8;
+    int dir_x = 0;
+    int dir_y = -256; // Default forward momentum if zero (shots travel south to north)
+    int has_bullet_dir = 0;
+
+    if (len_sq > 16) {
+        int len = 256;
+        for (int it = 0; it < 5; it++) {
+            if (len > 0) len = (len + len_sq / len) >> 1;
+        }
+        if (len > 0) {
+            dir_x = (bvx << 8) / len;
+            dir_y = (bvy << 8) / len;
+            has_bullet_dir = 1;
+        }
+    }
+
+    // Shift center slightly in bullet direction (1 to 3 px)
+    int center_shift = (r_base / 3);
+    if (center_shift < 1) center_shift = 1;
+    if (center_shift > 3) center_shift = 3;
+    if (has_bullet_dir) {
+        x += (dir_x * center_shift) >> 8;
+        sy += (dir_y * center_shift) >> 8;
+    }
+
+    // Perpendicular vector for elliptical elongation
+    int perp_x = -dir_y;
+    int perp_y = dir_x;
+
+    // Bounding box: expand around shifted center
+    int max_r = r_base + (r_base / 2) + 2;
+    int x0 = (x - max_r < 0) ? 0 : (x - max_r);
+    int x1 = (x + max_r >= SCREEN_W) ? SCREEN_W - 1 : (x + max_r);
+    int y0 = (sy - max_r < 0) ? 0 : (sy - max_r);
+    int y1 = (sy + max_r >= SCREEN_H) ? SCREEN_H - 1 : (sy + max_r);
+
+    // Radii squared for concentric zones
+    int r_core_sq = (r_base * r_base) / 5;
+    int r_mid_sq  = (r_base * r_base);
+    int r_edge_sq = max_r * max_r;
+
+    // Hash seed based on origin coordinates
+    uint32_t seed = (uint32_t)(x * 73 + y * 179 + size * 31);
+
     for (int py = y0; py <= y1; py++) {
         int dy = py - sy;
         for (int px = x0; px <= x1; px++) {
             int dx = px - x;
-            if (dx * dx + dy * dy <= r * r) {
-                if (is_bottom) {
-                    s_ground_bottom_cache[py * SCREEN_W + px] = color;
-                    ((uint16_t *)VRAM_A)[py * SCREEN_W + px] = color;
-                    ((uint16_t *)VRAM_B)[py * SCREEN_W + px] = color;
-                } else {
-                    s_ground_top_cache8[py * SCREEN_W + px] = col8;
-                    if (g_top_backbuffer) {
-                        g_top_backbuffer[py * SCREEN_W + px] = col8;
+
+            int d_long = 0;
+            int d_lat  = 0;
+            if (has_bullet_dir) {
+                // Project onto bullet direction and perpendicular
+                d_long = (dx * dir_x + dy * dir_y) >> 8;   // Parallel (elongated)
+                d_lat  = (dx * perp_x + dy * perp_y) >> 8; // Perpendicular (narrower)
+            } else {
+                d_long = dy;
+                d_lat  = dx;
+            }
+
+            // Elongation: stretch parallel by ~1.3x and compress lateral by ~0.85x
+            int eff_long = (d_long * 200) >> 8;
+            int eff_lat  = (d_lat * 290) >> 8;
+            int eff_dist_sq = eff_long * eff_long + eff_lat * eff_lat;
+
+            // Pseudo-random organic edge noise: deterministic per pixel
+            int noise = (((px * 13) ^ (py * 37) ^ (int)seed) & 15) - 7;
+            int noisy_dist = eff_dist_sq + noise * (r_base / 2);
+
+            int abs_py = is_bottom ? (py + 192) : py;
+            if (noisy_dist <= r_core_sq) {
+                // ZONE 1: WET CORE (Fresh magenta viscera)
+                stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_CORE, TOP_COLOR_XENOS_GORE_CORE);
+            } else if (noisy_dist <= r_mid_sq) {
+                // ZONE 2: VISCOUS MID (Dense purple ichor)
+                stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
+            } else if (noisy_dist <= r_edge_sq) {
+                // ZONE 3: COAGULATED PERIMETER WITH BAYER DITHERING
+                if (noisy_dist > (r_mid_sq + (r_edge_sq - r_mid_sq) / 2)) {
+                    // Outer 50%: only stamp on checkerboard pattern
+                    if (((px + py) & 1) == 0) {
+                        stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
                     }
+                } else {
+                    // Inner rim: solid coagulated dark
+                    stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
+                }
+            }
+        }
+    }
+
+    // Directional ballistic spray: throw 3-5 satellite micro-droplets in forward cone
+    if (has_bullet_dir && size >= 1) {
+        int drop_count = 2 + size;
+        if (drop_count > 6) drop_count = 6;
+        for (int d = 0; d < drop_count; d++) {
+            int spread = ((d * 47 + (int)seed) % 65) - 32;
+            int dist = r_base + 3 + ((d * 31 + ((int)seed >> 4)) % (r_base + 4));
+            int ox = (dir_x * dist + perp_x * spread) >> 8;
+            int oy = (dir_y * dist + perp_y * spread) >> 8;
+            int dpx = x + ox;
+            int dpy = sy + oy;
+            if (dpx >= 1 && dpx < SCREEN_W - 1 && dpy >= 1 && dpy < SCREEN_H - 1) {
+                int abs_y = is_bottom ? (dpy + 192) : dpy;
+                stamp_ground_pixel(dpx, abs_y, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
+                if ((d & 1) == 0) {
+                    stamp_ground_pixel(dpx + 1, abs_y, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
                 }
             }
         }
     }
 }
+
+void tiles_stamp_splatter(int x, int y, int size, uint16_t color) {
+    (void)color;
+    tiles_stamp_splatter_directional(x, y, size, 0, 0, 0);
+}
+
 
 void tiles_full_screen_refresh(void) {
     if (g_top_backbuffer) {
