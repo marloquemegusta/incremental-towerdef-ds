@@ -46,47 +46,52 @@ static void enemy_grid_build(void) {
 
 static const GameBalanceConfig s_default_balance = {
     .stages = {
-        // Etapa 1 (Min 0:00 - 2:00): Zergling base=180f (~3s), peak=40f (~0.66s, 1.5 Z/s), no scourges, no hydras, reward=300
-        { .zergling_delay_base = 180, .scourge_delay_base = 0,   .hydralisk_delay_base = 0,
-          .zergling_delay_peak = 40,  .scourge_delay_peak = 0,   .hydralisk_delay_peak = 0,
-          .stage_reward_scrap = 300 },
+        // Etapa 1 (Min 0:00 - 2:00): Zergling base=110f (~1.8s), peak=28f (~2.14 Z/s), recompensa=25
+        { .zergling_delay_base = 110, .scourge_delay_base = 0,   .hydralisk_delay_base = 0,
+          .zergling_delay_peak = 28,  .scourge_delay_peak = 0,   .hydralisk_delay_peak = 0,
+          .ultralisk_delay_peak = 0,
+          .stage_reward_scrap = 25 },
 
-        // Etapa 2 (Min 2:00 - 4:00): Zerglings base=90f + Scourge base=180f; peak: Zerg=20f, Scourge=45f, reward=600
-        { .zergling_delay_base = 90,  .scourge_delay_base = 180, .hydralisk_delay_base = 0,
-          .zergling_delay_peak = 20,  .scourge_delay_peak = 45,  .hydralisk_delay_peak = 0,
-          .stage_reward_scrap = 600 },
+        // Etapa 2 (Min 2:00 - 4:00): Zerglings base=90f + Scourge base=135f; peak: Zerg=22f, Scourge=45f, recompensa=50
+        { .zergling_delay_base = 90,  .scourge_delay_base = 135, .hydralisk_delay_base = 0,
+          .zergling_delay_peak = 22,  .scourge_delay_peak = 45,  .hydralisk_delay_peak = 0,
+          .ultralisk_delay_peak = 0,
+          .stage_reward_scrap = 50 },
 
-        // Etapa 3 (Min 4:00 - 6:00): Zerglings base=45f + Scourge base=90f; peak: Zerg=12f, Scourge=25f, reward=1200
-        { .zergling_delay_base = 45,  .scourge_delay_base = 90,  .hydralisk_delay_base = 0,
-          .zergling_delay_peak = 12,  .scourge_delay_peak = 25,  .hydralisk_delay_peak = 0,
-          .stage_reward_scrap = 1200 },
+        // Etapa 3 (Min 4:00 - 6:00): Zerglings base=60f + Scourge base=80f + Hydra base=270f; peak: Zerg=16f, Scourge=35f, Hydra=75f, recompensa=100
+        { .zergling_delay_base = 60,  .scourge_delay_base = 80,  .hydralisk_delay_base = 270,
+          .zergling_delay_peak = 16,  .scourge_delay_peak = 35,  .hydralisk_delay_peak = 75,
+          .ultralisk_delay_peak = 0,
+          .stage_reward_scrap = 100 },
 
-        // Etapa 4 (Min 6:00 - 8:00): Zerglings base=25f + Scourge base=50f + Hydra base=300f; peak: Zerg=8f, Scourge=15f, Hydra=60f, reward=2500
-        { .zergling_delay_base = 25,  .scourge_delay_base = 50,  .hydralisk_delay_base = 300,
-          .zergling_delay_peak = 8,   .scourge_delay_peak = 15,  .hydralisk_delay_peak = 60,
-          .stage_reward_scrap = 2500 },
+        // Etapa 4 (Min 6:00 - 8:00): Zerglings base=40f + Scourge base=50f + Hydra base=150f; peak: Zerg=12f, Scourge=24f, Hydra=45f, recompensa=200
+        { .zergling_delay_base = 40,  .scourge_delay_base = 50,  .hydralisk_delay_base = 150,
+          .zergling_delay_peak = 12,  .scourge_delay_peak = 24,  .hydralisk_delay_peak = 45,
+          .ultralisk_delay_peak = 0,
+          .stage_reward_scrap = 200 },
 
-        // Etapa 5 (Min 8:00 - 10:00): Marea final! Zerg base=12f + Scourge base=25f + Hydra base=120f; peak: Zerg=3f, Scourge=8f, Hydra=25f, reward=5000
-        { .zergling_delay_base = 12,  .scourge_delay_base = 25,  .hydralisk_delay_base = 120,
-          .zergling_delay_peak = 3,   .scourge_delay_peak = 8,   .hydralisk_delay_peak = 25,
-          .stage_reward_scrap = 5000 },
+        // Etapa 5 (Min 8:00 - 10:00): Marea final! Zerg base=25f + Scourge base=35f + Hydra base=80f; peak: Zerg=6f, Scourge=15f, Hydra=25f, Ultra=450f, recompensa=500
+        { .zergling_delay_base = 25,  .scourge_delay_base = 35,  .hydralisk_delay_base = 80,
+          .zergling_delay_peak = 6,   .scourge_delay_peak = 15,  .hydralisk_delay_peak = 25,
+          .ultralisk_delay_peak = 450,
+          .stage_reward_scrap = 500 },
     },
     // Enemy stats (Constant across all stages):
     // 0: Scourge, 1: Zergling, 2: Hydralisk, 3: Mutalisk, 4: Defiler, 5: Lurker, 6: Guardian, 7: Ultralisk
-    .enemy_hp = { 1, 3, 15, 40, 80, 120, 300, 800 },
+    .enemy_hp = { 1, 3, 18, 40, 80, 120, 300, 500 },
     .enemy_speed = { 70, 36, 24, 45, 22, 26, 18, 16 },
-    .enemy_scrap = { 2, 1, 8, 20, 45, 75, 180, 500 },
+    .enemy_scrap = { 2, 1, 8, 20, 45, 75, 180, 150 },
     .enemy_bite_damage = { 12, 6, 10, 10, 15, 20, 30, 50 },
-    .enemy_bite_interval = { 1, 25, 30, 25, 35, 30, 45, 40 },
+    .enemy_bite_interval = { 1, 25, 90, 25, 35, 30, 45, 40 },
 
     .upgrade_costs = {
-        { 15, 35, 80, 180, 0 },     // 0: Caliber Lv1..4 (Dmg 1 -> 2 -> 3 -> 5 -> 8)
-        { 15, 30, 65, 140, 0 },     // 1: Cadence Lv1..4 (Interval 12 -> 10 -> 8 -> 5 -> 3)
-        { 10, 20, 45, 90, 0 },      // 2: Mag Size Lv1..4 (Mag 10 -> 16 -> 25 -> 40 -> 60)
-        { 12, 35, 0, 0, 0 },        // 3: Bio Harvest Lv1..2 (Scrap multiplier +1, +2)
-        { 25, 50, 120, 250, 0 },    // 4: Supply Conveyor Lv1..4
-        { 20, 80, 0, 0, 0 },        // 5: Auto Fire (Lv1 Continuous/Hold: 20, Lv2 Auto Target: 80)
-        { 150, 400, 0, 0, 0 },      // 6: Extra Turrets (Socket 2: 150, Socket 3: 400)
+        { 15, 40, 100, 250, 0 },    // 0: Caliber Lv1..4 (Dmg 1 -> 2 -> 3 -> 5 -> 8)
+        { 15, 35, 90, 200, 0 },     // 1: Cadence Lv1..4 (Interval 12 -> 10 -> 8 -> 5 -> 3)
+        { 10, 25, 60, 130, 0 },     // 2: Mag Size Lv1..4 (Mag 10 -> 16 -> 25 -> 40 -> 60)
+        { 60, 180, 0, 0, 0 },       // 3: Bio Harvest Lv1..2 (Scrap multiplier +50%, +100%)
+        { 40, 80, 180, 350, 0 },    // 4: Supply Conveyor Lv1..4
+        { 25, 350, 0, 0, 0 },       // 5: Auto Fire (Lv1 Continuous/Hold: 25, Lv2 Auto Target: 350)
+        { 180, 500, 0, 0, 0 },      // 6: Extra Turrets (Socket 2: 180, Socket 3: 500)
     },
     .turret_damage = { 1, 2, 3, 5, 8 },
     .turret_fire_interval = { 12, 10, 8, 5, 3 },
@@ -94,8 +99,8 @@ static const GameBalanceConfig s_default_balance = {
     .turret_magazine = { 10, 16, 25, 40, 60 },
     .bunker_start_hp = 100,
     .conveyor_reload_interval = { 9999, 60, 25, 12, 6 },
-    .range_upgrade_costs = { 20, 45, 90, 180, 0 },
-    .magic = 0x544F5733 // "TOW3"
+    .range_upgrade_costs = { 20, 50, 110, 220, 0 },
+    .magic = 0x544F5734 // "TOW4"
 };
 
 static int s_fat_available = 0;
@@ -124,7 +129,7 @@ void balance_config_load(void) {
         if (n == sizeof(GameBalanceConfig)) {
             GameBalanceConfig loaded;
             memcpy(&loaded, raw, sizeof(loaded));
-            if (loaded.magic == 0x544F5733) {
+            if (loaded.magic == 0x544F5734) {
                 memcpy(&g_balance, &loaded, sizeof(g_balance));
             }
         }
@@ -347,13 +352,14 @@ void wall_apply_balance_and_upgrades(void) {
 }
 
 void wall_init(void) {
+    uint64_t prev_hp = g_wall.hp;
     memset(&g_wall, 0, sizeof(g_wall));
     memset(g_casings, 0, sizeof(g_casings));
     memset(g_bullet_darts, 0, sizeof(g_bullet_darts));
 
     g_wall.screen_y = WALL_DEFAULT_Y; // 144
-    g_wall.hp = 100;
-    g_wall.max_hp = 100;
+    g_wall.max_hp = g_balance.bunker_start_hp;
+    g_wall.hp = (prev_hp > 0 && prev_hp <= g_wall.max_hp) ? prev_hp : g_balance.bunker_start_hp;
     g_wall.turret_angles[0] = 0; // NW
     g_wall.turret_angles[1] = 2; // N (forward facing)
     g_wall.turret_angles[2] = 2; // N
@@ -818,6 +824,7 @@ void game_init(void) {
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_death_particles, 0, sizeof(g_death_particles));
 
+    g_wall.hp = 0;
     wall_init();
     g_game.mode = MODE_PAUSED;
     g_game.wave_number = 1;
@@ -826,6 +833,7 @@ void game_init(void) {
     g_game.bunker_max_hp = g_balance.bunker_start_hp;
     g_game.scrap = 10;
     g_game.fast_forward = 1;
+    g_game.stage_completed_flag = 0;
 
     // Upgrades initial state
     g_game.upgrades.caliber_lvl = 0;
@@ -881,6 +889,8 @@ void game_start_wave(void) {
     g_game.spawn_timer_zergling = 0;
     g_game.spawn_timer_scourge = 0;
     g_game.spawn_timer_hydra = 0;
+    g_game.spawn_timer_ultra = 0;
+    g_game.stage_completed_flag = 0;
 
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
@@ -897,6 +907,13 @@ void game_reset_to_prep(void) {
     g_game.bunker_hp = g_wall.hp;
     g_game.bunker_max_hp = g_wall.max_hp;
     g_game.mode = MODE_PAUSED;
+    g_game.wave_timer = STAGE_DURATION_FRAMES;
+    g_game.enemies_spawned = 0;
+    g_game.enemies_alive = 0;
+    g_game.spawn_timer_zergling = 0;
+    g_game.spawn_timer_scourge = 0;
+    g_game.spawn_timer_hydra = 0;
+    g_game.spawn_timer_ultra = 0;
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_death_particles, 0, sizeof(g_death_particles));
@@ -941,35 +958,45 @@ void game_update_simulation(void) {
     if (stage_idx >= STAGE_COUNT) stage_idx = STAGE_COUNT - 1;
     const StageConfig *st = &g_balance.stages[stage_idx];
 
-    // Check if in Base phase (> 1800f, first 90s) or Peak phase (<= 1800f, last 30s)
-    int is_base = (g_game.wave_timer > 1800);
-    int z_delay = is_base ? st->zergling_delay_base : st->zergling_delay_peak;
-    int s_delay = is_base ? st->scourge_delay_base : st->scourge_delay_peak;
-    int h_delay = is_base ? st->hydralisk_delay_base : st->hydralisk_delay_peak;
+    // 1. Spawning per species (active only while stage countdown is running)
+    if (g_game.wave_timer > 0) {
+        int is_base = (g_game.wave_timer > 1800);
+        int z_delay = is_base ? st->zergling_delay_base : st->zergling_delay_peak;
+        int s_delay = is_base ? st->scourge_delay_base : st->scourge_delay_peak;
+        int h_delay = is_base ? st->hydralisk_delay_base : st->hydralisk_delay_peak;
+        int u_delay = is_base ? 0 : st->ultralisk_delay_peak;
 
-    // 1. Spawning per species
-    // Zergling (Variant 1)
-    if (z_delay > 0) {
-        g_game.spawn_timer_zergling++;
-        if (g_game.spawn_timer_zergling >= z_delay) {
-            g_game.spawn_timer_zergling = 0;
-            spawn_enemy(1, g_balance.enemy_hp[1], g_balance.enemy_speed[1]);
+        // Zergling (Variant 1)
+        if (z_delay > 0) {
+            g_game.spawn_timer_zergling++;
+            if (g_game.spawn_timer_zergling >= z_delay) {
+                g_game.spawn_timer_zergling = 0;
+                spawn_enemy(1, g_balance.enemy_hp[1], g_balance.enemy_speed[1]);
+            }
         }
-    }
-    // Scourge (Variant 0)
-    if (s_delay > 0) {
-        g_game.spawn_timer_scourge++;
-        if (g_game.spawn_timer_scourge >= s_delay) {
-            g_game.spawn_timer_scourge = 0;
-            spawn_enemy(0, g_balance.enemy_hp[0], g_balance.enemy_speed[0]);
+        // Scourge (Variant 0)
+        if (s_delay > 0) {
+            g_game.spawn_timer_scourge++;
+            if (g_game.spawn_timer_scourge >= s_delay) {
+                g_game.spawn_timer_scourge = 0;
+                spawn_enemy(0, g_balance.enemy_hp[0], g_balance.enemy_speed[0]);
+            }
         }
-    }
-    // Hydralisk (Variant 2)
-    if (h_delay > 0) {
-        g_game.spawn_timer_hydra++;
-        if (g_game.spawn_timer_hydra >= h_delay) {
-            g_game.spawn_timer_hydra = 0;
-            spawn_enemy(2, g_balance.enemy_hp[2], g_balance.enemy_speed[2]);
+        // Hydralisk (Variant 2)
+        if (h_delay > 0) {
+            g_game.spawn_timer_hydra++;
+            if (g_game.spawn_timer_hydra >= h_delay) {
+                g_game.spawn_timer_hydra = 0;
+                spawn_enemy(2, g_balance.enemy_hp[2], g_balance.enemy_speed[2]);
+            }
+        }
+        // Ultralisk (Variant 7 - Coloso de Asedio)
+        if (u_delay > 0) {
+            g_game.spawn_timer_ultra++;
+            if (g_game.spawn_timer_ultra >= u_delay) {
+                g_game.spawn_timer_ultra = 0;
+                spawn_enemy(7, g_balance.enemy_hp[7], g_balance.enemy_speed[7]);
+            }
         }
     }
 
@@ -1101,10 +1128,11 @@ void game_update_simulation(void) {
         if (ex > TO_FP(248)) ex = TO_FP(248);
         g_enemies[i].x = ex;
 
-        // Check if reaching Wall fortification rim (Y_global >= 336, i.e. Y_local >= 144):
-        // 3D Depth: Enemies press against the wall parapet at Y=144; their head/mouth
-        // tucks behind the sandbag bulwark, leaving only their rear/hind legs visible on the road.
-        if (py >= 336) {
+        // Check if reaching Wall fortification rim or Hydralisk ranged firing line:
+        // Hydralisks anchor at Y_global=272 (Y_local=80, safely inside turret range Y=64) to bombard with acid spines.
+        // Other ground xenos press against the wall parapet at Y_global=336 (Y_local=144).
+        int reach_y = (g_enemies[i].variant == 2) ? 272 : 336;
+        if (py >= reach_y) {
             int b_variant = g_enemies[i].variant;
             if (b_variant < 0) b_variant = 0;
             if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
@@ -1136,7 +1164,7 @@ void game_update_simulation(void) {
                 continue;
             }
 
-            g_enemies[i].y = TO_FP(336);
+            g_enemies[i].y = TO_FP(reach_y);
             g_enemies[i].vy = 0;
             g_enemies[i].vx = 0;
             g_enemies[i].dir = 4; // Face South against the fortified wall
@@ -1454,7 +1482,12 @@ void game_update_simulation(void) {
                     g_game.enemies_killed++;
 
                     uint64_t base_scrap = g_balance.enemy_scrap[v];
-                    uint64_t reward = base_scrap * (1 + g_game.upgrades.bio_harvest_lvl);
+                    uint64_t reward = base_scrap;
+                    if (g_game.upgrades.bio_harvest_lvl == 1) {
+                        reward = base_scrap + (base_scrap + 1) / 2; // +50% scrap
+                    } else if (g_game.upgrades.bio_harvest_lvl >= 2) {
+                        reward = base_scrap * 2; // +100% scrap (x2)
+                    }
                     g_game.scrap += reward;
 
                     game_spawn_death_gore(gx, gy, g_bullets[b].vx, g_bullets[b].vy, g_enemies[e].variant);
@@ -1475,20 +1508,31 @@ void game_update_simulation(void) {
         }
     }
 
-    // 7. Stage Completion (survived 2 minutes)
+    // 7. Stage Completion:
+    // When time expires (2 min), reinforcements cease.
+    // The stage is only won when all active remnants on the field have been eradicated!
     if (g_game.wave_timer <= 0) {
-        int st_idx = g_game.wave_number - 1;
-        if (st_idx < 0) st_idx = 0;
-        if (st_idx >= STAGE_COUNT) st_idx = STAGE_COUNT - 1;
-        uint64_t stage_bonus = g_balance.stages[st_idx].stage_reward_scrap;
-        g_game.scrap += stage_bonus;
-
-        if (g_game.wave_number >= g_game.total_waves) {
-            g_game.mode = MODE_VICTORY;
-            return;
+        int active_count = 0;
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            if (g_enemies[i].active) active_count++;
         }
-        g_game.wave_number++;
-        game_reset_to_prep();
+
+        if (active_count == 0) {
+            int st_idx = g_game.wave_number - 1;
+            if (st_idx < 0) st_idx = 0;
+            if (st_idx >= STAGE_COUNT) st_idx = STAGE_COUNT - 1;
+            uint64_t stage_bonus = g_balance.stages[st_idx].stage_reward_scrap;
+            g_game.scrap += stage_bonus;
+
+            if (g_game.wave_number >= g_game.total_waves) {
+                g_game.mode = MODE_VICTORY;
+                return;
+            }
+            g_game.wave_number++;
+            g_game.stage_completed_flag = 1;
+            game_reset_to_prep();
+            tiles_full_screen_refresh();
+        }
     }
 }
 
@@ -1499,6 +1543,7 @@ void game_toggle_pause(void) {
         } else {
             game_start_wave();
         }
+        g_game.stage_completed_flag = 0;
         tiles_full_screen_refresh();
     } else if (g_game.mode == MODE_WAVE) {
         g_game.previous_mode = g_game.mode;
@@ -1621,6 +1666,19 @@ void game_handle_input_pause(touchPosition touch, int keys_down, int keys_held) 
     }
 
     if (keys_down & KEY_TOUCH) {
+        // [REPARAR BUNKER] Banner: (10..246, 114..138) -> Restaura +25 HP por 30 scrap
+        if (touch.px >= 10 && touch.px <= 246 && touch.py >= 114 && touch.py <= 138) {
+            if (g_wall.hp < g_wall.max_hp && g_game.scrap >= 30) {
+                g_game.scrap -= 30;
+                g_wall.hp += 25;
+                if (g_wall.hp > g_wall.max_hp) g_wall.hp = g_wall.max_hp;
+                g_game.bunker_hp = g_wall.hp;
+                g_wall.damage_flash_timer = 4;
+                tiles_full_screen_refresh();
+            }
+            return;
+        }
+
         // [TIENDA] Button: (10, 146, 74, 36) -> hitbox (10..84, 144..188)
         if (touch.px >= 10 && touch.px <= 84 && touch.py >= 144 && touch.py <= 188) {
             g_game.previous_mode = MODE_PAUSED;
@@ -1803,7 +1861,7 @@ static void calib_commit_changes(void) {
 
 static void calib_modify_val(int delta) {
     if (g_game.calib_page == 0) {
-        // ETAPAS (1..5): exactly 7 parameters per stage
+        // ETAPAS (1..5): exactly 8 parameters per stage
         int s = g_game.calib_stage_idx;
         if (s < 0) s = 0;
         if (s >= STAGE_COUNT) s = STAGE_COUNT - 1;
@@ -1816,7 +1874,8 @@ static void calib_modify_val(int delta) {
             case 3: st->zergling_delay_peak += delta; if (st->zergling_delay_peak < 0) st->zergling_delay_peak = 0; break;
             case 4: st->scourge_delay_peak += delta; if (st->scourge_delay_peak < 0) st->scourge_delay_peak = 0; break;
             case 5: st->hydralisk_delay_peak += delta; if (st->hydralisk_delay_peak < 0) st->hydralisk_delay_peak = 0; break;
-            case 6: st->stage_reward_scrap += delta; if (st->stage_reward_scrap < 0) st->stage_reward_scrap = 0; break;
+            case 6: st->ultralisk_delay_peak += delta; if (st->ultralisk_delay_peak < 0) st->ultralisk_delay_peak = 0; break;
+            case 7: st->stage_reward_scrap += delta; if (st->stage_reward_scrap < 0) st->stage_reward_scrap = 0; break;
         }
         calib_commit_changes();
         return;
@@ -1930,7 +1989,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row. Held buttons repeat, then accelerate.
-    int max_rows = (g_game.calib_page == 0) ? 7 : ((g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 26));
+    int max_rows = (g_game.calib_page == 0) ? 8 : ((g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 26));
     int nav_dir = 0;
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
@@ -1956,7 +2015,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     // Left / Right step size
     int step = 1;
     if (g_game.calib_page == 0) {
-        step = (g_game.calib_row == 6) ? 50 : 5;
+        step = (g_game.calib_row == 7) ? 50 : 5;
     } else if (g_game.calib_page == 1) {
         int f = g_game.calib_row % 5;
         step = (f == 1) ? 2 : 1;
@@ -1990,7 +2049,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
             g_game.calib_row = 0;
             return;
         }
-        if (touch.py >= 0 && touch.py <= 27 && touch.px > 205) {
+        if (touch.py >= 0 && touch.py <= 27 && touch.px >= 206 && touch.px <= 255) {
             g_game.calib_page = (g_game.calib_page + 1) % 4;
             g_game.calib_row = 0;
             return;
@@ -2008,11 +2067,11 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
 
         // Parameter rows touch hitboxes
         if (g_game.calib_page == 0) {
-            for (int r = 0; r < 7; r++) {
-                int ry = 36 + r * 15;
+            for (int r = 0; r < 8; r++) {
+                int ry = 34 + r * 14;
                 if (touch.py >= ry && touch.py <= ry + 13) {
                     g_game.calib_row = r;
-                    int rstep = (r == 6) ? 50 : 5;
+                    int rstep = (r == 7) ? 50 : 5;
                     if (touch.px >= 175 && touch.px <= 205) {
                         calib_modify_val(-rstep);
                     } else if (touch.px >= 212 && touch.px <= 242) {
