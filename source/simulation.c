@@ -421,15 +421,15 @@ void wall_spawn_casing(int x, int y, int dir_sign) {
     g_casings[slot].active = 1;
     g_casings[slot].x = TO_FP(x);
     g_casings[slot].y = TO_FP(y);
-    g_casings[slot].z = TO_FP(4);
-    int base_vx = TO_FP(1) + (rand() % (FP_ONE * 3 / 4));
+    g_casings[slot].z = TO_FP(5);
+    int base_vx = TO_FP(1) + (rand() % (FP_ONE * 5 / 4));
     g_casings[slot].vx = dir_sign * base_vx;
-    g_casings[slot].vy = TO_FP(1) + (rand() % (FP_ONE / 2)); // Eject toward bunker floor
-    g_casings[slot].vz = TO_FP(2) + (rand() % TO_FP(2));     // Eject upward
+    g_casings[slot].vy = TO_FP(1) + (rand() % (FP_ONE * 3 / 4)); // Eject toward bunker deck
+    g_casings[slot].vz = TO_FP(2) + (rand() % TO_FP(3));         // High energetic arc
     g_casings[slot].angle = rand() % 360;
-    g_casings[slot].spin_speed = dir_sign * (30 + (rand() % 20));
+    g_casings[slot].spin_speed = dir_sign * (35 + (rand() % 30));
     g_casings[slot].bounces = 0;
-    g_casings[slot].life = 480;
+    g_casings[slot].life = 600; // 10 seconds brass pile retention
 }
 
 int wall_spawn_bullet_dart(int start_x, int start_y, int target_x, int target_y, int target_enemy_idx) {
@@ -524,6 +524,8 @@ void wall_fire_at_target(int target_x, int target_y, int enemy_idx) {
         wall_spawn_casing(dx, dy, (barrel == 0 ? -1 : 1));
         g_wall.muzzle_flash_timer[s] = 2;
         g_wall.muzzle_flash_barrel[s] = barrel;
+        g_wall.turret_recoil[s] = 3;       // Snappy hydraulic kickback
+        g_wall.screen_shake_timer = 2;     // Micro-trauma camera tremor
 
         // Reproducir sonido de disparo visceral con paneo estéreo espacial (0 a 127)
         int pan = (sx * 127) / SCREEN_W;
@@ -551,6 +553,7 @@ void wall_fire_at(int target_x, int target_y) {
 void wall_update(void) {
     if (g_wall.fire_cooldown > 0) g_wall.fire_cooldown--;
     if (g_wall.damage_flash_timer > 0) g_wall.damage_flash_timer--;
+    if (g_wall.screen_shake_timer > 0) g_wall.screen_shake_timer--;
 
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
         // Debug Sandbox: replenish ammo if infinite ammo toggle is enabled
@@ -562,6 +565,9 @@ void wall_update(void) {
         if (g_wall.turret_cooldown[s] > 0) g_wall.turret_cooldown[s]--;
         if (g_wall.muzzle_flash_timer[s] > 0) {
             g_wall.muzzle_flash_timer[s]--;
+        }
+        if (g_wall.turret_recoil[s] > 0) {
+            g_wall.turret_recoil[s]--;
         }
     }
 
@@ -779,15 +785,15 @@ void wall_update(void) {
         g_casings[i].x += g_casings[i].vx;
         g_casings[i].y += g_casings[i].vy;
         g_casings[i].z += g_casings[i].vz;
-        g_casings[i].vz -= 140; // Gravity in Q8
+        g_casings[i].vz -= 110; // Slightly lighter gravity for high, dramatic ballistic arc
         g_casings[i].angle = (g_casings[i].angle + g_casings[i].spin_speed) % 360;
 
         if (g_casings[i].z <= 0) {
             g_casings[i].z = 0;
-            if (g_casings[i].bounces < 2) {
-                g_casings[i].vz = -(g_casings[i].vz * 42) / 100;
-                g_casings[i].vx = (g_casings[i].vx * 55) / 100;
-                g_casings[i].vy = (g_casings[i].vy * 55) / 100;
+            if (g_casings[i].bounces < 3) {
+                g_casings[i].vz = -(g_casings[i].vz * 45) / 100;
+                g_casings[i].vx = (g_casings[i].vx * 60) / 100;
+                g_casings[i].vy = (g_casings[i].vy * 60) / 100;
                 g_casings[i].spin_speed /= 2;
                 g_casings[i].bounces++;
             } else {
@@ -2301,8 +2307,8 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
                 return;
             }
         } else {
-            // Touch in battlefield: spawn chosen enemy right at touch coordinates!
-            game_sandbox_spawn_enemy(touch.px, touch.py);
+            // Touch in battlefield: spawn chosen enemy right at touch coordinates (bottom screen Y is +192)!
+            game_sandbox_spawn_enemy(touch.px, touch.py + 192);
             return;
         }
     }
