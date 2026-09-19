@@ -375,18 +375,18 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
     int sy = is_bottom ? (y - 192) : y;
     if (x < 2 || x >= SCREEN_W - 2 || sy < 2 || sy >= SCREEN_H - 2) return;
 
-    // Compact base radii: individual kills leave moderate stains; dense carnage builds up with multiple kills!
-    // size 1: small enemies (Scourge, Zergling) -> r_base = 2, max_r = 4 px
-    // size 2: medium enemies (Hydra, Mutalisk) -> r_base = 3, max_r = 5 px
-    // size 3: large enemies (Lurker, Guardian) -> r_base = 5, max_r = 7 px
-    // size 4: colossus (Ultralisk) -> r_base = 7, max_r = 10 px
-    int r_base = (size <= 1) ? 2 : ((size == 2) ? 3 : ((size == 3) ? 5 : 7));
-    int max_r = r_base + (r_base >= 4 ? 3 : 2);
+    // Compact core + extended conical spray range
+    // size 1 (Zergling/Scourge): r_base = 2, max_cone = 9
+    // size 2 (Hydralisk):        r_base = 3, max_cone = 14
+    // size 3 (Lurker/Guardian):  r_base = 4, max_cone = 18
+    // size 4 (Ultralisk):        r_base = 6, max_cone = 24
+    int r_base = (size <= 1) ? 2 : ((size == 2) ? 3 : ((size == 3) ? 4 : 6));
+    int max_cone = r_base * 3 + 3;
 
     // Direction vector from bullet velocity
     int len_sq = (bvx * bvx + bvy * bvy) >> 8;
     int dir_x = 0;
-    int dir_y = -256; // Default forward momentum if zero (shots travel south to north)
+    int dir_y = -256; // Default forward/north if zero
     int has_bullet_dir = 0;
 
     if (len_sq > 16) {
@@ -401,26 +401,15 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
         }
     }
 
-    // Shift center slightly in bullet direction (1 to 2 px)
-    int center_shift = (r_base / 2);
-    if (center_shift < 1) center_shift = 1;
-    if (center_shift > 2) center_shift = 2;
-    if (has_bullet_dir) {
-        x += (dir_x * center_shift) >> 8;
-        sy += (dir_y * center_shift) >> 8;
-    }
-
     int perp_x = -dir_y;
     int perp_y = dir_x;
 
-    int x0 = (x - max_r < 0) ? 0 : (x - max_r);
-    int x1 = (x + max_r >= SCREEN_W) ? SCREEN_W - 1 : (x + max_r);
-    int y0 = (sy - max_r < 0) ? 0 : (sy - max_r);
-    int y1 = (sy + max_r >= SCREEN_H) ? SCREEN_H - 1 : (sy + max_r);
-
-    int r_core_sq = (r_base <= 2) ? 1 : (r_base * r_base / 4);
-    int r_mid_sq  = r_base * r_base;
-    int r_edge_sq = max_r * max_r;
+    // Bounding box: spans entry puddle and extended exit cone
+    int bb_rad = max_cone + 2;
+    int x0 = (x - bb_rad < 0) ? 0 : (x - bb_rad);
+    int x1 = (x + bb_rad >= SCREEN_W) ? SCREEN_W - 1 : (x + bb_rad);
+    int y0 = (sy - bb_rad < 0) ? 0 : (sy - bb_rad);
+    int y1 = (sy + bb_rad >= SCREEN_H) ? SCREEN_H - 1 : (sy + bb_rad);
 
     uint32_t seed = (uint32_t)(x * 73 + y * 179 + size * 31);
 
@@ -429,48 +418,66 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
         for (int px = x0; px <= x1; px++) {
             int dx = px - x;
 
-            int d_long = 0;
-            int d_lat  = 0;
-            if (has_bullet_dir) {
-                d_long = (dx * dir_x + dy * dir_y) >> 8;
-                d_lat  = (dx * perp_x + dy * perp_y) >> 8;
-            } else {
-                d_long = dy;
-                d_lat  = dx;
+            // Longitude (along bullet vector: >0 is exit spray behind enemy)
+            // Latitude (perpendicular to bullet vector)
+            int d_long = (dx * dir_x + dy * dir_y) >> 8;
+            int d_lat  = (dx * perp_x + dy * perp_y) >> 8;
+            int abs_lat = (d_lat < 0) ? -d_lat : d_lat;
+
+            int dist_sq = dx * dx + dy * dy;
+            int abs_py = is_bottom ? (py + 192) : py;
+
+            // 1. Compact nucleus right under enemy body (radius <= 1 or 2)
+            if (dist_sq <= ((r_base <= 2) ? 1 : 2)) {
+                stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_CORE, TOP_COLOR_XENOS_GORE_CORE);
+                continue;
             }
 
-            // Moderate elongation: 1.25x parallel
-            int eff_long = (d_long * 205) >> 8;
-            int eff_lat  = (d_lat * 270) >> 8;
-            int eff_dist_sq = eff_long * eff_long + eff_lat * eff_lat;
+            int noise = (((px * 13) ^ (py * 37) ^ (int)seed) & 7) - 3; // -3..+4
 
-            // Pseudo-random organic edge noise
-            int noise = (((px * 13) ^ (py * 37) ^ (int)seed) & 15) - 7;
-            int noisy_dist = eff_dist_sq + noise * (r_base / 2);
+            // 2. Entry side (in front of bullet impact, d_long < 0): small compact entry pool
+            if (d_long < 0) {
+                if (dist_sq + noise <= (r_base * r_base)) {
+                    if (((px + py) & 1) == 0 || dist_sq <= 2) {
+                        stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
+                    }
+                }
+                continue;
+            }
 
-            int abs_py = is_bottom ? (py + 192) : py;
-            if (noisy_dist <= r_core_sq) {
-                // ZONE 1: WET CORE (Fresh magenta viscera)
-                stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_CORE, TOP_COLOR_XENOS_GORE_CORE);
-            } else if (noisy_dist <= r_mid_sq) {
-                // ZONE 2: VISCOUS MID (Dense purple ichor)
+            // 3. Exit spray cone (d_long >= 0): fanning outward behind the enemy
+            // Cone half-width expands with distance: W = r_base + (d_long * 5) / 8 (~32 degree half angle)
+            int cone_width = r_base + ((d_long * 5) >> 3) + (noise >> 1);
+            if (abs_lat > cone_width) continue;
+            if (d_long > max_cone + noise) continue;
+
+            // Zone A: Viscous mid within inner cone
+            if (d_long <= (r_base + 2) && abs_lat <= (r_base + 1)) {
                 stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
-            } else if (noisy_dist <= r_edge_sq) {
-                // ZONE 3: COAGULATED PERIMETER WITH BAYER DITHERING
-                // 50% checkerboard pattern on outer margin
+            }
+            // Zone B: Mid-cone spray (50% Bayer checkerboard dither)
+            else if (d_long <= (max_cone * 2 / 3)) {
                 if (((px + py) & 1) == 0) {
+                    uint16_t c = (abs_lat <= (cone_width / 2)) ? COLOR_XENOS_GORE_MID : COLOR_XENOS_GORE_DARK;
+                    stamp_ground_pixel(px, abs_py, c, TOP_COLOR_XENOS_GORE_MID);
+                }
+            }
+            // Zone C: Extended fade-out perimeter (25% Bayer dither: (px&1)==0 && (py&1)==0)
+            // Allows overlapping stains from multiple nearby enemies to naturally accumulate into thick blood!
+            else {
+                if (((px & 1) == 0) && ((py & 1) == 0)) {
                     stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
                 }
             }
         }
     }
 
-    // Directional forward spray: strictly 1 or 2 micro-droplets
+    // 4. Directional ballistic flecks at the apex of the exit cone
     if (has_bullet_dir && size >= 1) {
-        int drop_count = (size >= 2) ? 2 : 1;
+        int drop_count = 1 + (size / 2);
         for (int d = 0; d < drop_count; d++) {
-            int spread = ((d * 47 + (int)seed) % 41) - 20;
-            int dist = max_r + 2 + d * 3;
+            int dist = max_cone + 2 + d * 3;
+            int spread = ((d * 37 + (int)seed) % 19) - 9;
             int ox = (dir_x * dist + perp_x * spread) >> 8;
             int oy = (dir_y * dist + perp_y * spread) >> 8;
             int dpx = x + ox;
@@ -482,6 +489,7 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
         }
     }
 }
+
 
 void tiles_stamp_particle_droplet(int x, int y, int size, uint16_t color) {
     if (x < 1 || x >= SCREEN_W - 1 || y < 1 || y >= FIELD_H - 1) return;

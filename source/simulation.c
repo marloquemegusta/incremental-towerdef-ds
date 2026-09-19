@@ -46,9 +46,9 @@ static void enemy_grid_build(void) {
 
 static const GameBalanceConfig s_default_balance = {
     .stages = {
-        // Etapa 1 (Min 0:00 - 2:00): Zergling base=110f (~1.8s), peak=28f (~2.14 Z/s), recompensa=25
-        { .zergling_delay_base = 110, .scourge_delay_base = 0,   .hydralisk_delay_base = 0,
-          .zergling_delay_peak = 28,  .scourge_delay_peak = 0,   .hydralisk_delay_peak = 0,
+        // Etapa 1 (Min 0:00 - 2:00): Zergling base=90f, peak=24f; Hydralisk base=180f (~3s), peak=60f (~1s), recompensa=25
+        { .zergling_delay_base = 90,  .scourge_delay_base = 0,   .hydralisk_delay_base = 180,
+          .zergling_delay_peak = 24,  .scourge_delay_peak = 0,   .hydralisk_delay_peak = 60,
           .ultralisk_delay_peak = 0,
           .stage_reward_scrap = 25 },
 
@@ -562,23 +562,10 @@ void wall_update(void) {
         if (g_wall.max_ammo[s] >= 9000) {
             g_game.upgrades.auto_target = 1;
             g_wall.fire_interval = 3;
-            g_wall.active_turrets = 2;
-            for (int k = 0; k < 2; k++) {
-                g_enemies[k].active = 1;
-                g_enemies[k].variant = 2; // Armored Hydralisk
-                g_enemies[k].hp = 999999;
-                g_enemies[k].max_hp = 999999;
-                g_enemies[k].incoming_damage = 0;
-                g_enemies[k].x = TO_FP(k == 0 ? 96 : 160);
-                g_enemies[k].y = TO_FP(192 + 70);
-                g_enemies[k].speed = 0;
-                g_enemies[k].dir = 4;
-                g_enemies[k].anim_frame = 0;
-                g_enemies[k].biting_target = -1;
-                g_enemies[k].vx = 0;
-                g_enemies[k].vy = 0;
-            }
+            g_wall.active_turrets = 4;
+            g_wall.damage = 6; // High caliber: shred both zerglings and hydralisks cleanly
         }
+
 
         if (g_wall.turret_cooldown[s] > 0) g_wall.turret_cooldown[s]--;
         if (g_wall.muzzle_flash_timer[s] > 0) {
@@ -1135,10 +1122,23 @@ void game_update_simulation(void) {
                             int push = TO_FP(1) / 2;
                             if (odx > 0) sep_force_x += push;
                             else if (odx < 0) sep_force_x -= push;
+                            else sep_force_x += ((i & 1) ? push : -push);
+                        }
+
+                        // Smooth lateral bypass around stationary units (e.g. anchored Hydralisks)
+                        if (g_enemies[j].biting_target >= 0 && ody < 0 && aody < TO_FP(18) && aodx < TO_FP(16)) {
+                            int flank = TO_FP(1);
+                            if (odx > 0) sep_force_x += flank;
+                            else if (odx < 0) sep_force_x -= flank;
+                            else sep_force_x += ((i & 1) ? flank : -flank);
                         }
                     }
                 }
             }
+        }
+        // Anchored units attacking the wall or stationed do not get shoved laterally
+        if (g_enemies[i].biting_target >= 0) {
+            sep_force_x = 0;
         }
         ex += sep_force_x;
         // Keep within battlefield bounds [8..248]

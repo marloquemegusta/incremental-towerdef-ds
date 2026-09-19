@@ -30,12 +30,12 @@
     },
     {
       "release": true,
-      "frames": 480
+      "frames": 240
     },
     {
-      "frames": 300,
+      "frames": 600,
       "capture_sequence": "overdrive_combat",
-      "capture_every": 2,
+      "capture_every": 3,
       "capture": "02_combat_end"
     }
   ],
