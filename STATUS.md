@@ -32,6 +32,7 @@
 - [x] Limpieza de assets canónicos: exclusivamente 8 especies del enjambre StarCraft visibles en `assets/sprites/enemies/`.
 - [x] Resolución de `[OQ-01]` a `[OQ-04]` (Muralla unificada, marea continua pautada, escalera de automatización del disparo y economía limpia Chatarra + Núcleos sin energía pasiva).
 - [x] **Especificación Maestra y Contrato de Fase 1:** Documento `docs/PHASE_1_SPEC.md` consolidado con el alcance completo del prototipo jugable.
+- [x] **Diseño de Escalado Incremental y Automatización Visual:** Documento `docs/SCALING_AND_AUTOMATION_IDEAS.md` consolidado con la visión de logística de drones visibles (Fase 2) y escala volumétrica de enemigos colosales/titanes (Fase 3).
 - [ ] **Desarrollo de Fase 1 (Detalle técnico en [docs/PHASE_1_SPEC.md](docs/PHASE_1_SPEC.md)):**
   - [x] **Sesión 1: Muralla, Sockets y Balística Táctil [COMPLETADA - commit `fb6b1bf`]:**
     - Muralla continua en borde inferior con parapeto 3D y descarte de transparencias (`0x0000`).
