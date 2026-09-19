@@ -6,33 +6,19 @@
       "capture": "01_prep"
     },
     {
-      "tap": {
-        "x": 40,
-        "y": 170
-      },
-      "frames": 5
+      "button_down": "L",
+      "frames": 2
     },
     {
-      "release": true,
-      "frames": 10
+      "button_down": "R",
+      "frames": 6
     },
     {
-      "tap": {
-        "x": 180,
-        "y": 115
-      },
-      "frames": 5
+      "button_up": "R",
+      "frames": 2
     },
     {
-      "release": true,
-      "frames": 10
-    },
-    {
-      "button_down": "B",
-      "frames": 5
-    },
-    {
-      "button_up": "B",
+      "button_up": "L",
       "frames": 10
     },
     {
@@ -44,11 +30,11 @@
     },
     {
       "release": true,
-      "frames": 520
+      "frames": 480
     },
     {
-      "frames": 500,
-      "capture_sequence": "epic_firing",
+      "frames": 300,
+      "capture_sequence": "overdrive_combat",
       "capture_every": 2,
       "capture": "02_combat_end"
     }

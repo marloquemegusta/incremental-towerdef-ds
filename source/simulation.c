@@ -525,7 +525,6 @@ void wall_fire_at_target(int target_x, int target_y, int enemy_idx) {
         g_wall.muzzle_flash_timer[s] = 2;
         g_wall.muzzle_flash_barrel[s] = barrel;
         g_wall.turret_recoil[s] = 3;       // Snappy hydraulic kickback
-        g_wall.screen_shake_timer = 2;     // Micro-trauma camera tremor
 
         // Reproducir sonido de disparo visceral con paneo estéreo espacial (0 a 127)
         int pan = (sx * 127) / SCREEN_W;
@@ -553,7 +552,6 @@ void wall_fire_at(int target_x, int target_y) {
 void wall_update(void) {
     if (g_wall.fire_cooldown > 0) g_wall.fire_cooldown--;
     if (g_wall.damage_flash_timer > 0) g_wall.damage_flash_timer--;
-    if (g_wall.screen_shake_timer > 0) g_wall.screen_shake_timer--;
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
         // Debug Sandbox & Overdrive: replenish ammo if infinite ammo toggle is enabled or max_ammo >= 9000
         if ((g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.turret_infinite_ammo) || g_wall.max_ammo[s] >= 9000) {
