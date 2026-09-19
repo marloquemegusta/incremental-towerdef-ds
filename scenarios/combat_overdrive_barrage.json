@@ -1,0 +1,49 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 10,
+      "capture": "01_prep"
+    },
+    {
+      "tap": {
+        "x": 220,
+        "y": 170
+      },
+      "frames": 5
+    },
+    {
+      "release": true,
+      "frames": 10
+    },
+    {
+      "button_down": "L",
+      "frames": 2
+    },
+    {
+      "button_down": "R",
+      "frames": 10
+    },
+    {
+      "button_up": "R",
+      "frames": 2
+    },
+    {
+      "button_up": "L",
+      "frames": 10
+    },
+    {
+      "frames": 120,
+      "capture_sequence": "overdrive_fire",
+      "capture_every": 1,
+      "capture": "02_firing_end"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_prep",
+      "to": "02_firing_end",
+      "min_changed_pixels": 100
+    }
+  }
+}
