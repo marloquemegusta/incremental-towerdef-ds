@@ -548,14 +548,12 @@ void wall_update(void) {
     if (g_wall.damage_flash_timer > 0) g_wall.damage_flash_timer--;
 
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
-        // Active reload progress
-        if (g_wall.is_reloading[s]) {
-            g_wall.reload_timer[s]--;
-            if (g_wall.reload_timer[s] <= 0) {
-                g_wall.ammo[s] = g_wall.max_ammo[s];
-                g_wall.is_reloading[s] = 0;
-            }
+        // Debug Sandbox: replenish ammo if infinite ammo toggle is enabled
+        if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.turret_infinite_ammo) {
+            g_wall.ammo[s] = g_wall.max_ammo[s];
+            g_wall.is_reloading[s] = 0;
         }
+
         if (g_wall.turret_cooldown[s] > 0) g_wall.turret_cooldown[s]--;
         if (g_wall.muzzle_flash_timer[s] > 0) {
             g_wall.muzzle_flash_timer[s]--;
