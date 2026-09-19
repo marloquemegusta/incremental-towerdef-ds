@@ -84,7 +84,7 @@ static const GameBalanceConfig s_default_balance = {
         { 40, 120, 300, 700, 0 },   // 2: Mag Size Lv1..4
         { 150, 600, 0, 0, 0 },      // 3: Bio Harvest Lv1..2
         { 120, 350, 800, 1800, 0 }, // 4: Supply Conveyor Lv1..4
-        { 350, 0, 0, 0, 0 },        // 5: Auto Target
+        { 100, 350, 0, 0, 0 },      // 5: Auto Fire (Lv1 Continuous: 100, Lv2 Auto Target: 350)
         { 600, 1800, 0, 0, 0 },     // 6: Extra Turrets (Socket 2, Socket 3)
     },
     .turret_damage = { 1, 2, 3, 5, 8 },
@@ -94,7 +94,7 @@ static const GameBalanceConfig s_default_balance = {
     .bunker_start_hp = 100,
     .conveyor_reload_interval = { 9999, 60, 25, 12, 6 },
     .range_upgrade_costs = { 40, 100, 250, 600, 0 },
-    .magic = 0x544F5732 // "TOW2"
+    .magic = 0x544F5733 // "TOW3"
 };
 
 static int s_fat_available = 0;
@@ -123,7 +123,7 @@ void balance_config_load(void) {
         if (n == sizeof(GameBalanceConfig)) {
             GameBalanceConfig loaded;
             memcpy(&loaded, raw, sizeof(loaded));
-            if (loaded.magic == 0x544F5732) {
+            if (loaded.magic == 0x544F5733) {
                 memcpy(&g_balance, &loaded, sizeof(g_balance));
             }
         }
@@ -827,6 +827,7 @@ void game_init(void) {
     g_game.upgrades.firerate_lvl = 0;
     g_game.upgrades.range_lvl = 0;
     g_game.upgrades.mag_size_lvl = 0;
+    g_game.upgrades.continuous_fire = 0;
     g_game.upgrades.auto_target = 0; // Starts requiring manual touch-targeting until upgrade purchased!
     g_game.upgrades.conveyor_lvl = 0; // Starts requiring manual ammo drag!
     g_game.upgrades.extra_turrets = 0;
@@ -1661,17 +1662,21 @@ uint64_t upgrade_get_cost(int idx) {
         return (level >= 0 && level < 4) ? g_balance.range_upgrade_costs[level] : 999999;
     }
     if (idx >= 0 && idx < 7) {
+        int auto_fire_lvl = 0;
+        if (g_game.upgrades.continuous_fire) auto_fire_lvl = 1;
+        if (g_game.upgrades.auto_target) auto_fire_lvl = 2;
+
         int levels[7] = {
             g_game.upgrades.caliber_lvl,
             g_game.upgrades.firerate_lvl,
             g_game.upgrades.mag_size_lvl,
             g_game.upgrades.bio_harvest_lvl,
             g_game.upgrades.conveyor_lvl,
-            g_game.upgrades.auto_target,
+            auto_fire_lvl,
             g_game.upgrades.extra_turrets
         };
         int level = levels[idx];
-        int max_l = (idx == 3 || idx == 6) ? 2 : (idx == 5 ? 1 : 4);
+        int max_l = (idx == 3 || idx == 5 || idx == 6) ? 2 : 4;
         if (level >= 0 && level < max_l && g_balance.upgrade_costs[idx][level] > 0)
             return g_balance.upgrade_costs[idx][level];
         return 999999;
@@ -1703,7 +1708,13 @@ void upgrade_purchase(int idx) {
         case 2: g_game.upgrades.mag_size_lvl++; break;
         case 3: g_game.upgrades.bio_harvest_lvl++; break;
         case 4: g_game.upgrades.conveyor_lvl++; break;
-        case 5: g_game.upgrades.auto_target = 1; break;
+        case 5:
+            if (!g_game.upgrades.continuous_fire) {
+                g_game.upgrades.continuous_fire = 1;
+            } else {
+                g_game.upgrades.auto_target = 1;
+            }
+            break;
         case 6:
             g_game.upgrades.extra_turrets++;
             if (g_game.upgrades.extra_turrets > 2) g_game.upgrades.extra_turrets = 2;
@@ -1866,10 +1877,12 @@ static void calib_modify_val(int delta) {
             val_ptr = (int64_t *)&g_balance.upgrade_costs[4][r - 14];
         } else if (r == 18) {
             val_ptr = (int64_t *)&g_balance.upgrade_costs[5][0];
-        } else if (r >= 19 && r <= 20) {
-            val_ptr = (int64_t *)&g_balance.upgrade_costs[6][r - 19];
-        } else if (r >= 21 && r <= 24) {
-            val_ptr = (int64_t *)&g_balance.range_upgrade_costs[r - 21];
+        } else if (r == 19) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[5][1];
+        } else if (r >= 20 && r <= 21) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[6][r - 20];
+        } else if (r >= 22 && r <= 25) {
+            val_ptr = (int64_t *)&g_balance.range_upgrade_costs[r - 22];
         }
         if (val_ptr) {
             int64_t n = *val_ptr + delta;
@@ -1912,7 +1925,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row. Held buttons repeat, then accelerate.
-    int max_rows = (g_game.calib_page == 0) ? 7 : ((g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 25));
+    int max_rows = (g_game.calib_page == 0) ? 7 : ((g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 26));
     int nav_dir = 0;
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;

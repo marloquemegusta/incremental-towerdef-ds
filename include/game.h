@@ -281,7 +281,7 @@ typedef struct {
     int bunker_start_hp;
     int conveyor_reload_interval[5];
     uint64_t range_upgrade_costs[5];
-    uint32_t magic;                  // 0x544F5732 ("TOW2")
+    uint32_t magic;                  // 0x544F5733 ("TOW3")
 } GameBalanceConfig;
 
 extern GameBalanceConfig g_balance;
