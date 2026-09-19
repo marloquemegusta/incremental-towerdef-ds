@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Omnissiah Vox-Forge: Vídeos Sincronizados y Bucles Continuos</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #090a0f;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 12px;
+      line-height: 1.4;
+    }
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+    h1 {
+      font-size: 1.35rem;
+      color: #f59e0b;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 0.7rem;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fbbf24;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      display: inline-block;
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
+    .info {
+      font-size: 0.82rem;
+      color: #9ca3af;
+      margin-bottom: 20px;
+      border-left: 3px solid #f59e0b;
+      padding-left: 10px;
+    }
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: bold;
+      color: #f3f4f6;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #374151;
+      padding-bottom: 6px;
+    }
+    .video-card {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+    .video-title {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #e5e7eb;
+      margin-bottom: 2px;
+    }
+    .video-desc {
+      font-size: 0.78rem;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+    video {
+      width: 100%;
+      aspect-ratio: 512 / 384;
+      border-radius: 8px;
+      background: #000;
+      display: block;
+      border: 1px solid #4b5563;
+    }
+    .audio-card {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .audio-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px;
+    }
+    .audio-name {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #e5e7eb;
+    }
+    .audio-tag {
+      font-size: 0.72rem;
+      color: #f59e0b;
+      font-weight: bold;
+    }
+    audio {
+      width: 100%;
+      height: 40px;
+      margin-top: 4px;
+      outline: none;
+    }
+    .download-link {
+      display: inline-block;
+      font-size: 0.72rem;
+      color: #60a5fa;
+      text-decoration: none;
+      margin-top: 6px;
+    }
+    .download-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎬 Omnissiah Vox-Forge</h1>
+    <div class="badge">VÍDEOS SINCRONIZADOS + BUCLES CONTINUOS</div>
+    <p class="info">
+      Sonidos rediseñados desde cero con <b>golpe de cañón real (PUM)</b> y <b>explosión orgánica visceral (SPLAT)</b>, grabados sobre el campo de batalla real de Nintendo DS a 3 cadencias.
+    </p>
+
+    <!-- SECCIÓN VÍDEOS -->
+    <div class="section-title">
+      <span>📹 1. Vídeos con Sonido Sincronizado</span>
+      <span style="font-size: 0.75rem; color: #f59e0b;">512x384 DS Pixel-Art</span>
+    </div>
+
+    <!-- Video 1: Lento -->
+    <div class="video-card">
+      <div class="video-title">A. Heavy Bolter Lento (180 RPM · 3 tiros/seg)</div>
+      <div class="video-desc">Golpe contundente "PUM" con retroceso, casquillo saltando y zergling reventando en vísceras púrpuras.</div>
+      <video controls playsinline loop preload="metadata" poster="">
+        <source src="showcase_bolter_slow.mp4" type="video/mp4">
+      </video>
+      <a class="download-link" href="showcase_bolter_slow.mp4" download="showcase_bolter_slow.mp4">⬇ Descargar Vídeo MP4 (Lento)</a>
+    </div>
+
+    <!-- Video 2: Medio -->
+    <div class="video-card">
+      <div class="video-title">B. Fuego Sostenido Medio (360 RPM · 6 tiros/seg)</div>
+      <div class="video-desc">Cadencia de ametralladora continua estándar para oleadas medias.</div>
+      <video controls playsinline loop preload="metadata">
+        <source src="showcase_bolter_med.mp4" type="video/mp4">
+      </video>
+      <a class="download-link" href="showcase_bolter_med.mp4" download="showcase_bolter_med.mp4">⬇ Descargar Vídeo MP4 (Medio)</a>
+    </div>
+
+    <!-- Video 3: Rápido -->
+    <div class="video-card">
+      <div class="video-title">C. Cañón Vulcano Rápido (660 RPM · 11 tiros/seg)</div>
+      <div class="video-desc">Ráfaga de alta cadencia triturando la masa del enjambre invasor.</div>
+      <video controls playsinline loop preload="metadata">
+        <source src="showcase_bolter_fast_vulcan.mp4" type="video/mp4">
+      </video>
+      <a class="download-link" href="showcase_bolter_fast_vulcan.mp4" download="showcase_bolter_fast_vulcan.mp4">⬇ Descargar Vídeo MP4 (Vulcano)</a>
+    </div>
+
+    <!-- SECCIÓN BUCLES CONTINUOS AUDIO -->
+    <div class="section-title">
+      <span>🔁 2. Bucles de Disparo Continuo (Audio en Loop)</span>
+      <span style="font-size: 0.75rem; color: #34d399;">Metralleta en Bucle</span>
+    </div>
+
+    <div class="audio-card">
+      <div class="audio-header">
+        <span class="audio-name">Metralleta Pesada (180 RPM)</span>
+        <span class="audio-tag">Bucle Lento</span>
+      </div>
+      <audio controls loop preload="auto" src="bolter_loop_180rpm.wav"></audio>
+      <a class="download-link" href="bolter_loop_180rpm.wav" download="bolter_loop_180rpm.wav">⬇ Descargar Bucle WAV</a>
+    </div>
+
+    <div class="audio-card">
+      <div class="audio-header">
+        <span class="audio-name">Metralleta Sostenida (360 RPM)</span>
+        <span class="audio-tag">Bucle Medio</span>
+      </div>
+      <audio controls loop preload="auto" src="bolter_loop_360rpm.wav"></audio>
+      <a class="download-link" href="bolter_loop_360rpm.wav" download="bolter_loop_360rpm.wav">⬇ Descargar Bucle WAV</a>
+    </div>
+
+    <div class="audio-card">
+      <div class="audio-header">
+        <span class="audio-name">Vulcano / Gatling (660 RPM)</span>
+        <span class="audio-tag">Bucle Rápido</span>
+      </div>
+      <audio controls loop preload="auto" src="bolter_loop_660rpm_vulcan.wav"></audio>
+      <a class="download-link" href="bolter_loop_660rpm_vulcan.wav" download="bolter_loop_660rpm_vulcan.wav">⬇ Descargar Bucle WAV</a>
+    </div>
+
+    <!-- SECCIÓN EFECTOS DISCRETOS NUEVOS -->
+    <div class="section-title">
+      <span>🎯 3. Comparativa de Efectos Discretos Rediseñados</span>
+      <span style="font-size: 0.75rem; color: #c084fc;">PUM vs SPLAT</span>
+    </div>
+
+    <div class="audio-card">
+      <div class="audio-header">
+        <span class="audio-name">💥 Disparo Cañón "PUM" (Sub-bass + Snap Pólvora)</span>
+        <span class="audio-tag" style="color: #fbbf24;">Nuevo</span>
+      </div>
+      <div style="font-size: 0.75rem; color: #9ca3af;">Golpe contundente balístico, elimina el sonido chiptune electrónico.</div>
+      <audio controls preload="auto" src="heavy_bolter_pum.wav"></audio>
+      <a class="download-link" href="heavy_bolter_pum.wav" download="heavy_bolter_pum.wav">⬇ Descargar WAV</a>
+    </div>
+
+    <div class="audio-card">
+      <div class="audio-header">
+        <span class="audio-name">☠️ Muerte Xenos "SPLAT" Visceral</span>
+        <span class="audio-tag" style="color: #c084fc;">Totalmente Distinto</span>
+      </div>
+      <div style="font-size: 0.75rem; color: #9ca3af;">Sub-rumble 35Hz + crujido de caparazón + masa viscosa + siseo ácido. No se confunde con el tiro.</div>
+      <audio controls preload="auto" src="xenos_visceral_splat.wav"></audio>
+      <a class="download-link" href="xenos_visceral_splat.wav" download="xenos_visceral_splat.wav">⬇ Descargar WAV</a>
+    </div>
+
+    <div class="audio-card">
+      <div class="audio-header">
+        <span class="audio-name">👾 Pasos Quitinosos (Skitter Enjambre)</span>
+        <span class="audio-tag" style="color: #34d399;">Caminar</span>
+      </div>
+      <div style="font-size: 0.75rem; color: #9ca3af;">Micro-patitas sobre metal de 12ms.</div>
+      <audio controls preload="auto" src="skitter_steps.wav"></audio>
+      <a class="download-link" href="skitter_steps.wav" download="skitter_steps.wav">⬇ Descargar WAV</a>
+    </div>
+
+    <div class="audio-card" style="background: linear-gradient(145deg, #1e1b4b, #111827); border-color: #6366f1;">
+      <div class="audio-header">
+        <span class="audio-name" style="color: #c7d2fe;">🌌 Tono de Shepard (Tensión Infinita Bucle)</span>
+        <span class="audio-tag" style="color: #818cf8;">Efecto Odisea</span>
+      </div>
+      <audio controls loop preload="auto" src="shepard_infinite.wav"></audio>
+      <a class="download-link" style="color: #a5b4fc;" href="shepard_infinite.wav" download="shepard_infinite.wav">⬇ Descargar WAV</a>
+    </div>
+
+  </div>
+</body>
+</html>
