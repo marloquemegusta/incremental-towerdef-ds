@@ -4,6 +4,6 @@ upgrade_id,name,max_level,cost_0,cost_1,cost_2,cost_3,cost_4
 2,mag_size,5,15,25,35,55,85
 3,bio_harvest,5,25,40,65,105,170
 4,conveyor,3,50,90,160,,
-5,auto_target,1,80,,,,
+5,auto_target,2,100,350,,,
 6,extra_turrets,3,200,400,800,1600,
 7,range,5,30,60,120,240,480

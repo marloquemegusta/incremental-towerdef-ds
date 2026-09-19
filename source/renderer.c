@@ -924,14 +924,26 @@ void renderer_draw_ui_upgrades(void) {
             snprintf(buf, sizeof(buf), "FEED %s$", cost_str);
             renderer_draw_text(x + 4, y + 16, buf, cost_col);
         } else if (i == 5) {
-            snprintf(buf, sizeof(buf), "TARGET: %s", g_game.upgrades.auto_target ? "ON" : "OFF");
-            renderer_draw_text(x + 4, y + 4, buf, text_col);
-            if (!g_game.upgrades.auto_target) {
-                snprintf(buf, sizeof(buf), "COGIT %s$", cost_str);
+            int auto_lvl = 0;
+            if (g_game.upgrades.continuous_fire) auto_lvl = 1;
+            if (g_game.upgrades.auto_target) auto_lvl = 2;
+
+            if (auto_lvl == 0) {
+                snprintf(buf, sizeof(buf), "FIRE: MANUAL");
+                renderer_draw_text(x + 4, y + 4, buf, text_col);
+                snprintf(buf, sizeof(buf), "+HOLD %s$", cost_str);
+                renderer_draw_text(x + 4, y + 16, buf, cost_col);
+            } else if (auto_lvl == 1) {
+                snprintf(buf, sizeof(buf), "FIRE: HOLD");
+                renderer_draw_text(x + 4, y + 4, buf, text_col);
+                snprintf(buf, sizeof(buf), "+AIM  %s$", cost_str);
+                renderer_draw_text(x + 4, y + 16, buf, cost_col);
             } else {
+                snprintf(buf, sizeof(buf), "AUTO TARGET");
+                renderer_draw_text(x + 4, y + 4, buf, text_col);
                 snprintf(buf, sizeof(buf), "MAXED");
+                renderer_draw_text(x + 4, y + 16, buf, cost_col);
             }
-            renderer_draw_text(x + 4, y + 16, buf, cost_col);
         } else if (i == 6) {
             int ext = g_game.upgrades.extra_turrets;
             snprintf(buf, sizeof(buf), "SOCKET %d", ext + 2);
@@ -985,7 +997,7 @@ void renderer_draw_ui_calibration(void) {
         snprintf(buf, sizeof(buf), "PAGE %d/4", g_game.calib_page + 1);
         renderer_draw_text(190, 18, buf, COLOR_AMBER);
         int first = (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 25);
+        int last = (g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 26);
         static const char *enemy_labels[40] = {
             "SCOURGE HP", "SCOURGE SPD", "SCOURGE SCRAP", "SCOURGE DMG", "SCOURGE FRM",
             "ZERGLING HP", "ZERGLING SPD", "ZERGLING SCRAP", "ZERGLING DMG", "ZERGLING FRM",
@@ -1004,13 +1016,13 @@ void renderer_draw_ui_calibration(void) {
             "CONVEYOR LV0 (FRM)", "CONVEYOR LV1 (FRM)", "CONVEYOR LV2 (FRM)", "CONVEYOR LV3 (FRM)", "CONVEYOR LV4 (FRM)",
             "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4"
         };
-        static const char *cost_labels[25] = {
+        static const char *cost_labels[26] = {
             "CALIBER LV1 COST", "CALIBER LV2 COST", "CALIBER LV3 COST", "CALIBER LV4 COST",
             "CADENCE LV1 COST", "CADENCE LV2 COST", "CADENCE LV3 COST", "CADENCE LV4 COST",
             "MAGAZINE LV1 COST", "MAGAZINE LV2 COST", "MAGAZINE LV3 COST", "MAGAZINE LV4 COST",
             "BIO HARVEST LV1", "BIO HARVEST LV2",
             "AUTO SUPPLY LV1", "AUTO SUPPLY LV2", "AUTO SUPPLY LV3", "AUTO SUPPLY LV4",
-            "AUTO TARGET COST",
+            "HOLD FIRE COST", "AUTO TARGET COST",
             "SOCKET 2 (ROF>=2)", "SOCKET 3 (ROF>=4)",
             "RANGE LV1 COST", "RANGE LV2 COST", "RANGE LV3 COST", "RANGE LV4 COST"
         };
@@ -1034,8 +1046,9 @@ void renderer_draw_ui_calibration(void) {
                 else if (r >= 12 && r <= 13) val = (int)g_balance.upgrade_costs[3][r - 12];
                 else if (r >= 14 && r <= 17) val = (int)g_balance.upgrade_costs[4][r - 14];
                 else if (r == 18) val = (int)g_balance.upgrade_costs[5][0];
-                else if (r >= 19 && r <= 20) val = (int)g_balance.upgrade_costs[6][r - 19];
-                else if (r >= 21 && r <= 24) val = (int)g_balance.range_upgrade_costs[r - 21];
+                else if (r == 19) val = (int)g_balance.upgrade_costs[5][1];
+                else if (r >= 20 && r <= 21) val = (int)g_balance.upgrade_costs[6][r - 20];
+                else if (r >= 22 && r <= 25) val = (int)g_balance.range_upgrade_costs[r - 22];
             }
             int y = 32 + n * 13; int sel = (r == g_game.calib_row);
             renderer_fill_rect(6, y, 244, 12, sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL);

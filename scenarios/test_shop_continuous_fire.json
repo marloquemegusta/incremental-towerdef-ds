@@ -1,0 +1,45 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    { "frames": 30, "capture": "01_pause_menu" },
+    { "tap": { "x": 40, "y": 160 }, "frames": 10 },
+    { "release": true, "frames": 20, "capture": "02_shop_menu" },
+    { "tap": { "x": 160, "y": 178 }, "frames": 10 },
+    { "release": true, "frames": 20, "capture": "03_back_to_pause" },
+    { "tap": { "x": 120, "y": 160 }, "frames": 10 },
+    { "release": true, "frames": 20, "capture": "04_calib_page1" },
+    { "button_down": "Y", "frames": 5 },
+    { "button_up": "Y", "frames": 10 },
+    { "button_down": "Y", "frames": 5 },
+    { "button_up": "Y", "frames": 10 },
+    { "button_down": "Y", "frames": 5 },
+    { "button_up": "Y", "frames": 15, "capture": "05_calib_costs_p1" },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 5 },
+    { "button_up": "DOWN", "frames": 15, "capture": "06_calib_costs_p2" }
+  ],
+  "assertions": {
+    "screen_changed": { "from": "01_pause_menu", "to": "02_shop_menu", "min_changed_pixels": 100 },
+    "screen_changes": [
+      { "from": "02_shop_menu", "to": "03_back_to_pause", "min_changed_pixels": 100 },
+      { "from": "04_calib_page1", "to": "05_calib_costs_p1", "min_changed_pixels": 100 }
+    ]
+  }
+}
