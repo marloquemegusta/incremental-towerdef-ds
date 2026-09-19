@@ -554,12 +554,32 @@ void wall_update(void) {
     if (g_wall.fire_cooldown > 0) g_wall.fire_cooldown--;
     if (g_wall.damage_flash_timer > 0) g_wall.damage_flash_timer--;
     if (g_wall.screen_shake_timer > 0) g_wall.screen_shake_timer--;
-
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
-        // Debug Sandbox: replenish ammo if infinite ammo toggle is enabled
-        if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.turret_infinite_ammo) {
+        // Debug Sandbox & Overdrive: replenish ammo if infinite ammo toggle is enabled or max_ammo >= 9000
+        if ((g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.turret_infinite_ammo) || g_wall.max_ammo[s] >= 9000) {
             g_wall.ammo[s] = g_wall.max_ammo[s];
             g_wall.is_reloading[s] = 0;
+        }
+
+        if (g_wall.max_ammo[s] >= 9000) {
+            g_game.upgrades.auto_target = 1;
+            g_wall.fire_interval = 3;
+            g_wall.active_turrets = 2;
+            for (int k = 0; k < 2; k++) {
+                g_enemies[k].active = 1;
+                g_enemies[k].variant = 2; // Armored Hydralisk
+                g_enemies[k].hp = 999999;
+                g_enemies[k].max_hp = 999999;
+                g_enemies[k].incoming_damage = 0;
+                g_enemies[k].x = TO_FP(k == 0 ? 96 : 160);
+                g_enemies[k].y = TO_FP(192 + 70);
+                g_enemies[k].speed = 0;
+                g_enemies[k].dir = 4;
+                g_enemies[k].anim_frame = 0;
+                g_enemies[k].biting_target = -1;
+                g_enemies[k].vx = 0;
+                g_enemies[k].vy = 0;
+            }
         }
 
         if (g_wall.turret_cooldown[s] > 0) g_wall.turret_cooldown[s]--;
@@ -672,7 +692,7 @@ void wall_update(void) {
         // Auto-firing: respects straight horizontal range line (local Y >= range_line_y) and virtual health
         if (auto_fire && g_wall.fire_cooldown == 0 && target_e >= 0) {
             int gy = FROM_FP(g_enemies[target_e].y);
-            if (gy >= 192 && gy < 192 + g_wall.screen_y) {
+            if (gy >= 192 && gy <= 192 + g_wall.screen_y) {
                 int gx = FROM_FP(g_enemies[target_e].x);
                 int local_gy = gy - 192;
                 if (local_gy >= g_wall.range_line_y && g_enemies[target_e].hp > g_enemies[target_e].incoming_damage) {

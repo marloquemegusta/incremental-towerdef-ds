@@ -60,6 +60,23 @@ int main(void) {
             s_sandbox_hotkey_held = 0;
         }
 
+        // Showcase / GIF Recording Overdrive Hotkey: L + R activates endless ammo, autotarget, rapid fire & heavy targets
+        if ((keys_held & KEY_L) != 0 && (keys_held & KEY_R) != 0) {
+            g_game.upgrades.auto_target = 1;
+            g_wall.fire_interval = 3;
+            g_wall.active_turrets = 2; // Dual battery for visceral alternating barrages!
+            for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+                g_wall.max_ammo[s] = 9999;
+                g_wall.ammo[s] = 9999;
+                g_wall.is_reloading[s] = 0;
+            }
+            if (g_game.enemies_alive < 2) {
+                g_game.sandbox.enemy_hp = 5000;
+                game_sandbox_spawn_enemy(90, 192 + 75);
+                game_sandbox_spawn_enemy(166, 192 + 75);
+            }
+        }
+
         // Bottom Screen mode-specific input
         if (!start_toggled && g_game.mode == MODE_DEBUG_SANDBOX) {
             game_handle_input_sandbox(touch, keys_down, keys_held);
