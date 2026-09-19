@@ -229,3 +229,13 @@ Leyenda de Estados:
   5. **Comportamiento Táctil Estricto (Prohibido Fuego a Asfalto Vacío):** Pulsar o arrastrar el stylus sobre asfalto vacío NO dispara. El fuego solo se activa si el stylus pulsa o pasa sobre un enemigo vivo (dentro de tolerancia táctil de ~16-20 px).
   6. **Logística Táctil de Munición (Fricción Manual Fase 1):** Cajón único de munición en búnker ($X=128, Y=166$). Al vaciarse el tambor (10 disparos base), la torreta entra en bloqueo y requiere arrastrar suministros desde el depósito con el stylus para recargar.
   7. **Indicador de Integridad Dieléctrico por Cátodos (32 Bombillas):** La barra de vida de la muralla se sustituye por una fila de 32 bombillas de filamento/cátodo verde a lo largo del zócalo inferior ($Y \in [186..191]$), integradas visualmente en la chapa del búnker.
+
+### `[OQ-07]` Automatización Visual Cinética (Drones y Logística de Munición)
+- **Estado:** `[DECIDIDO]` (Detalle en [`docs/SCALING_AND_AUTOMATION_IDEAS.md`](docs/SCALING_AND_AUTOMATION_IDEAS.md))
+- **Decisión:** En Fase 2, la recarga manual con stylus se delega en un enjambre de drones/servocráneos visibles que vuelan entre el silo central y las torretas. Los cuellos de botella se perciben visualmente (torretas humeando a la espera de munición). Se simplifica la gestión a una única estadística canónica (*Rendimiento/Velocidad Logística de Drones*).
+
+### `[OQ-08]` Escalado de Amenazas: Masa Volumétrica Real y Titanes vs. Variaciones Cosméticas
+- **Estado:** `[DECIDIDO]` (Detalle en [`docs/SCALING_AND_AUTOMATION_IDEAS.md`](docs/SCALING_AND_AUTOMATION_IDEAS.md))
+- **Decisión:** Se prohíben las escalas artificiales por mero cambio de paleta cromática. La escala se basa en:
+  1. **Colosos Terrestres de Asalto:** Criaturas masivas (~1/3 de pantalla táctil, 64-80 px) con $\times 20$ a $\times 50$ HP que absorben fuego y poseen mecánicas de nodriza/desove continuo.
+  2. **Titán Colosal en Pantalla Superior:** Asedio a dos pantallas en el clímax de la run, dañado mediante balística vertical que cruza la bisagra y superarmas del Megaproyecto.
