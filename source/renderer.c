@@ -1391,15 +1391,6 @@ void renderer_refresh_top_vram(void) {
 
 void top_screen_present(void) {
     if (s_top_vram) {
-        // Micro-trauma screen shake via hardware sub-engine scroll
-        if (g_wall.screen_shake_timer > 0) {
-            int shake_x = (g_wall.screen_shake_timer & 1) ? 1 : 0;
-            bgSetScroll(s_top_bg, shake_x, 0);
-        } else {
-            bgSetScroll(s_top_bg, 0, 0);
-        }
-        bgUpdate();
-
         // Flush CPU D-cache before DMA transfer to ensure hardware coherency!
         DC_FlushRange(g_top_backbuffer, SCREEN_W * SCREEN_H);
         dmaCopyWords(1, g_top_backbuffer, s_top_vram, SCREEN_W * SCREEN_H);
