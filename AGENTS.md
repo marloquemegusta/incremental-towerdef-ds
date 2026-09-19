@@ -12,7 +12,11 @@
 2. Los cambios visuales se contrastan con capturas en `artifacts/`.
 3. No se asume éxito de ejecución sin evidencia determinista en logs y capturas.
 4. Las decisiones de producto y diseño son guiadas por `DESIGN.md`.
-5. **Uso Estricto de Assets Reales en Mockups y Composiciones:** Al generar mockups, pantallas o composiciones visuales, se deben usar SIEMPRE los assets canónicos reales de sprites y tiles almacenados en `assets/` (abriendo y componiendo directamente los archivos de imagen existentes). Queda ESTRICTAMENTE PROHIBIDO redibujar o simplificar programáticamente por código las torretas, enemigos o elementos de escenario.
+5. **Prohibición Estricta de Mockups Sintéticos Offline / Obligatoriedad de Ejecución en Motor Real (DeSmuME):**
+   - Queda TERMINANTEMENTE PROHIBIDO crear simulaciones de gameplay, animaciones de combate o mockups de pantalla mediante scripts offline externos (PIL, Canvas, Python u otras herramientas sintéticas ajenas al binario).
+   - Toda simulación visual, prueba de tiles/escenario, animación y demostración de combate DEBE compilarse directamente en la ROM (`scripts/build-project.ps1`) y ejecutarse dentro del motor real de C en ARM9 mediante escenarios headless de DeSmuME (`scripts/run-scenario.ps1`).
+   - Esto garantiza que la física, las partículas balísticas, los casquillos, el retroceso hidráulico, los splatters de sangre con dithering y la lógica determinista real del juego sean los que generen invariablemente las capturas y GIFs de evidencia.
+   - Al incorporar o proponer nuevos tiles o sprites, se deben convertir a los arrays C correspondientes, compilar la ROM y capturar el resultado con DeSmuME.
 6. **Definición de Assets Maestros de Sprites:** El asset maestro canónico de cualquier entidad con animación (torretas, enemigos, etc.) es SIEMPRE la cinta completa de animación (`*_strip_master_1x.png`). Los archivos GIF son exclusivamente recursos ilustrativos de previsualización para el usuario. Las hojas de propuestas exploratorias iniciales (p. ej. hojas de 12 propuestas) se archivan únicamente como referencia histórica.
 7. **Campo de Batalla Abierto y Muralla Defensiva:**
    - **Superficie Abierta (256 px):** El campo de batalla abarca el ancho completo de 256 px de la pantalla, sin carriles cerrados ni calzadas estrechas de 32 px. Los enemigos avanzan libremente hacia el sur en formación de enjambre sobre la superficie urbana completa.
