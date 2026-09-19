@@ -739,11 +739,30 @@ void renderer_draw_death_particles_top(void) {
         int gx = FROM_FP(g_death_particles[i].x);
         int gy = FROM_FP(g_death_particles[i].y);
         int gz = FROM_FP(g_death_particles[i].z);
-        int draw_y = gy - gz; // Elevated 3D parabolic arc!
+        int draw_y = gy - gz;
         if (draw_y >= 0 && draw_y < SCREEN_H && gx >= 0 && gx < SCREEN_W) {
-            top_draw_pixel(gx, draw_y, g_death_particles[i].color);
-            if (g_death_particles[i].size > 0 && gx + 1 < SCREEN_W) {
-                top_draw_pixel(gx + 1, draw_y, g_death_particles[i].color);
+            int sz = g_death_particles[i].size;
+            uint8_t c8 = (g_death_particles[i].color == COLOR_XENOS_CHITIN) ? TOP_COLOR_IRON_LIGHT :
+                         ((g_death_particles[i].color == COLOR_XENOS_GORE_CORE) ? TOP_COLOR_XENOS_GORE_CORE : TOP_COLOR_XENOS_GORE_MID);
+            if (sz == 3) {
+                // Flash pop
+                top_draw_pixel(gx, draw_y, TOP_COLOR_WHITE);
+                if (gx > 0) top_draw_pixel(gx - 1, draw_y, TOP_COLOR_WHITE);
+                if (gx + 1 < SCREEN_W) top_draw_pixel(gx + 1, draw_y, TOP_COLOR_WHITE);
+                if (draw_y > 0) top_draw_pixel(gx, draw_y - 1, TOP_COLOR_WHITE);
+                if (draw_y + 1 < SCREEN_H) top_draw_pixel(gx, draw_y + 1, TOP_COLOR_WHITE);
+            } else if (sz == 2) {
+                // 2x2 chunk
+                top_draw_pixel(gx, draw_y, c8);
+                if (gx + 1 < SCREEN_W) top_draw_pixel(gx + 1, draw_y, c8);
+                if (draw_y + 1 < SCREEN_H) top_draw_pixel(gx, draw_y + 1, c8);
+                if (gx + 1 < SCREEN_W && draw_y + 1 < SCREEN_H) top_draw_pixel(gx + 1, draw_y + 1, c8);
+            } else if (sz == 1) {
+                // 2x1 fragment
+                top_draw_pixel(gx, draw_y, c8);
+                if (gx + 1 < SCREEN_W) top_draw_pixel(gx + 1, draw_y, c8);
+            } else {
+                top_draw_pixel(gx, draw_y, c8);
             }
             g_death_particles[i].prev_top_x = gx;
             g_death_particles[i].prev_top_y = draw_y;
@@ -758,27 +777,62 @@ void renderer_draw_death_particles_bottom(void) {
         int gx = FROM_FP(g_death_particles[i].x);
         int gy = FROM_FP(g_death_particles[i].y) - 192;
         int gz = FROM_FP(g_death_particles[i].z);
-        int draw_y = gy - gz; // Elevated 3D parabolic arc!
+        int draw_y = gy - gz;
         if (draw_y >= 0 && draw_y < SCREEN_H && gx >= 0 && gx < SCREEN_W) {
-            renderer_draw_pixel(gx, draw_y, g_death_particles[i].color);
-            tiles_dirty_mark_rect(gx - 1, draw_y - 1, 4, 4, 1, s_bot_fb_idx);
+            uint16_t c = g_death_particles[i].color;
+            int sz = g_death_particles[i].size;
             g_death_particles[i].prev_bot_has_shadow = 0;
-            if (g_death_particles[i].size > 0) {
-                if (gx + 1 < SCREEN_W) renderer_draw_pixel(gx + 1, draw_y, g_death_particles[i].color);
-                // Drop shadow on ground under flying chunks
+
+            if (sz == 3) {
+                // Flash / kinetic burst (3x3 cross)
+                renderer_draw_pixel(gx, draw_y, c);
+                if (gx > 0) renderer_draw_pixel(gx - 1, draw_y, c);
+                if (gx + 1 < SCREEN_W) renderer_draw_pixel(gx + 1, draw_y, c);
+                if (draw_y > 0) renderer_draw_pixel(gx, draw_y - 1, c);
+                if (draw_y + 1 < SCREEN_H) renderer_draw_pixel(gx, draw_y + 1, c);
+                tiles_dirty_mark_rect(gx - 2, draw_y - 2, 5, 5, 1, s_bot_fb_idx);
+            } else if (sz == 2) {
+                // Heavy 2x2 chunk of chitin/flesh
+                renderer_draw_pixel(gx, draw_y, c);
+                if (gx + 1 < SCREEN_W) renderer_draw_pixel(gx + 1, draw_y, c);
+                if (draw_y + 1 < SCREEN_H) renderer_draw_pixel(gx, draw_y + 1, c);
+                if (gx + 1 < SCREEN_W && draw_y + 1 < SCREEN_H) renderer_draw_pixel(gx + 1, draw_y + 1, c);
+                tiles_dirty_mark_rect(gx - 1, draw_y - 1, 4, 4, 1, s_bot_fb_idx);
+
+                // Ground drop shadow (converges when landing, separates in air!)
                 if (gy >= 0 && gy < SCREEN_H && gz > 1) {
-                    renderer_draw_pixel(gx, gy, RGB15(2, 2, 4) | BIT(15));
-                    tiles_dirty_mark_rect(gx, gy, 1, 1, 1, s_bot_fb_idx);
+                    uint16_t shd = RGB15(1, 1, 2) | BIT(15);
+                    renderer_draw_pixel(gx, gy, shd);
+                    if (gx + 1 < SCREEN_W) renderer_draw_pixel(gx + 1, gy, shd);
+                    tiles_dirty_mark_rect(gx - 1, gy - 1, 4, 3, 1, s_bot_fb_idx);
                     g_death_particles[i].prev_bot_has_shadow = 1;
                     g_death_particles[i].prev_bot_sy = gy;
                 }
+            } else if (sz == 1) {
+                // Medium 2x1 fragment
+                renderer_draw_pixel(gx, draw_y, c);
+                if (gx + 1 < SCREEN_W) renderer_draw_pixel(gx + 1, draw_y, c);
+                tiles_dirty_mark_rect(gx - 1, draw_y - 1, 4, 3, 1, s_bot_fb_idx);
+
+                if (gy >= 0 && gy < SCREEN_H && gz > 2) {
+                    renderer_draw_pixel(gx, gy, RGB15(2, 2, 3) | BIT(15));
+                    tiles_dirty_mark_rect(gx, gy, 2, 2, 1, s_bot_fb_idx);
+                    g_death_particles[i].prev_bot_has_shadow = 1;
+                    g_death_particles[i].prev_bot_sy = gy;
+                }
+            } else {
+                // 1px blood droplet
+                renderer_draw_pixel(gx, draw_y, c);
+                tiles_dirty_mark_rect(gx - 1, draw_y - 1, 3, 3, 1, s_bot_fb_idx);
             }
+
             g_death_particles[i].prev_bot_x = gx;
             g_death_particles[i].prev_bot_y = draw_y;
             g_death_particles[i].prev_bot_active = 1;
         }
     }
 }
+
 
 void renderer_draw_ui_wave(void) {
     // Top HUD banner
