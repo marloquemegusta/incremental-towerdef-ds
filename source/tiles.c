@@ -375,19 +375,13 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
     int sy = is_bottom ? (y - 192) : y;
     if (x < 2 || x >= SCREEN_W - 2 || sy < 2 || sy >= SCREEN_H - 2) return;
 
-    // Radius configurations based on size
-    int r_base = (size <= 0) ? 2 : ((size == 1) ? 4 : ((size == 2) ? 7 : ((size == 3) ? 10 : 14)));
-
-    // Micro-droplets (size 0) from airborne particles landing
-    if (size <= 0) {
-        stamp_ground_pixel(x, y, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
-        int off_x = (rand() % 3) - 1;
-        int off_y = (rand() % 3) - 1;
-        if (off_x != 0 || off_y != 0) {
-            stamp_ground_pixel(x + off_x, y + off_y, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
-        }
-        return;
-    }
+    // Compact base radii: individual kills leave moderate stains; dense carnage builds up with multiple kills!
+    // size 1: small enemies (Scourge, Zergling) -> r_base = 2, max_r = 4 px
+    // size 2: medium enemies (Hydra, Mutalisk) -> r_base = 3, max_r = 5 px
+    // size 3: large enemies (Lurker, Guardian) -> r_base = 5, max_r = 7 px
+    // size 4: colossus (Ultralisk) -> r_base = 7, max_r = 10 px
+    int r_base = (size <= 1) ? 2 : ((size == 2) ? 3 : ((size == 3) ? 5 : 7));
+    int max_r = r_base + (r_base >= 4 ? 3 : 2);
 
     // Direction vector from bullet velocity
     int len_sq = (bvx * bvx + bvy * bvy) >> 8;
@@ -407,32 +401,27 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
         }
     }
 
-    // Shift center slightly in bullet direction (1 to 3 px)
-    int center_shift = (r_base / 3);
+    // Shift center slightly in bullet direction (1 to 2 px)
+    int center_shift = (r_base / 2);
     if (center_shift < 1) center_shift = 1;
-    if (center_shift > 3) center_shift = 3;
+    if (center_shift > 2) center_shift = 2;
     if (has_bullet_dir) {
         x += (dir_x * center_shift) >> 8;
         sy += (dir_y * center_shift) >> 8;
     }
 
-    // Perpendicular vector for elliptical elongation
     int perp_x = -dir_y;
     int perp_y = dir_x;
 
-    // Bounding box: expand around shifted center
-    int max_r = r_base + (r_base / 2) + 2;
     int x0 = (x - max_r < 0) ? 0 : (x - max_r);
     int x1 = (x + max_r >= SCREEN_W) ? SCREEN_W - 1 : (x + max_r);
     int y0 = (sy - max_r < 0) ? 0 : (sy - max_r);
     int y1 = (sy + max_r >= SCREEN_H) ? SCREEN_H - 1 : (sy + max_r);
 
-    // Radii squared for concentric zones
-    int r_core_sq = (r_base * r_base) / 5;
-    int r_mid_sq  = (r_base * r_base);
+    int r_core_sq = (r_base <= 2) ? 1 : (r_base * r_base / 4);
+    int r_mid_sq  = r_base * r_base;
     int r_edge_sq = max_r * max_r;
 
-    // Hash seed based on origin coordinates
     uint32_t seed = (uint32_t)(x * 73 + y * 179 + size * 31);
 
     for (int py = y0; py <= y1; py++) {
@@ -443,20 +432,19 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
             int d_long = 0;
             int d_lat  = 0;
             if (has_bullet_dir) {
-                // Project onto bullet direction and perpendicular
-                d_long = (dx * dir_x + dy * dir_y) >> 8;   // Parallel (elongated)
-                d_lat  = (dx * perp_x + dy * perp_y) >> 8; // Perpendicular (narrower)
+                d_long = (dx * dir_x + dy * dir_y) >> 8;
+                d_lat  = (dx * perp_x + dy * perp_y) >> 8;
             } else {
                 d_long = dy;
                 d_lat  = dx;
             }
 
-            // Elongation: stretch parallel by ~1.3x and compress lateral by ~0.85x
-            int eff_long = (d_long * 200) >> 8;
-            int eff_lat  = (d_lat * 290) >> 8;
+            // Moderate elongation: 1.25x parallel
+            int eff_long = (d_long * 205) >> 8;
+            int eff_lat  = (d_lat * 270) >> 8;
             int eff_dist_sq = eff_long * eff_long + eff_lat * eff_lat;
 
-            // Pseudo-random organic edge noise: deterministic per pixel
+            // Pseudo-random organic edge noise
             int noise = (((px * 13) ^ (py * 37) ^ (int)seed) & 15) - 7;
             int noisy_dist = eff_dist_sq + noise * (r_base / 2);
 
@@ -469,45 +457,61 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
                 stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
             } else if (noisy_dist <= r_edge_sq) {
                 // ZONE 3: COAGULATED PERIMETER WITH BAYER DITHERING
-                if (noisy_dist > (r_mid_sq + (r_edge_sq - r_mid_sq) / 2)) {
-                    // Outer 50%: only stamp on checkerboard pattern
-                    if (((px + py) & 1) == 0) {
-                        stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
-                    }
-                } else {
-                    // Inner rim: solid coagulated dark
+                // 50% checkerboard pattern on outer margin
+                if (((px + py) & 1) == 0) {
                     stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
                 }
             }
         }
     }
 
-    // Directional ballistic spray: throw 3-5 satellite micro-droplets in forward cone
+    // Directional forward spray: strictly 1 or 2 micro-droplets
     if (has_bullet_dir && size >= 1) {
-        int drop_count = 2 + size;
-        if (drop_count > 6) drop_count = 6;
+        int drop_count = (size >= 2) ? 2 : 1;
         for (int d = 0; d < drop_count; d++) {
-            int spread = ((d * 47 + (int)seed) % 65) - 32;
-            int dist = r_base + 3 + ((d * 31 + ((int)seed >> 4)) % (r_base + 4));
+            int spread = ((d * 47 + (int)seed) % 41) - 20;
+            int dist = max_r + 2 + d * 3;
             int ox = (dir_x * dist + perp_x * spread) >> 8;
             int oy = (dir_y * dist + perp_y * spread) >> 8;
             int dpx = x + ox;
             int dpy = sy + oy;
             if (dpx >= 1 && dpx < SCREEN_W - 1 && dpy >= 1 && dpy < SCREEN_H - 1) {
                 int abs_y = is_bottom ? (dpy + 192) : dpy;
-                stamp_ground_pixel(dpx, abs_y, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
-                if ((d & 1) == 0) {
-                    stamp_ground_pixel(dpx + 1, abs_y, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
-                }
+                stamp_ground_pixel(dpx, abs_y, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
             }
         }
     }
+}
+
+void tiles_stamp_particle_droplet(int x, int y, int size, uint16_t color) {
+    if (x < 1 || x >= SCREEN_W - 1 || y < 1 || y >= FIELD_H - 1) return;
+
+    if (size <= 0) {
+        // 75% of light blood droplets dissipate in air without leaving a mark
+        if ((rand() & 3) != 0) return;
+        // 25% leave a single 1-pixel dark stain
+        stamp_ground_pixel(x, y, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
+        return;
+    }
+
+    if (size == 1) {
+        // Medium fragment: 50% chance of 1-pixel mark
+        if ((rand() & 1) != 0) return;
+        uint16_t c = (color & BIT(15)) ? color : COLOR_XENOS_GORE_MID;
+        stamp_ground_pixel(x, y, c, TOP_COLOR_XENOS_GORE_MID);
+        return;
+    }
+
+    // Heavy chunk (size >= 2): small 2-pixel mark
+    stamp_ground_pixel(x, y, color, TOP_COLOR_XENOS_GORE_MID);
+    stamp_ground_pixel(x + 1, y, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
 }
 
 void tiles_stamp_splatter(int x, int y, int size, uint16_t color) {
     (void)color;
     tiles_stamp_splatter_directional(x, y, size, 0, 0, 0);
 }
+
 
 
 void tiles_full_screen_refresh(void) {
