@@ -47,3 +47,7 @@
    - Para que la UI de Antigravity renderice sin links rotos imágenes o animaciones GIF en los artefactos de `<appDataDir>\brain\<conversation-id>`, se debe cumplir estrictamente:
      1. Copiar los archivos a la raíz de `<appDataDir>\brain\<conversation-id>\`.
      2. Usar obligatoriamente la sintaxis de ruta absoluta POSIX normalizada: `![caption](/C:/Users/malfonso/.gemini/antigravity/brain/<conv_id>/<file>.gif)` o enlaces directos Markdown con `file:///C:/Users/...`. Queda prohibido usar nombres relativos planos (`showcase.gif`) sin la barra raíz del sistema.
+6. **Regla Canónica de Captura y Demostración de Disparo en GIFs:**
+   - Para generar animaciones GIF de torretas disparando, se debe configurar invariablemente cargador masivo o infinito (`ammo = 9999`), la mejora de auto-apuntado activa (`auto_target = 1`), cadencia rápida (`fire_interval = 3`) y objetivos de entrenamiento o enemigos pesados en rango dentro del campo de tiro.
+   - Esto garantiza que la batería de torretas descargue un torrente ininterrumpido de proyectiles, retroceso hidráulico visible y lluvia continua de casquillos de artillería pesada en el búnker sin detenerse por recarga ni por eliminación prematura de los objetivos.
+

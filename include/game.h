@@ -191,6 +191,7 @@ typedef struct {
     int barrel_alt[4];   // 0 or 1 for left/right muzzle
     int muzzle_flash_timer[4];
     int muzzle_flash_barrel[4];
+    int turret_recoil[4];    // Frames of hydraulic kickback remaining (0..3)
     int target_enemy_idx[4]; // Enemy currently tracked by each socket (-1 if none)
     int traverse_timer[4];   // Sub-frame timer for smooth mechanical rotation
 
