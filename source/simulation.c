@@ -45,9 +45,9 @@ static void enemy_grid_build(void) {
 
 static const GameBalanceConfig s_default_balance = {
     .stages = {
-        // Etapa 1 (Min 0:00 - 2:00): Zergling base=180f (~3s), peak=30f (0.5s), no scourges, no hydras, reward=300
+        // Etapa 1 (Min 0:00 - 2:00): Zergling base=180f (~3s), peak=40f (~0.66s, 1.5 Z/s), no scourges, no hydras, reward=300
         { .zergling_delay_base = 180, .scourge_delay_base = 0,   .hydralisk_delay_base = 0,
-          .zergling_delay_peak = 30,  .scourge_delay_peak = 0,   .hydralisk_delay_peak = 0,
+          .zergling_delay_peak = 40,  .scourge_delay_peak = 0,   .hydralisk_delay_peak = 0,
           .stage_reward_scrap = 300 },
 
         // Etapa 2 (Min 2:00 - 4:00): Zerglings base=90f + Scourge base=180f; peak: Zerg=20f, Scourge=45f, reward=600
@@ -79,13 +79,13 @@ static const GameBalanceConfig s_default_balance = {
     .enemy_bite_interval = { 1, 25, 30, 25, 35, 30, 45, 40 },
 
     .upgrade_costs = {
-        { 60, 200, 450, 1000, 0 },  // 0: Caliber Lv1..4
-        { 90, 250, 600, 1400, 0 },  // 1: Cadence Lv1..4
-        { 40, 120, 300, 700, 0 },   // 2: Mag Size Lv1..4
-        { 150, 600, 0, 0, 0 },      // 3: Bio Harvest Lv1..2
-        { 120, 350, 800, 1800, 0 }, // 4: Supply Conveyor Lv1..4
-        { 100, 350, 0, 0, 0 },      // 5: Auto Fire (Lv1 Continuous: 100, Lv2 Auto Target: 350)
-        { 600, 1800, 0, 0, 0 },     // 6: Extra Turrets (Socket 2, Socket 3)
+        { 15, 35, 80, 180, 0 },     // 0: Caliber Lv1..4 (Dmg 1 -> 2 -> 3 -> 5 -> 8)
+        { 15, 30, 65, 140, 0 },     // 1: Cadence Lv1..4 (Interval 12 -> 10 -> 8 -> 5 -> 3)
+        { 10, 20, 45, 90, 0 },      // 2: Mag Size Lv1..4 (Mag 10 -> 16 -> 25 -> 40 -> 60)
+        { 12, 35, 0, 0, 0 },        // 3: Bio Harvest Lv1..2 (Scrap multiplier +1, +2)
+        { 25, 50, 120, 250, 0 },    // 4: Supply Conveyor Lv1..4
+        { 20, 80, 0, 0, 0 },        // 5: Auto Fire (Lv1 Continuous/Hold: 20, Lv2 Auto Target: 80)
+        { 150, 400, 0, 0, 0 },      // 6: Extra Turrets (Socket 2: 150, Socket 3: 400)
     },
     .turret_damage = { 1, 2, 3, 5, 8 },
     .turret_fire_interval = { 12, 10, 8, 5, 3 },
@@ -93,7 +93,7 @@ static const GameBalanceConfig s_default_balance = {
     .turret_magazine = { 10, 16, 25, 40, 60 },
     .bunker_start_hp = 100,
     .conveyor_reload_interval = { 9999, 60, 25, 12, 6 },
-    .range_upgrade_costs = { 40, 100, 250, 600, 0 },
+    .range_upgrade_costs = { 20, 45, 90, 180, 0 },
     .magic = 0x544F5733 // "TOW3"
 };
 
