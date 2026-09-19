@@ -294,11 +294,25 @@ void renderer_draw_wall(void) {
         int sy = g_wall.screen_y + c_wall_sockets[s].y;
         int angle = g_wall.turret_angles[s];
 
-        int dest_x = sx - TURRET_PIVOT_X;
-        int dest_y = sy - TURRET_PIVOT_Y;
+        // Mechanical hydraulic recoil kickback
+        static const struct { int8_t dx, dy; } s_recoil_offsets[5] = {
+            {  1, 1 }, // Angle 0 (aiming far left)
+            {  1, 2 }, // Angle 1 (aiming mid left)
+            {  0, 2 }, // Angle 2 (aiming straight up)
+            { -1, 2 }, // Angle 3 (aiming mid right)
+            { -1, 1 }, // Angle 4 (aiming far right)
+        };
+        int r_frames = g_wall.turret_recoil[s];
+        int r_dist = (r_frames >= 2) ? 2 : (r_frames == 1 ? 1 : 0);
+        int r_ang = (angle >= 0 && angle < 5) ? angle : 2;
+        int rx = s_recoil_offsets[r_ang].dx * r_dist;
+        int ry = s_recoil_offsets[r_ang].dy * r_dist;
+
+        int dest_x = sx - TURRET_PIVOT_X + rx;
+        int dest_y = sy - TURRET_PIVOT_Y + ry;
 
         wall_draw_turret_sprite(g_backbuffer, dest_x, dest_y, angle);
-        tiles_dirty_mark_rect(dest_x - 2, dest_y - 2, TURRET_SPRITE_W + 4, TURRET_SPRITE_H + 18, 1, s_bot_fb_idx);
+        tiles_dirty_mark_rect(dest_x - 3, dest_y - 3, TURRET_SPRITE_W + 6, TURRET_SPRITE_H + 22, 1, s_bot_fb_idx);
 
         // Diegetic Ammo & Reload indicator beneath each turret cupola
         int bar_w = 16;
@@ -327,20 +341,30 @@ void renderer_draw_wall(void) {
             }
         }
 
-        // Muzzle Flash
+        // High-energy Muzzle Flash
         if (g_wall.muzzle_flash_timer[s] > 0) {
             int alt = g_wall.muzzle_flash_barrel[s];
             const TurretCalibratedPoints *pts = &c_turret_points[angle];
             int mx = dest_x + (alt == 0 ? pts->ml_x : pts->mr_x);
             int my = dest_y + (alt == 0 ? pts->ml_y : pts->mr_y);
 
-            if (mx >= 1 && mx < SCREEN_W - 1 && my >= 1 && my < SCREEN_H - 1) {
+            if (mx >= 2 && mx < SCREEN_W - 3 && my >= 2 && my < SCREEN_H - 3) {
+                // Incandescent plasma core
                 g_backbuffer[my * SCREEN_W + mx] = COLOR_WHITE;
-                g_backbuffer[(my - 1) * SCREEN_W + mx] = COLOR_MUZZLE_FLASH;
+                g_backbuffer[my * SCREEN_W + mx + 1] = COLOR_WHITE;
+                g_backbuffer[(my - 1) * SCREEN_W + mx] = COLOR_WHITE;
+                g_backbuffer[(my - 1) * SCREEN_W + mx + 1] = COLOR_MUZZLE_FLASH;
+
+                // Fiery corona flare
+                g_backbuffer[(my - 2) * SCREEN_W + mx] = COLOR_MUZZLE_FLASH;
                 g_backbuffer[(my + 1) * SCREEN_W + mx] = COLOR_MUZZLE_FLASH;
+                g_backbuffer[(my + 1) * SCREEN_W + mx + 1] = RGB15(31, 16, 2) | BIT(15);
                 g_backbuffer[my * SCREEN_W + (mx - 1)] = COLOR_MUZZLE_FLASH;
-                g_backbuffer[my * SCREEN_W + (mx + 1)] = COLOR_MUZZLE_FLASH;
-                tiles_dirty_mark_rect(mx - 1, my - 1, 3, 3, 1, s_bot_fb_idx);
+                g_backbuffer[my * SCREEN_W + (mx + 2)] = COLOR_MUZZLE_FLASH;
+                g_backbuffer[(my - 1) * SCREEN_W + (mx - 1)] = RGB15(31, 16, 2) | BIT(15);
+                g_backbuffer[(my - 1) * SCREEN_W + (mx + 2)] = RGB15(31, 16, 2) | BIT(15);
+
+                tiles_dirty_mark_rect(mx - 2, my - 3, 6, 6, 1, s_bot_fb_idx);
             }
         }
     }
@@ -416,30 +440,71 @@ void renderer_draw_wall(void) {
         }
     }
 
-    // 3. Draw Casings (Tumbling Brass Particles)
+    // 3. Draw Casings (Heavy Tumbling Brass Artillery Particles)
     for (int i = 0; i < MAX_CASINGS; i++) {
         if (!g_casings[i].active) continue;
         int cx = FROM_FP(g_casings[i].x);
         int cz = FROM_FP(g_casings[i].z);
-        int cy = FROM_FP(g_casings[i].y) - cz;
+        int floor_y = FROM_FP(g_casings[i].y);
+        int cy = floor_y - cz;
 
-        if (cx >= 1 && cx < SCREEN_W - 2 && cy >= 1 && cy < SCREEN_H - 2) {
-            uint16_t col = (cz > 1) ? (RGB15(31, 28, 10) | BIT(15)) : (RGB15(24, 18, 5) | BIT(15));
+        if (cx >= 2 && cx < SCREEN_W - 3 && cy >= 2 && cy < SCREEN_H - 3) {
+            uint16_t c_hi   = (cz > 1) ? (RGB15(31, 29, 12) | BIT(15)) : (RGB15(30, 25, 8) | BIT(15)); // Specular gold
+            uint16_t c_body = (cz > 1) ? (RGB15(27, 21, 5)  | BIT(15)) : (RGB15(22, 16, 4) | BIT(15)); // Brass mid
+            uint16_t c_dark = (cz > 1) ? (RGB15(15, 10, 2)  | BIT(15)) : (RGB15(11, 7, 2)  | BIT(15)); // Base rim
+
+            // Projected 3D drop shadow on the bunker deck while airborne
+            if (cz > 1 && floor_y >= 0 && floor_y < SCREEN_H - 1) {
+                g_backbuffer[floor_y * SCREEN_W + cx] = RGB15(1, 1, 2) | BIT(15);
+                g_backbuffer[floor_y * SCREEN_W + cx + 1] = RGB15(1, 1, 2) | BIT(15);
+                g_backbuffer[(floor_y + 1) * SCREEN_W + cx] = RGB15(1, 1, 2) | BIT(15);
+            }
+
             int ang_idx = ((g_casings[i].angle % 360) / 45) % 4;
             if (ang_idx == 0) {
-                g_backbuffer[cy * SCREEN_W + cx] = col;
-                g_backbuffer[cy * SCREEN_W + cx + 1] = RGB15(16, 12, 3) | BIT(15);
+                // Horizontal 3x2:
+                // [c_hi]   [c_hi]   [c_body]
+                // [c_body] [c_dark] [c_dark]
+                g_backbuffer[cy * SCREEN_W + cx - 1]     = c_hi;
+                g_backbuffer[cy * SCREEN_W + cx]         = c_hi;
+                g_backbuffer[cy * SCREEN_W + cx + 1]     = c_body;
+                g_backbuffer[(cy + 1) * SCREEN_W + cx - 1] = c_body;
+                g_backbuffer[(cy + 1) * SCREEN_W + cx]     = c_dark;
+                g_backbuffer[(cy + 1) * SCREEN_W + cx + 1] = c_dark;
             } else if (ang_idx == 1) {
-                g_backbuffer[cy * SCREEN_W + cx] = col;
-                g_backbuffer[(cy + 1) * SCREEN_W + cx + 1] = RGB15(16, 12, 3) | BIT(15);
+                // Diagonal 3x3:
+                g_backbuffer[(cy - 1) * SCREEN_W + cx]     = c_hi;
+                g_backbuffer[(cy - 1) * SCREEN_W + cx + 1] = c_hi;
+                g_backbuffer[cy * SCREEN_W + cx - 1]       = c_hi;
+                g_backbuffer[cy * SCREEN_W + cx]           = c_body;
+                g_backbuffer[cy * SCREEN_W + cx + 1]       = c_dark;
+                g_backbuffer[(cy + 1) * SCREEN_W + cx - 1] = c_body;
+                g_backbuffer[(cy + 1) * SCREEN_W + cx]     = c_dark;
             } else if (ang_idx == 2) {
-                g_backbuffer[cy * SCREEN_W + cx] = col;
-                g_backbuffer[(cy + 1) * SCREEN_W + cx] = RGB15(16, 12, 3) | BIT(15);
+                // Vertical 2x3:
+                // [c_hi]   [c_hi]
+                // [c_body] [c_body]
+                // [c_dark] [c_dark]
+                g_backbuffer[(cy - 1) * SCREEN_W + cx]     = c_hi;
+                g_backbuffer[(cy - 1) * SCREEN_W + cx + 1] = c_hi;
+                g_backbuffer[cy * SCREEN_W + cx]           = c_body;
+                g_backbuffer[cy * SCREEN_W + cx + 1]       = c_body;
+                g_backbuffer[(cy + 1) * SCREEN_W + cx]     = c_dark;
+                g_backbuffer[(cy + 1) * SCREEN_W + cx + 1] = c_dark;
             } else {
-                g_backbuffer[cy * SCREEN_W + cx] = col;
-                g_backbuffer[(cy + 1) * SCREEN_W + cx - 1] = RGB15(16, 12, 3) | BIT(15);
+                // Diagonal 3x3 reverse:
+                g_backbuffer[(cy - 1) * SCREEN_W + cx - 1] = c_hi;
+                g_backbuffer[(cy - 1) * SCREEN_W + cx]     = c_hi;
+                g_backbuffer[cy * SCREEN_W + cx - 1]       = c_dark;
+                g_backbuffer[cy * SCREEN_W + cx]           = c_body;
+                g_backbuffer[cy * SCREEN_W + cx + 1]       = c_hi;
+                g_backbuffer[(cy + 1) * SCREEN_W + cx]     = c_dark;
+                g_backbuffer[(cy + 1) * SCREEN_W + cx + 1] = c_body;
             }
-            tiles_dirty_mark_rect(cx - 1, cy - 1, 4, 4, 1, s_bot_fb_idx);
+
+            int dirty_y0 = (cz > 1 && cy > floor_y) ? floor_y - 1 : cy - 2;
+            int dirty_y1 = (cz > 1 && floor_y > cy) ? floor_y + 2 : cy + 2;
+            tiles_dirty_mark_rect(cx - 2, dirty_y0, 6, (dirty_y1 - dirty_y0) + 3, 1, s_bot_fb_idx);
             g_casings[i].prev_cx = cx;
             g_casings[i].prev_cy = cy;
             g_casings[i].prev_active = 1;
@@ -452,18 +517,31 @@ void renderer_draw_wall(void) {
         int bx = FROM_FP(g_bullet_darts[i].x);
         int by = FROM_FP(g_bullet_darts[i].y);
 
-        if (bx >= 1 && bx < SCREEN_W - 1 && by >= 1 && by < SCREEN_H - 1) {
+        if (bx >= 2 && bx < SCREEN_W - 2 && by >= 2 && by < SCREEN_H - 2) {
             g_backbuffer[by * SCREEN_W + bx] = COLOR_WHITE;
             int vx_sign = (g_bullet_darts[i].vx > 0) ? 1 : ((g_bullet_darts[i].vx < 0) ? -1 : 0);
             int vy_sign = (g_bullet_darts[i].vy > 0) ? 1 : -1;
-            int tx = bx - vx_sign;
-            int ty = by - vy_sign;
-            if (tx >= 0 && tx < SCREEN_W && ty >= 0 && ty < SCREEN_H) {
-                g_backbuffer[ty * SCREEN_W + tx] = COLOR_BOLTER_TRACER;
+
+            // Tracer Segment 1 (Brilliant bolter yellow)
+            int t1x = bx - vx_sign;
+            int t1y = by - vy_sign;
+            if (t1x >= 0 && t1x < SCREEN_W && t1y >= 0 && t1y < SCREEN_H) {
+                g_backbuffer[t1y * SCREEN_W + t1x] = COLOR_BOLTER_TRACER;
             }
-            int min_dx = tx < bx ? tx : bx;
-            int min_dy = ty < by ? ty : by;
-            tiles_dirty_mark_rect(min_dx, min_dy, abs(bx - tx) + 2, abs(by - ty) + 2, 1, s_bot_fb_idx);
+            // Tracer Segment 2 (Burning propellant orange)
+            int t2x = bx - 2 * vx_sign;
+            int t2y = by - 2 * vy_sign;
+            if (t2x >= 0 && t2x < SCREEN_W && t2y >= 0 && t2y < SCREEN_H) {
+                g_backbuffer[t2y * SCREEN_W + t2x] = RGB15(31, 16, 2) | BIT(15);
+            }
+            // Lateral illumination glow
+            if (by + 1 < SCREEN_H) {
+                g_backbuffer[(by + 1) * SCREEN_W + bx] = COLOR_BOLTER_TRACER;
+            }
+
+            int min_dx = t2x < bx ? t2x : bx;
+            int min_dy = t2y < by ? t2y : by;
+            tiles_dirty_mark_rect(min_dx - 1, min_dy - 1, abs(bx - t2x) + 3, abs(by - t2y) + 3, 1, s_bot_fb_idx);
             g_bullet_darts[i].prev_bx = bx;
             g_bullet_darts[i].prev_by = by;
             g_bullet_darts[i].prev_active = 1;
@@ -1313,6 +1391,15 @@ void renderer_refresh_top_vram(void) {
 
 void top_screen_present(void) {
     if (s_top_vram) {
+        // Micro-trauma screen shake via hardware sub-engine scroll
+        if (g_wall.screen_shake_timer > 0) {
+            int shake_x = (g_wall.screen_shake_timer & 1) ? 1 : 0;
+            bgSetScroll(s_top_bg, shake_x, 0);
+        } else {
+            bgSetScroll(s_top_bg, 0, 0);
+        }
+        bgUpdate();
+
         // Flush CPU D-cache before DMA transfer to ensure hardware coherency!
         DC_FlushRange(g_top_backbuffer, SCREEN_W * SCREEN_H);
         dmaCopyWords(1, g_top_backbuffer, s_top_vram, SCREEN_W * SCREEN_H);
