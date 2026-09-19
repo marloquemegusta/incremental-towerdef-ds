@@ -1,5 +1,6 @@
 #include "game.h"
 #include "tiles.h"
+#include "audio.h"
 
 int main(void) {
     // Adaptive simulation keeps real-time progression when rendering is saturated.
@@ -12,6 +13,7 @@ int main(void) {
 
     // Internal Math and Systems
     math_init();
+    audio_init();
     game_init();
 
     // Hardware Telemetry Timers (Timer 0: subsystem profiler, Timer 1: 1-sec FPS interval)
