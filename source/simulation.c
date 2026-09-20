@@ -46,33 +46,33 @@ static void enemy_grid_build(void) {
 
 static const GameBalanceConfig s_default_balance = {
     .stages = {
-        // Etapa 1 (Min 0:00 - 2:00): Zergling base=90f, peak=24f; Hydralisk base=180f (~3s), peak=60f (~1s), recompensa=25
-        { .zergling_delay_base = 90,  .scourge_delay_base = 0,   .hydralisk_delay_base = 180,
-          .zergling_delay_peak = 24,  .scourge_delay_peak = 0,   .hydralisk_delay_peak = 60,
+        // Etapa 1 (Min 0:00 - 2:00): Solo Zerglings. Base=75f, peak=22f, recompensa=25
+        { .zergling_delay_base = 75,  .scourge_delay_base = 0,   .hydralisk_delay_base = 0,
+          .zergling_delay_peak = 22,  .scourge_delay_peak = 0,   .hydralisk_delay_peak = 0,
           .ultralisk_delay_peak = 0,
           .stage_reward_scrap = 25 },
 
-        // Etapa 2 (Min 2:00 - 4:00): Zerglings base=90f + Scourge base=135f; peak: Zerg=22f, Scourge=45f, recompensa=50
-        { .zergling_delay_base = 90,  .scourge_delay_base = 135, .hydralisk_delay_base = 0,
-          .zergling_delay_peak = 22,  .scourge_delay_peak = 45,  .hydralisk_delay_peak = 0,
+        // Etapa 2 (Min 2:00 - 4:00): Zerglings base=80f + Scourge base=120f; peak: Zerg=20f, Scourge=40f, recompensa=50
+        { .zergling_delay_base = 80,  .scourge_delay_base = 120, .hydralisk_delay_base = 0,
+          .zergling_delay_peak = 20,  .scourge_delay_peak = 40,  .hydralisk_delay_peak = 0,
           .ultralisk_delay_peak = 0,
           .stage_reward_scrap = 50 },
 
-        // Etapa 3 (Min 4:00 - 6:00): Zerglings base=60f + Scourge base=80f + Hydra base=270f; peak: Zerg=16f, Scourge=35f, Hydra=75f, recompensa=100
-        { .zergling_delay_base = 60,  .scourge_delay_base = 80,  .hydralisk_delay_base = 270,
-          .zergling_delay_peak = 16,  .scourge_delay_peak = 35,  .hydralisk_delay_peak = 75,
+        // Etapa 3 (Min 4:00 - 6:00): Zerglings base=60f + Scourge base=80f + Hydra base=240f; peak: Zerg=18f, Scourge=35f, Hydra=75f, recompensa=100
+        { .zergling_delay_base = 60,  .scourge_delay_base = 80,  .hydralisk_delay_base = 240,
+          .zergling_delay_peak = 18,  .scourge_delay_peak = 35,  .hydralisk_delay_peak = 75,
           .ultralisk_delay_peak = 0,
           .stage_reward_scrap = 100 },
 
-        // Etapa 4 (Min 6:00 - 8:00): Zerglings base=40f + Scourge base=50f + Hydra base=150f; peak: Zerg=12f, Scourge=24f, Hydra=45f, recompensa=200
-        { .zergling_delay_base = 40,  .scourge_delay_base = 50,  .hydralisk_delay_base = 150,
-          .zergling_delay_peak = 12,  .scourge_delay_peak = 24,  .hydralisk_delay_peak = 45,
+        // Etapa 4 (Min 6:00 - 8:00): Zerglings base=40f + Scourge base=50f + Hydra base=140f; peak: Zerg=14f, Scourge=25f, Hydra=45f, recompensa=200
+        { .zergling_delay_base = 40,  .scourge_delay_base = 50,  .hydralisk_delay_base = 140,
+          .zergling_delay_peak = 14,  .scourge_delay_peak = 25,  .hydralisk_delay_peak = 45,
           .ultralisk_delay_peak = 0,
           .stage_reward_scrap = 200 },
 
-        // Etapa 5 (Min 8:00 - 10:00): Marea final! Zerg base=25f + Scourge base=35f + Hydra base=80f; peak: Zerg=6f, Scourge=15f, Hydra=25f, Ultra=450f, recompensa=500
+        // Etapa 5 (Min 8:00 - 10:00): Marea final! Zerg base=25f + Scourge base=35f + Hydra base=80f; peak: Zerg=8f, Scourge=15f, Hydra=30f, Ultra=450f, recompensa=500
         { .zergling_delay_base = 25,  .scourge_delay_base = 35,  .hydralisk_delay_base = 80,
-          .zergling_delay_peak = 6,   .scourge_delay_peak = 15,  .hydralisk_delay_peak = 25,
+          .zergling_delay_peak = 8,   .scourge_delay_peak = 15,  .hydralisk_delay_peak = 30,
           .ultralisk_delay_peak = 450,
           .stage_reward_scrap = 500 },
     },
@@ -100,7 +100,7 @@ static const GameBalanceConfig s_default_balance = {
     .bunker_start_hp = 100,
     .conveyor_reload_interval = { 9999, 60, 25, 12, 6 },
     .range_upgrade_costs = { 20, 50, 110, 220, 0 },
-    .magic = 0x544F5734 // "TOW4"
+    .magic = 0x544F5735 // "TOW5"
 };
 
 static int s_fat_available = 0;
@@ -129,7 +129,7 @@ void balance_config_load(void) {
         if (n == sizeof(GameBalanceConfig)) {
             GameBalanceConfig loaded;
             memcpy(&loaded, raw, sizeof(loaded));
-            if (loaded.magic == 0x544F5734) {
+            if (loaded.magic == 0x544F5735) {
                 memcpy(&g_balance, &loaded, sizeof(g_balance));
             }
         }
