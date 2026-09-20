@@ -23,6 +23,7 @@ Este documento se actualiza con cada petición de la sesión.
 | 3 | Recordar el formato `walkthrough.md` por sesión, actualizado en cada petición | Preferencia guardada + este documento |
 | 4 | Que el walkthrough salga pre-renderizado en un visor aparte | Rutas relativas + `walkthrough.html` autocontenido |
 | 5 | Commitear a `main`, mergear y limpiar | Merge fast-forward a `main` (`27b8a58`), rama `feat/no-range` borrada, temporales de sesión eliminados |
+| 6 | `git push` y subir la ROM a la DS | `origin/main` al día (`bfd877a`) y `towerdefense.nds` subido al FTP de la consola (PASS) |
 
 ---
 
