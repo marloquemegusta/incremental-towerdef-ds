@@ -9,10 +9,11 @@ targeteable, tanto por auto-apuntado como por stylus.
 
 Este documento se actualiza con cada petición de la sesión.
 
-> **Cómo ver las imágenes:** las rutas son relativas a este archivo
-> (`artifacts/walkthrough/...`), así que basta con abrir el `.md` en un visor de markdown desde
-> la raíz del repo. Si prefieres un visor único sin dependencias de ruta, usa
-> [`walkthrough.html`](walkthrough.html), que lleva toda la media embebida en base64.
+> **Nota (reubicado):** este walkthrough se movió desde la raíz del repo a
+> `walkthroughs/00-no-range/` al adoptar la convención de una carpeta por sesión. Sus imágenes
+> originales vivían en `artifacts/walkthrough/` (carpeta no versionada y ya purgada), así que los
+> enlaces `artifacts/...` de este documento pueden estar rotos. Para ver la sesión completa con
+> toda la media embebida, usa [`walkthrough.html`](walkthrough.html), que es autocontenido (base64).
 
 ### Peticiones de esta sesión
 
