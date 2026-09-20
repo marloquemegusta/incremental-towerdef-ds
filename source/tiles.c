@@ -1,5 +1,6 @@
 #include "tiles.h"
 #include "enemy_data.h"
+#include "scrabling_tiles.h"
 
 // Color Palette Shading Ramps
 #define C_BLACK       (RGB15(0, 0, 0) | BIT(15))
@@ -182,38 +183,40 @@ static uint16_t s_ground_bottom_cache[SCREEN_W * SCREEN_H] __attribute__((aligne
 static void generate_ground_to_buffer(uint16_t *buffer, int y_offset) {
     if (!buffer) return;
 
-    for (int ty = 0; ty < MAP_ROWS; ty++) {
-        int global_ty = ty + (y_offset / TILE_SIZE);
-        for (int tx = 0; tx < MAP_COLS; tx++) {
-            int tid = 0;
-            // Rich canonical Sector 1 composition:
-            // 70% pristine concrete slabs, 10% grass in joints, 8% cracks, 6% oil stains,
-            // 4% drainage sumideros, and tactical sandbags placed near corners
-            uint32_t n = hash_noise(tx, global_ty, 777);
+    // Fill background with base dark stone tone
+    uint16_t bg_col = RGB15(6, 7, 8) | BIT(15);
+    for (int i = 0; i < SCREEN_W * SCREEN_H; i++) {
+        buffer[i] = bg_col;
+    }
 
-            if ((tx == 2 && (global_ty == 3 || global_ty == 15)) ||
-                (tx == 13 && (global_ty == 4 || global_ty == 16))) {
-                tid = 5; // Sandbag fortification
-            } else if (n > 238) {
-                tid = 1; // Grass tuft
-            } else if (n < 25) {
-                tid = 2; // Structural crack
-            } else if (n >= 50 && n <= 65) {
-                tid = 3; // Oil stain
-            } else if (n >= 180 && n <= 190) {
-                tid = 4; // Storm drain grate
-            } else {
-                tid = 0; // Base concrete slab
-            }
+    // Render 32x16 isometric diamond tiles interlocking seamlessly
+    int start_row = -2;
+    int end_row = (SCREEN_H / 8) + 2; // 26 rows
+    int start_col = -2;
+    int end_col = (SCREEN_W / 32) + 2; // 10 cols
 
-            const uint16_t *src = s_tiles[tid];
-            int px = tx * TILE_SIZE;
-            int py = ty * TILE_SIZE;
+    for (int row = start_row; row < end_row; row++) {
+        int py = row * 8 - 16;
+        int x_offset = (row & 1) ? 16 : 0;
+        int global_row = row + (y_offset / 8);
 
-            for (int y = 0; y < TILE_SIZE; y++) {
-                uint16_t *dst = &buffer[(py + y) * SCREEN_W + px];
-                for (int x = 0; x < TILE_SIZE; x++) {
-                    dst[x] = src[y * TILE_SIZE + x];
+        for (int col = start_col; col < end_col; col++) {
+            int px = col * 32 + x_offset;
+            uint32_t n = hash_noise(col, global_row, 31415);
+            // Mix: 45% cobblestone (0), 35% irregular stones (1), 20% flat flagstone (2)
+            int t_idx = (n < 90) ? 2 : ((n < 170) ? 1 : 0);
+            const uint16_t (*src)[32] = g_scrabling_tiles[t_idx];
+
+            for (int dy = 0; dy < 32; dy++) {
+                int y = py + dy;
+                if (y < 0 || y >= SCREEN_H) continue;
+                for (int dx = 0; dx < 32; dx++) {
+                    int x = px + dx;
+                    if (x < 0 || x >= SCREEN_W) continue;
+                    uint16_t c = src[dy][dx];
+                    if (c & BIT(15)) {
+                        buffer[y * SCREEN_W + x] = c;
+                    }
                 }
             }
         }
@@ -545,21 +548,29 @@ void tiles_init(void) {
     generate_ground_to_buffer(s_ground_top_cache, 0);
     generate_ground_to_buffer(s_ground_bottom_cache, 192);
 
-    // Pre-bake the military hazard range line across road (X: 32..224, Y: 64)
+    // Pre-bake organic brushed dashed yellow road line across battlefield (X: 16..240, Y: 64)
     int range_y = 64;
-    for (int x = 32; x < 224; x++) {
-        int is_amber = ((x / 4) % 2 == 0);
-        uint16_t stripe_col = is_amber ? (RGB15(31, 22, 2) | BIT(15)) : (RGB15(6, 6, 8) | BIT(15));
-        uint16_t shadow_col = RGB15(2, 2, 4) | BIT(15);
-        uint16_t hi_col     = is_amber ? (RGB15(31, 28, 12) | BIT(15)) : (RGB15(12, 14, 16) | BIT(15));
-
-        s_ground_bottom_cache[(range_y - 1) * SCREEN_W + x] = shadow_col;
-        s_ground_bottom_cache[range_y * SCREEN_W + x]       = hi_col;
-        s_ground_bottom_cache[(range_y + 1) * SCREEN_W + x] = stripe_col;
-
-        if ((x % 16) == 0) {
-            s_ground_bottom_cache[(range_y + 2) * SCREEN_W + x] = RGB15(31, 20, 0) | BIT(15);
-            s_ground_bottom_cache[(range_y + 3) * SCREEN_W + x] = RGB15(24, 14, 0) | BIT(15);
+    for (int x = 16; x < 240; x++) {
+        int pos = (x - 16) % 22;
+        int dash_idx = (x - 16) / 22;
+        int dash_len = 12 + ((dash_idx * 5) % 4) - 1; // Organic variation: 11..14 px
+        
+        if (pos < dash_len) {
+            uint32_t n = hash_noise(x, range_y, 777);
+            // Brush extremity fraying / bristle gaps
+            if ((pos == 0 || pos == dash_len - 1) && (n < 75)) continue;
+            
+            uint16_t paint_hi  = (n > 190) ? (RGB15(31, 28, 8) | BIT(15)) : (RGB15(30, 24, 2) | BIT(15));
+            uint16_t paint_mid = (n < 70)  ? (RGB15(23, 17, 0) | BIT(15)) : (RGB15(27, 21, 2) | BIT(15));
+            
+            // Paint over stone floor with subtle stone weathering
+            if (n > 30) {
+                s_ground_bottom_cache[range_y * SCREEN_W + x]       = paint_hi;
+                s_ground_bottom_cache[(range_y + 1) * SCREEN_W + x] = paint_mid;
+                if (n > 230 && pos > 1 && pos < dash_len - 2) {
+                    s_ground_bottom_cache[(range_y + 2) * SCREEN_W + x] = RGB15(20, 15, 0) | BIT(15);
+                }
+            }
         }
     }
 
@@ -600,21 +611,13 @@ void tiles_init(void) {
         for (int x = 0; x < SCREEN_W; x++) {
             uint16_t c16 = s_ground_top_cache[y * SCREEN_W + x];
             uint8_t idx = TOP_C_CONC_BASE;
-            if (c16 == C_CONC_LIGHT) idx = TOP_C_CONC_LIGHT;
-            else if (c16 == C_CONC_DARK) idx = TOP_C_CONC_DARK;
-            else if (c16 == C_CONC_BEVEL) idx = TOP_C_CONC_BEVEL;
-            else if (c16 == C_JOINT) idx = TOP_C_JOINT;
-            else if (c16 == C_GRASS_DEEP) idx = TOP_C_GRASS_DEEP;
-            else if (c16 == C_GRASS_MID) idx = TOP_C_GRASS_MID;
-            else if (c16 == C_GRASS_TALL) idx = TOP_C_GRASS_TALL;
-            else if (c16 == C_OIL_DARK) idx = TOP_C_OIL_DARK;
-            else if (c16 == C_OIL_MID) idx = TOP_C_OIL_MID;
-            else if (c16 == C_CRACK_LINE) idx = TOP_C_CRACK_LINE;
-            else if (c16 == C_BAG_DARK) idx = TOP_C_BAG_DARK;
-            else if (c16 == C_BAG_MID) idx = TOP_C_BAG_MID;
-            else if (c16 == C_BAG_HI) idx = TOP_C_BAG_HI;
-            else if (c16 == C_DRAIN_GRATE) idx = TOP_C_DRAIN_GRATE;
-            else if (c16 == C_DRAIN_HOLE) idx = TOP_C_DRAIN_HOLE;
+            if (c16 == 0x9462) idx = TOP_C_OIL_DARK;
+            else if (c16 == 0x98A4) idx = TOP_C_CONC_DARK;
+            else if (c16 == 0x9C82) idx = TOP_C_DRAIN_HOLE;
+            else if (c16 == 0xA927) idx = TOP_C_JOINT;
+            else if (c16 == 0xB9CA) idx = TOP_C_CONC_BASE;
+            else if (c16 == 0xCA50) idx = TOP_C_CONC_LIGHT;
+            else if (c16 == 0xDAD5) idx = TOP_C_CONC_BEVEL;
             s_ground_top_cache8[y * SCREEN_W + x] = idx;
         }
     }

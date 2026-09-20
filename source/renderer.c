@@ -99,22 +99,13 @@ void renderer_init(void) {
         BG_PALETTE_SUB[i] = g_enemy_palette[i];
     }
     BG_PALETTE_SUB[TOP_COLOR_TRANSPARENT]    = 0;
-    BG_PALETTE_SUB[TOP_C_CONC_BASE]          = RGB15(8, 8, 10);
-    BG_PALETTE_SUB[TOP_C_CONC_LIGHT]         = RGB15(10, 11, 12);
-    BG_PALETTE_SUB[TOP_C_CONC_DARK]          = RGB15(5, 6, 7);
-    BG_PALETTE_SUB[TOP_C_CONC_BEVEL]         = RGB15(13, 14, 16);
-    BG_PALETTE_SUB[TOP_C_JOINT]              = RGB15(4, 4, 5);
-    BG_PALETTE_SUB[TOP_C_GRASS_DEEP]         = RGB15(4, 7, 4);
-    BG_PALETTE_SUB[TOP_C_GRASS_MID]          = RGB15(8, 12, 6);
-    BG_PALETTE_SUB[TOP_C_GRASS_TALL]         = RGB15(11, 17, 7);
-    BG_PALETTE_SUB[TOP_C_OIL_DARK]           = RGB15(2, 2, 3);
-    BG_PALETTE_SUB[TOP_C_OIL_MID]            = RGB15(4, 4, 4);
-    BG_PALETTE_SUB[TOP_C_CRACK_LINE]         = RGB15(2, 2, 3);
-    BG_PALETTE_SUB[TOP_C_BAG_DARK]           = RGB15(7, 6, 4);
-    BG_PALETTE_SUB[TOP_C_BAG_MID]            = RGB15(14, 12, 8);
-    BG_PALETTE_SUB[TOP_C_BAG_HI]             = RGB15(20, 17, 12);
-    BG_PALETTE_SUB[TOP_C_DRAIN_GRATE]        = RGB15(3, 3, 3);
-    BG_PALETTE_SUB[TOP_C_DRAIN_HOLE]         = RGB15(0, 0, 0);
+    BG_PALETTE_SUB[TOP_C_CONC_DARK]          = RGB15(4, 5, 6);
+    BG_PALETTE_SUB[TOP_C_JOINT]              = RGB15(7, 9, 10);
+    BG_PALETTE_SUB[TOP_C_CONC_BASE]          = RGB15(10, 14, 14);
+    BG_PALETTE_SUB[TOP_C_CONC_LIGHT]         = RGB15(16, 18, 18);
+    BG_PALETTE_SUB[TOP_C_CONC_BEVEL]         = RGB15(21, 22, 22);
+    BG_PALETTE_SUB[TOP_C_OIL_DARK]           = RGB15(2, 3, 5);
+    BG_PALETTE_SUB[TOP_C_DRAIN_HOLE]         = RGB15(2, 4, 7);
 
     BG_PALETTE_SUB[TOP_COLOR_BLACK]          = RGB15(0, 0, 0);
     BG_PALETTE_SUB[TOP_COLOR_WHITE]          = RGB15(31, 31, 31);
