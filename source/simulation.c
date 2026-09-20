@@ -1635,9 +1635,13 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     if (is_touch && touch.px > 0 && touch.py >= 14 && touch.py < g_wall.screen_y) {
         int can_trigger = touch_press || g_game.upgrades.continuous_fire;
 
-        // Find enemy touched within tolerance (radius ~22px)
+        // The logical position is the sprite anchor, not its full visible bounds.
+        // Use a padded rectangular touch affordance matching the enemy footprint;
+        // this also makes the visible corners selectable.
+        const int enemy_touch_half_width = 18;
+        const int enemy_touch_half_height = 22;
         int hit_enemy = -1;
-        int best_dsq = 22 * 22;
+        int best_dsq = 0x7fffffff;
         for (int e = 0; e < MAX_ENEMIES; e++) {
             if (!g_enemies[e].active) continue;
             int gy = FROM_FP(g_enemies[e].y);
@@ -1651,8 +1655,12 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
             int gx = FROM_FP(g_enemies[e].x);
             int ddx = touch.px - gx;
             int ddy = touch.py - local_y;
+            if (ddx < -enemy_touch_half_width || ddx > enemy_touch_half_width ||
+                ddy < -enemy_touch_half_height || ddy > enemy_touch_half_height) {
+                continue;
+            }
             int dsq = ddx * ddx + ddy * ddy;
-            if (dsq <= best_dsq) {
+            if (dsq < best_dsq) {
                 best_dsq = dsq;
                 hit_enemy = e;
             }
