@@ -748,10 +748,6 @@ void wall_update(void) {
         }
 
         if (hit_enemy == 1 && hit_e_idx >= 0) {
-            // Kinetic impact sparks
-            for (int k = 0; k < 3; k++) {
-                game_add_splatter_ex(hit_x, hit_y, COLOR_BOLTER_TRACER, 0, 8);
-            }
             if (g_enemies[hit_e_idx].incoming_damage >= (uint64_t)g_bullet_darts[i].damage) {
                 g_enemies[hit_e_idx].incoming_damage -= g_bullet_darts[i].damage;
             } else {
@@ -1636,10 +1632,6 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
         int can_trigger = touch_press || g_game.upgrades.continuous_fire;
 
         // The logical position is the sprite anchor, not its full visible bounds.
-        // Use a padded rectangular touch affordance matching the enemy footprint;
-        // this also makes the visible corners selectable.
-        const int enemy_touch_half_width = 18;
-        const int enemy_touch_half_height = 22;
         int hit_enemy = -1;
         int best_dsq = 0x7fffffff;
         for (int e = 0; e < MAX_ENEMIES; e++) {
@@ -1652,13 +1644,52 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
             // Anti-overkill virtual health: must have positive effective health remaining!
             if (g_enemies[e].hp <= g_enemies[e].incoming_damage) continue;
 
-            int gx = FROM_FP(g_enemies[e].x);
-            int ddx = touch.px - gx;
-            int ddy = touch.py - local_y;
-            if (ddx < -enemy_touch_half_width || ddx > enemy_touch_half_width ||
-                ddy < -enemy_touch_half_height || ddy > enemy_touch_half_height) {
+            int v = g_enemies[e].variant;
+            if (v < 0 || v >= ENEMY_VARIANT_COUNT) continue;
+            const EnemyTypeDef *type = &g_enemy_types[v];
+
+            int d = g_enemies[e].dir & 7;
+            int source_dir = d - 2;
+            if (source_dir < 0) source_dir = 0;
+            if (source_dir > 4) source_dir = 4;
+
+            int f = g_enemies[e].anim_frame;
+            const EnemyFrameDef *fd = 0;
+            if (g_enemies[e].biting_target >= 0 && type->attack_frame_count > 0) {
+                if (f >= type->attack_frame_count) f %= type->attack_frame_count;
+                fd = &type->attack_frames[source_dir][f];
+            } else if (type->frame_count > 0) {
+                if (f >= type->frame_count) f %= type->frame_count;
+                fd = &type->frames[source_dir][f];
+            }
+
+            int cy = local_y;
+            if (type->is_flying && type->flight_altitude > 0) {
+                cy -= type->flight_altitude;
+            }
+
+            int min_x, max_x, min_y, max_y;
+            const int STYLUS_PAD = 4;
+            if (fd && fd->w > 0 && fd->h > 0) {
+                min_x = FROM_FP(g_enemies[e].x) + fd->offset_x - STYLUS_PAD;
+                max_x = FROM_FP(g_enemies[e].x) + fd->offset_x + fd->w + STYLUS_PAD;
+                min_y = cy + fd->offset_y - STYLUS_PAD;
+                max_y = cy + fd->offset_y + fd->h + STYLUS_PAD;
+            } else {
+                min_x = FROM_FP(g_enemies[e].x) - 16;
+                max_x = FROM_FP(g_enemies[e].x) + 16;
+                min_y = cy - 16;
+                max_y = cy + 16;
+            }
+
+            if (touch.px < min_x || touch.px > max_x ||
+                touch.py < min_y || touch.py > max_y) {
                 continue;
             }
+
+            int gx = FROM_FP(g_enemies[e].x);
+            int ddx = touch.px - gx;
+            int ddy = touch.py - cy;
             int dsq = ddx * ddx + ddy * ddy;
             if (dsq < best_dsq) {
                 best_dsq = dsq;

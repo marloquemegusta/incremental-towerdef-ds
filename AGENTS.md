@@ -62,4 +62,10 @@
 6. **Regla Canónica de Captura y Demostración de Disparo en GIFs:**
    - Para generar animaciones GIF de torretas disparando, se debe configurar invariablemente cargador masivo o infinito (`ammo = 9999`), la mejora de auto-apuntado activa (`auto_target = 1`), cadencia rápida (`fire_interval = 3`) y objetivos de entrenamiento o enemigos pesados en rango dentro del campo de tiro.
    - Esto garantiza que la batería de torretas descargue un torrente ininterrumpido de proyectiles, retroceso hidráulico visible y lluvia continua de casquillos de artillería pesada en el búnker sin detenerse por recarga ni por eliminación prematura de los objetivos.
+7. **Convención Canónica de Walkthroughs por Sesión (Resumen Acumulativo):**
+   - El resumen de sesión (`walkthrough.md`) **nunca** se deja suelto en la raíz del repo. Se guarda en `walkthroughs/<nombre-sesion>/walkthrough.md`, dentro de una carpeta por sesión, con sus assets en `walkthroughs/<nombre-sesion>/assets/`. El nombre de la carpeta coincide con la rama `feat/<feature>`.
+   - Estos archivos **sí se versionan** (a diferencia de `artifacts/`, que está en `.gitignore`); al mergear la rama `feat/<feature>` a `main` los resúmenes se acumulan como histórico de sesiones.
+   - Las imágenes y anexos se referencian con rutas relativas al propio `.md` (p. ej. `assets/foo.png`).
+   - `walkthroughs/README.md` es el índice acumulativo de sesiones; cada sesión nueva añade su fila.
+   - La regla 5 (incrustación para la UI de Antigravity) sigue aplicando al renderizar allí: en ese caso la media se copia a `<appDataDir>\brain\<conv_id>\` con ruta absoluta POSIX.
 
