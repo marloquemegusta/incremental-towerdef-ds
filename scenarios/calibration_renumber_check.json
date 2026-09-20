@@ -1,0 +1,47 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 30, "capture": "01_boot_prep"},
+
+    {"tap": {"x": 120, "y": 170}, "frames": 6},
+    {"release": true, "frames": 20, "capture": "02_calibration_page0"},
+
+    {"button_down": "Y", "frames": 4},
+    {"button_up": "Y", "frames": 6},
+    {"button_down": "Y", "frames": 4},
+    {"button_up": "Y", "frames": 10, "capture": "03_page2_top"},
+
+    {"button_down": "UP", "frames": 4},
+    {"button_up": "UP", "frames": 10, "capture": "04_page2_last_row"},
+
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 4},
+    {"button_down": "DOWN", "frames": 4}, {"button_up": "DOWN", "frames": 10, "capture": "05_page2_rows10_19"},
+
+    {"button_down": "Y", "frames": 4},
+    {"button_up": "Y", "frames": 10, "capture": "06_page3_top"},
+
+    {"button_down": "UP", "frames": 4},
+    {"button_up": "UP", "frames": 10, "capture": "07_page3_last_rows"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_boot_prep",
+      "to": "02_calibration_page0",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {"from": "01_boot_prep", "to": "02_calibration_page0", "min_changed_pixels": 100},
+      {"from": "03_page2_top", "to": "05_page2_rows10_19", "min_changed_pixels": 100},
+      {"from": "06_page3_top", "to": "07_page3_last_rows", "min_changed_pixels": 100}
+    ]
+  }
+}

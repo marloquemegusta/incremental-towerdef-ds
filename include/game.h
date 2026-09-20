@@ -18,7 +18,6 @@
 #define MAX_TURRETS 4
 #define MAX_CASINGS 256
 #define MAX_BULLET_DARTS 64
-#define WALL_TURRET_RANGE 96
 
 // Fixed point math: Q8 (256 = 1.0)
 #define FP_SHIFT 8
@@ -210,8 +209,8 @@ typedef struct {
     int fire_cooldown;   // Global wall battery cadence throttle
     int fire_interval;   // Fire rate (frames between rounds, default 12 for 1 turret)
     int damage;          // Damage per bullet impact (default 1)
-    int range;           // Effective ballistic radius in px (default 80, reach to Y=64)
-    int range_line_y;    // Straight horizontal range perimeter line (default 64)
+    int range;           // Dormant: derived from range_line_y, unused
+    int range_line_y;    // Dormant defensive fire line; 0 = whole bottom battlefield targetable
     int locked_enemy_idx;// Player-designated priority target (-1 if none)
     int conveyor_timer;  // Auto-feed cadence counter
 } WallPlatform;
@@ -242,13 +241,12 @@ typedef struct {
     int enemy_hp;         // 1..99999
     int enemy_speed;      // 0..120 px/s (0 = frozen dummy)
     int turret_firerate;  // 1..30 frames fire interval
-    int turret_range;     // 30..200 px radius
     int turret_damage;    // 1..999 damage per bullet
     int turret_infinite_ammo; // 1 = infinite ammo
     int run_sim;          // 0 = paused/step, 1 = live continuous
     int separation_enabled;
     int profiler_compact;
-    int edit_row;         // 0..5 for D-Pad parameter tuning
+    int edit_row;         // 0..4 for D-Pad parameter tuning
     int spawn_count;
     int last_keys_down;   // Diagnostic input trace for the sandbox profiler
     int last_keys_held;
@@ -281,12 +279,12 @@ typedef struct {
     uint64_t upgrade_costs[7][5];
     int turret_damage[5];
     int turret_fire_interval[5];
-    int turret_range[5];
+    int turret_range[5];             // Dormant defensive fire line (Y); 0 = full bottom battlefield
     int turret_magazine[5];
     int bunker_start_hp;
     int conveyor_reload_interval[5];
-    uint64_t range_upgrade_costs[5];
-    uint32_t magic;                  // 0x544F5735 ("TOW5")
+    uint64_t range_upgrade_costs[5]; // Dormant: RANGE upgrade retired
+    uint32_t magic;                  // 0x544F5736 ("TOW6")
 } GameBalanceConfig;
 
 extern GameBalanceConfig g_balance;
@@ -300,7 +298,7 @@ typedef struct {
     // Branch A: Battery Stats
     int caliber_lvl;     // +Damage per bullet (Base 2 -> 3 -> 4 -> 6 -> 8)
     int firerate_lvl;    // +Cadence (Interval 18 -> 14 -> 10 -> 6)
-    int range_lvl;       // +Range radius (65 -> 80 -> 100 -> 125)
+    int range_lvl;       // Dormant: RANGE upgrade retired, always 0
     int mag_size_lvl;    // +Max ammo capacity (20 -> 35 -> 50 -> 80)
 
     // Branch B: Economy
@@ -447,7 +445,6 @@ void renderer_draw_text(int x, int y, const char *str, uint16_t color);
 
 void renderer_draw_battlefield_bottom(void);
 void renderer_draw_wall(void);
-void renderer_draw_range_perimeter(void);
 void renderer_draw_battlefield_top(void);
 void renderer_draw_turret(const Turret *t, int is_selected);
 void renderer_draw_enemies_bottom(void);

@@ -145,7 +145,6 @@ Mejora                   Nivel 1    Nivel 2    Nivel 3    Nivel 4    Efecto Prin
 4: Conveyor (Auto-ammo)    25         50        120        250       Recarga pasiva de munición
 5: Auto-Fire               20         80          -          -       Lv1 = Gatillo Continuo (Hold), Lv2 = Auto-Target
 6: Torretas Extra         150        400          -          -       Desbloqueo de Sockets laterales
-7: Rango                   20         45         90        180       Línea de intercepción avanzada
 ```
 
 ---

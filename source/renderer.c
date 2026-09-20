@@ -543,30 +543,6 @@ void renderer_draw_wall(void) {
     }
 }
 
-void renderer_draw_range_perimeter(void) {
-    int y = g_wall.range_line_y; // Straight horizontal line parallel to wall (default Y=64)
-    if (y < 20 || y + 3 >= SCREEN_H || y >= g_wall.screen_y) return;
-
-    // High-visibility military hazard range line across road (X: 32..224)
-    for (int x = 32; x < 224; x++) {
-        int is_amber = ((x / 4) % 2 == 0);
-        uint16_t stripe_col = is_amber ? (RGB15(31, 22, 2) | BIT(15)) : (RGB15(6, 6, 8) | BIT(15));
-        uint16_t shadow_col = RGB15(2, 2, 4) | BIT(15);
-        uint16_t hi_col     = is_amber ? (RGB15(31, 28, 12) | BIT(15)) : (RGB15(12, 14, 16) | BIT(15));
-
-        // 2 px thick hazard line with top shadow
-        g_backbuffer[(y - 1) * SCREEN_W + x] = shadow_col;
-        g_backbuffer[y * SCREEN_W + x]       = hi_col;
-        g_backbuffer[(y + 1) * SCREEN_W + x] = stripe_col;
-
-        // Inward hazard tick marks every 16 px
-        if ((x % 16) == 0) {
-            g_backbuffer[(y + 2) * SCREEN_W + x] = RGB15(31, 20, 0) | BIT(15);
-            g_backbuffer[(y + 3) * SCREEN_W + x] = RGB15(24, 14, 0) | BIT(15);
-        }
-    }
-}
-
 void renderer_draw_battlefield_bottom(void) {
     // 60 FPS Deduplicated Dirty Blocks (8x8):
     // In VRAM double-buffering, restore the exact dirty blocks marked when this buffer was drawn 2 frames ago.
@@ -1016,18 +992,17 @@ void renderer_draw_ui_upgrades(void) {
     static const struct {
         int x, y, w, h;
         const char *title;
-    } s_card_pos[8] = {
+    } s_card_pos[7] = {
         { 10, 24, 110, 32, "CALIBER" },
         { 130, 24, 110, 32, "FIRE RATE" },
         { 10, 62, 110, 32, "MAG SIZE" },
         { 130, 62, 110, 32, "BIO HARVEST" },
         { 10, 100, 110, 32, "AUTO SUPPLY" },
         { 130, 100, 110, 32, "AUTO TARGET" },
-        { 10, 138, 110, 32, "EXTRA TURRETS" },
-        { 130, 138, 110, 32, "RANGE" }
+        { 10, 138, 110, 32, "EXTRA TURRETS" }
     };
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 7; i++) {
         int x = s_card_pos[i].x;
         int y = s_card_pos[i].y;
         int w = s_card_pos[i].w;
@@ -1108,13 +1083,6 @@ void renderer_draw_ui_upgrades(void) {
                 snprintf(buf, sizeof(buf), "+1  %s$", cost_str);
                 renderer_draw_text(x + 4, y + 16, buf, cost_col);
             }
-        } else if (i == 7) {
-            int lv = g_game.upgrades.range_lvl;
-            snprintf(buf, sizeof(buf), "RANGE LV%d", lv);
-            renderer_draw_text(x + 4, y + 4, buf, text_col);
-            if (lv < 4) snprintf(buf, sizeof(buf), "%d>%d %s$", g_balance.turret_range[lv], g_balance.turret_range[lv + 1], cost_str);
-            else snprintf(buf, sizeof(buf), "MAXED");
-            renderer_draw_text(x + 4, y + 16, buf, cost_col);
         }
     }
 
@@ -1147,7 +1115,7 @@ void renderer_draw_ui_calibration(void) {
         snprintf(buf, sizeof(buf), "PAGE %d/4", g_game.calib_page + 1);
         renderer_draw_text(190, 18, buf, COLOR_AMBER);
         int first = (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 26);
+        int last = (g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 21 : 22);
         static const char *enemy_labels[40] = {
             "SCOURGE HP", "SCOURGE SPD", "SCOURGE SCRAP", "SCOURGE DMG", "SCOURGE FRM",
             "ZERGLING HP", "ZERGLING SPD", "ZERGLING SCRAP", "ZERGLING DMG", "ZERGLING FRM",
@@ -1158,23 +1126,21 @@ void renderer_draw_ui_calibration(void) {
             "GUARDIAN HP", "GUARDIAN SPD", "GUARDIAN SCRAP", "GUARDIAN DMG", "GUARDIAN FRM",
             "ULTRA HP", "ULTRA SPD", "ULTRA SCRAP", "ULTRA DMG", "ULTRA FRM"
         };
-        static const char *base_labels[26] = {
+        static const char *base_labels[21] = {
             "BUNKER START HP",
             "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4",
             "CADENCE LV0 (FRM)", "CADENCE LV1 (FRM)", "CADENCE LV2 (FRM)", "CADENCE LV3 (FRM)", "CADENCE LV4 (FRM)",
-            "RANGE LV0 (Y-LINE)", "RANGE LV1 (Y-LINE)", "RANGE LV2 (Y-LINE)", "RANGE LV3 (Y-LINE)", "RANGE LV4 (Y-LINE)",
             "CONVEYOR LV0 (FRM)", "CONVEYOR LV1 (FRM)", "CONVEYOR LV2 (FRM)", "CONVEYOR LV3 (FRM)", "CONVEYOR LV4 (FRM)",
             "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4"
         };
-        static const char *cost_labels[26] = {
+        static const char *cost_labels[22] = {
             "CALIBER LV1 COST", "CALIBER LV2 COST", "CALIBER LV3 COST", "CALIBER LV4 COST",
             "CADENCE LV1 COST", "CADENCE LV2 COST", "CADENCE LV3 COST", "CADENCE LV4 COST",
             "MAGAZINE LV1 COST", "MAGAZINE LV2 COST", "MAGAZINE LV3 COST", "MAGAZINE LV4 COST",
             "BIO HARVEST LV1", "BIO HARVEST LV2",
             "AUTO SUPPLY LV1", "AUTO SUPPLY LV2", "AUTO SUPPLY LV3", "AUTO SUPPLY LV4",
             "HOLD FIRE COST", "AUTO TARGET COST",
-            "SOCKET 2 (ROF>=2)", "SOCKET 3 (ROF>=4)",
-            "RANGE LV1 COST", "RANGE LV2 COST", "RANGE LV3 COST", "RANGE LV4 COST"
+            "SOCKET 2 (ROF>=2)", "SOCKET 3 (ROF>=4)"
         };
         for (int n = 0; n < 10 && first + n < last; n++) {
             int r = first + n, val = 0;
@@ -1186,9 +1152,8 @@ void renderer_draw_ui_calibration(void) {
                 if (r == 0) val = g_balance.bunker_start_hp;
                 else if (r <= 5) val = g_balance.turret_damage[r - 1];
                 else if (r <= 10) val = g_balance.turret_fire_interval[r - 6];
-                else if (r <= 15) val = g_balance.turret_range[r - 11];
-                else if (r <= 20) val = g_balance.conveyor_reload_interval[r - 16];
-                else val = g_balance.turret_magazine[r - 21];
+                else if (r <= 15) val = g_balance.conveyor_reload_interval[r - 11];
+                else val = g_balance.turret_magazine[r - 16];
             } else {
                 if (r >= 0 && r <= 3) val = (int)g_balance.upgrade_costs[0][r];
                 else if (r >= 4 && r <= 7) val = (int)g_balance.upgrade_costs[1][r - 4];
@@ -1198,7 +1163,6 @@ void renderer_draw_ui_calibration(void) {
                 else if (r == 18) val = (int)g_balance.upgrade_costs[5][0];
                 else if (r == 19) val = (int)g_balance.upgrade_costs[5][1];
                 else if (r >= 20 && r <= 21) val = (int)g_balance.upgrade_costs[6][r - 20];
-                else if (r >= 22 && r <= 25) val = (int)g_balance.range_upgrade_costs[r - 22];
             }
             int y = 32 + n * 13; int sel = (r == g_game.calib_row);
             renderer_fill_rect(6, y, 244, 12, sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL);
@@ -1329,10 +1293,10 @@ void renderer_draw_ui_sandbox(void) {
         return;
     }
 
-    // D-Pad adjustable parameters (Rows 0..5)
+    // D-Pad adjustable parameters (Rows 0..4)
     static const char *s_tier_names[8] = { "SCOURGE", "ZERGLING", "HYDRALISK", "MUTALISK", "DEFILER", "LURKER", "GUARDIAN", "ULTRALISK" };
-    const char *labels[6] = { "ENEMY SPECIES", "ENEMY HP", "ENEMY SPEED", "TURRET RANGE", "FIRE CADENCE", "BULLET DMG" };
-    for (int r = 0; r < 6; r++) {
+    const char *labels[5] = { "ENEMY SPECIES", "ENEMY HP", "ENEMY SPEED", "FIRE CADENCE", "BULLET DMG" };
+    for (int r = 0; r < 5; r++) {
         int y = 26 + r * 14;
         int is_sel = (g_game.sandbox.edit_row == r);
         uint16_t row_col = is_sel ? COLOR_WHITE : COLOR_IRON_LIGHT;
@@ -1360,14 +1324,11 @@ void renderer_draw_ui_sandbox(void) {
                 }
                 break;
             case 3:
-                snprintf(buf, sizeof(buf), "%d px", g_game.sandbox.turret_range);
-                break;
-            case 4:
                     int fire_rate = g_game.sandbox.turret_firerate;
                     if (fire_rate < 1) fire_rate = 1;
                     snprintf(buf, sizeof(buf), "%d f (%d/s)", fire_rate, 60 / fire_rate);
                 break;
-            case 5:
+            case 4:
                 snprintf(buf, sizeof(buf), "%d DMG", g_game.sandbox.turret_damage);
                 break;
         }
@@ -1404,13 +1365,6 @@ void renderer_draw_ui_sandbox(void) {
     top_draw_text(214, 180, buf, TOP_COLOR_AMBER);
 
     // --- BOTTOM SCREEN: Battlefield Overlay & Touch Control Bar ---
-    // Turret range circle preview
-    if (g_turrets[0].placed) {
-        int tx = g_turrets[0].x;
-        int ty = g_turrets[0].y;
-        renderer_draw_circle(tx, ty, g_game.sandbox.turret_range, COLOR_AMBER, 0);
-    }
-
     // Bottom control bar (y >= 148, h = 44)
     tiles_dirty_mark_rect(0, 148, SCREEN_W, 44, 1, s_bot_fb_idx);
     renderer_fill_rect(0, 148, SCREEN_W, 44, COLOR_BLACK);

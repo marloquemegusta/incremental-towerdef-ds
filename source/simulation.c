@@ -95,12 +95,13 @@ static const GameBalanceConfig s_default_balance = {
     },
     .turret_damage = { 1, 2, 3, 5, 8 },
     .turret_fire_interval = { 12, 10, 8, 5, 3 },
-    .turret_range = { 64, 48, 32, 16, 0 },
+    // 0 = no defensive range line: the whole bottom battlefield (local Y 0..143) is targetable
+    .turret_range = { 0, 0, 0, 0, 0 },
     .turret_magazine = { 10, 16, 25, 40, 60 },
     .bunker_start_hp = 100,
     .conveyor_reload_interval = { 9999, 60, 25, 12, 6 },
     .range_upgrade_costs = { 20, 50, 110, 220, 0 },
-    .magic = 0x544F5735 // "TOW5"
+    .magic = 0x544F5736 // "TOW6"
 };
 
 static int s_fat_available = 0;
@@ -129,7 +130,7 @@ void balance_config_load(void) {
         if (n == sizeof(GameBalanceConfig)) {
             GameBalanceConfig loaded;
             memcpy(&loaded, raw, sizeof(loaded));
-            if (loaded.magic == 0x544F5735) {
+            if (loaded.magic == 0x544F5736) {
                 memcpy(&g_balance, &loaded, sizeof(g_balance));
             }
         }
@@ -674,7 +675,8 @@ void wall_update(void) {
             g_wall.traverse_timer[s] = 0;
         }
 
-        // Auto-firing: respects straight horizontal range line (local Y >= range_line_y) and virtual health
+        // Auto-firing: the dormant range_line_y gate stays satisfied (0) so the entire
+        // bottom battlefield is engageable; virtual health still prevents overkill.
         if (auto_fire && g_wall.fire_cooldown == 0 && target_e >= 0) {
             int gy = FROM_FP(g_enemies[target_e].y);
             if (gy >= 192 && gy <= 192 + g_wall.screen_y) {
@@ -855,7 +857,6 @@ void game_init(void) {
     g_game.sandbox.enemy_hp = 10;
     g_game.sandbox.enemy_speed = 30;
     g_game.sandbox.turret_firerate = 10;
-    g_game.sandbox.turret_range = 80;
     g_game.sandbox.turret_damage = 5;
     g_game.sandbox.turret_infinite_ammo = 1;
     g_game.sandbox.run_sim = 1;
@@ -1297,15 +1298,9 @@ void game_update_simulation(void) {
             }
         }
 
-        // Dynamic range based on upgrade (or sandbox override)
-        if (g_game.mode == MODE_DEBUG_SANDBOX) {
-            tur->range = g_game.sandbox.turret_range;
-            if (g_game.sandbox.turret_infinite_ammo) {
-                tur->ammo = tur->max_ammo;
-            }
-        } else {
-            int r_lvl = g_game.upgrades.range_lvl;
-            tur->range = (r_lvl < 5) ? g_balance.turret_range[r_lvl] : g_balance.turret_range[4];
+        // Dead legacy turret path: no range concept. Sandbox still forces infinite ammo.
+        if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.turret_infinite_ammo) {
+            tur->ammo = tur->max_ammo;
         }
 
         // Target selection
@@ -1635,7 +1630,7 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     }
 
     // Combat interaction (Upper & Mid road: Y >= 14 && Y < 144)
-    // STRICT RULE: Only fires when touching a living enemy inside range!
+    // STRICT RULE: Only fires when touching a living enemy anywhere on the bottom screen!
     // Empty asphalt clicks DO NOT FIRE!
     if (is_touch && touch.px > 0 && touch.py >= 14 && touch.py < g_wall.screen_y) {
         int can_trigger = touch_press || g_game.upgrades.continuous_fire;
@@ -1648,7 +1643,7 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
             int gy = FROM_FP(g_enemies[e].y);
             if (gy < 192) continue; // Must be on bottom screen
             int local_y = gy - 192;
-            if (local_y < g_wall.range_line_y) continue; // Outside range perimeter (Y < 64)
+            if (local_y < g_wall.range_line_y) continue; // Dormant gate (0 = whole screen)
 
             // Anti-overkill virtual health: must have positive effective health remaining!
             if (g_enemies[e].hp <= g_enemies[e].incoming_damage) continue;
@@ -1738,10 +1733,6 @@ void game_handle_input_victory(touchPosition touch, int keys_down, int keys_held
 }
 
 uint64_t upgrade_get_cost(int idx) {
-    if (idx == 7) {
-        int level = g_game.upgrades.range_lvl;
-        return (level >= 0 && level < 4) ? g_balance.range_upgrade_costs[level] : 999999;
-    }
     if (idx >= 0 && idx < 7) {
         int auto_fire_lvl = 0;
         if (g_game.upgrades.continuous_fire) auto_fire_lvl = 1;
@@ -1800,7 +1791,6 @@ void upgrade_purchase(int idx) {
             g_game.upgrades.extra_turrets++;
             if (g_game.upgrades.extra_turrets > 2) g_game.upgrades.extra_turrets = 2;
             break;
-        case 7: g_game.upgrades.range_lvl++; break;
     }
 
     wall_apply_balance_and_upgrades();
@@ -1856,9 +1846,6 @@ void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_hel
         // Tab 7: Extra turrets (10, 138, 110, 32)
         else if (touch.px >= 10 && touch.px <= 120 && touch.py >= 136 && touch.py <= 172) {
             upgrade_purchase(6);
-        }
-        else if (touch.px >= 130 && touch.px <= 240 && touch.py >= 136 && touch.py <= 172) {
-            upgrade_purchase(7);
         }
     }
 }
@@ -1929,15 +1916,10 @@ static void calib_modify_val(int delta) {
             if (g_balance.turret_fire_interval[i] < 1) g_balance.turret_fire_interval[i] = 1;
         } else if (r >= 11 && r <= 15) {
             int i = r - 11;
-            g_balance.turret_range[i] += delta * 2;
-            if (g_balance.turret_range[i] < 0) g_balance.turret_range[i] = 0;
-            if (g_balance.turret_range[i] > 140) g_balance.turret_range[i] = 140;
-        } else if (r >= 16 && r <= 20) {
-            int i = r - 16;
             g_balance.conveyor_reload_interval[i] += delta;
             if (g_balance.conveyor_reload_interval[i] < 1) g_balance.conveyor_reload_interval[i] = 1;
-        } else if (r >= 21 && r <= 25) {
-            int i = r - 21;
+        } else if (r >= 16 && r <= 20) {
+            int i = r - 16;
             g_balance.turret_magazine[i] += delta;
             if (g_balance.turret_magazine[i] < 1) g_balance.turret_magazine[i] = 1;
         }
@@ -1963,8 +1945,6 @@ static void calib_modify_val(int delta) {
             val_ptr = (int64_t *)&g_balance.upgrade_costs[5][1];
         } else if (r >= 20 && r <= 21) {
             val_ptr = (int64_t *)&g_balance.upgrade_costs[6][r - 20];
-        } else if (r >= 22 && r <= 25) {
-            val_ptr = (int64_t *)&g_balance.range_upgrade_costs[r - 22];
         }
         if (val_ptr) {
             int64_t n = *val_ptr + delta;
@@ -2007,7 +1987,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row. Held buttons repeat, then accelerate.
-    int max_rows = (g_game.calib_page == 0) ? 8 : ((g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 26 : 26));
+    int max_rows = (g_game.calib_page == 0) ? 8 : ((g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 21 : 22));
     int nav_dir = 0;
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
@@ -2038,7 +2018,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
         int f = g_game.calib_row % 5;
         step = (f == 1) ? 2 : 1;
     } else if (g_game.calib_page == 2) {
-        step = (g_game.calib_row == 0) ? 10 : ((g_game.calib_row >= 11 && g_game.calib_row <= 15) ? 2 : 1);
+        step = (g_game.calib_row == 0) ? 10 : 1;
     } else if (g_game.calib_page == 3) {
         step = (g_game.calib_row >= 19 && g_game.calib_row <= 20) ? 50 : 10;
     }
@@ -2256,11 +2236,11 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
         return;
     }
 
-    // D-Pad UP / DOWN selects parameter row (0..5)
+    // D-Pad UP / DOWN selects parameter row (0..4)
     if (keys_down & KEY_UP) {
-        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 5) % 6;
+        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 4) % 5;
     } else if (keys_down & KEY_DOWN) {
-        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 1) % 6;
+        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 1) % 5;
     }
 
     // D-Pad LEFT / RIGHT adjusts selected parameter
@@ -2301,19 +2281,7 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
                 g_game.sandbox.enemy_speed = s_spd_steps[idx];
                 break;
             }
-            case 3: { // Turret Range
-                static const int s_rng_steps[] = { 40, 65, 80, 100, 125, 150, 200 };
-                int idx = 2;
-                for (int j = 0; j < 7; j++) {
-                    if (s_rng_steps[j] == g_game.sandbox.turret_range) { idx = j; break; }
-                }
-                idx += delta;
-                if (idx < 0) idx = 0;
-                if (idx > 6) idx = 6;
-                g_game.sandbox.turret_range = s_rng_steps[idx];
-                break;
-            }
-            case 4: { // Turret Fire Interval (cadence)
+            case 3: { // Turret Fire Interval (cadence)
                 static const int s_int_steps[] = { 1, 3, 5, 8, 12, 18, 25, 35 };
                 int idx = 4;
                 for (int j = 0; j < 8; j++) {
@@ -2325,7 +2293,7 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
                 g_game.sandbox.turret_firerate = s_int_steps[idx];
                 break;
             }
-            case 5: { // Turret Damage
+            case 4: { // Turret Damage
                 static const int s_dmg_steps[] = { 1, 2, 3, 5, 10, 20, 50, 100 };
                 int idx = 3;
                 for (int j = 0; j < 8; j++) {
