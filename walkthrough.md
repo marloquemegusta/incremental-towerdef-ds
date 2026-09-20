@@ -22,6 +22,7 @@ Este documento se actualiza con cada petición de la sesión.
 | 2 | Enseñar capturas que demuestren que funciona | Evidencia visual entregada (sección 1) |
 | 3 | Recordar el formato `walkthrough.md` por sesión, actualizado en cada petición | Preferencia guardada + este documento |
 | 4 | Que el walkthrough salga pre-renderizado en un visor aparte | Rutas relativas + `walkthrough.html` autocontenido |
+| 5 | Commitear a `main`, mergear y limpiar | Merge fast-forward a `main` (`27b8a58`), rama `feat/no-range` borrada, temporales de sesión eliminados |
 
 ---
 
