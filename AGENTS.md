@@ -24,6 +24,13 @@
 8. **Regla Canónica de Exclusividad Cromática Xenos:**
    - La gama púrpura/violeta/magenta (`RGB 115, 35, 155` a `RGB 240, 150, 255`) y el blanco hueso luminoso quedan **estrictamente reservados para el enjambre xenos**.
    - Queda estrictamente prohibido utilizar matices púrpuras en el escenario (suelo de metal, aceras, muros, conos o maquinaria del Mechanicus), garantizando un contraste visual inmediato y sin ambigüedades entre los enemigos y el entorno balístico.
+9. **Regla Canónica de Suelo Isométrico 2:1 y Assets Maestros de Escenario (Sector 1):**
+   - El suelo de combate de Sector 1 utiliza la proyección isométrica 2:1 (`dx=2, dy=1`) mediante tiles maestros de 32x32 px (`assets/tiles/sector1/master/tile_061_cobblestone_1x.png`, `tile_062_irregular_1x.png`, `tile_063_flagstone_1x.png`) generados por Scrabling.
+   - En el motor de C (`source/tiles.c`, `source/renderer.c`), se renderizan en modo bitmap / modo 5 paletizado con solapamiento *back-to-front* (paso vertical $Y=8$ px y horizontal $X=16$ px alternado).
+   - Queda estrictamente prohibido el uso de los antiguos tiles cenitales/ortogonales a 90° (archivados en `assets/tiles/sector1/archive/`).
+10. **Regla Canónica de la Línea de Fuego / Rango Defensivo ($Y=64$):**
+    - La línea de demarcación del rango balístico en $Y=64$ de la pantalla inferior es una franja discontinua de pintura vial amarilla trazada con textura orgánica de brocha y desgaste irregular directamente sobre el empedrado.
+    - No debe incluir respaldos metálicos, pestañas grises ni bases sólidas rectangulares que rompan la continuidad del empedrado.
 
 ## Protocolo de Sesiones Atómicas, Ramas y Worktrees
 1. **Un Chat = Una Sesión Atómica (Feature-Scoped):** Cada nueva conversación con el asistente se dedica exclusivamente a una feature, fix o iteración concreta, evitando dispersión de contexto.

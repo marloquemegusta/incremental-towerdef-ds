@@ -1,30 +1,19 @@
-# Tileset Canónico de Sector 1 (16x16 Píxeles)
+# Tileset Canónico de Sector 1 (Isométrico 2:1 - 32x32 Píxeles)
 
-Esta carpeta contiene los tiles oficiales de 16x16 píxeles utilizados en el mapa del Sector 1 del Bastión Imperial (`g_s1_tiles[17][256]`).
+Esta carpeta contiene los tiles oficiales de suelo isométrico 2:1 (`dx=2, dy=1`) utilizados en el mapa del Sector 1 del Bastión Imperial (`source/tiles.c`, `source/scrabling_data.c`).
 
-## Convención de Nomenclatura
-- `TXX_[nombre]_1x.png`: Tile canónico en resolución nativa de Nintendo DS (16x16 px).
-- `TXX_[nombre]_8x.png`: Versión ampliada a 128x128 px con escalado Nearest-Neighbor para inspección visual directa.
-- `archive/`: Contiene borradores previos, hojas de propuestas exploratorias y variantes descartadas.
+## Assets Maestros Canónicos (`master/`)
+- `tile_061_cobblestone_1x.png`: Tile maestro canónico de empedrado uniforme (32x32 px nativos NDS).
+- `tile_062_irregular_1x.png`: Tile maestro canónico de losas de piedra irregulares (32x32 px).
+- `tile_063_flagstone_1x.png`: Tile maestro canónico de losas lisas de calzada (32x32 px).
+- `*_8x.png`: Previsualizaciones ampliadas a 256x256 px mediante escalado Nearest-Neighbor para inspección visual.
 
-## Catálogo de Tiles
+## Renderizado en Motor (Modo 5 / Bitmap Paletizado)
+- **Topología:** Ensamblado continuo de rombos en proyección isométrica 2:1.
+- **Paso vertical:** 8 píxeles entre filas sucesivas (renderizado de norte a sur *back-to-front*).
+- **Paso horizontal:** 16 píxeles con desplazamiento alternado por fila.
+- **Línea de rango defensivo ($Y=64$):** Franja discontinua de pintura vial amarilla trazada con textura orgánica de brocha sobre la piedra.
 
-| ID | Índice C | Nombre de Tile | Categoría | Descripción |
-| :---: | :---: | :--- | :--- | :--- |
-| **T00** | 0 | `T00_road_plain_1x.png` | Carretera | Asfalto liso de la trinchera |
-| **T01** | 1 | `T01_road_dash_1x.png` | Carretera | Asfalto con línea discontinua central |
-| **T02** | 2 | `T02_road_cracked_1x.png` | Carretera | Asfalto agrietado por impactos |
-| **T03** | 3 | `T03_road_crater_1x.png` | Carretera | Cráter de metralla en calzada |
-| **T04** | 4 | `T04_curb_straight_1x.png` | Bordillo | Bordillo recto con franjas de peligro |
-| **T05** | 5 | `T05_curb_storm_drain_1x.png` | Bordillo | Bordillo con rejilla pluvial |
-| **T06** | 6 | `T06_curb_culvert_pipe_1x.png` | Bordillo | Bordillo con tubería de evacuación |
-| **T07** | 7 | `T07_curb_stairs_down_1x.png` | Bordillo | Escaleras de acceso a la trinchera |
-| **T08** | 8 | `T08_sidewalk_slabs_1x.png` | Plaza / Acera | Placas de fundición estándar |
-| **T09** | 9 | `T09_sidewalk_cracked_1x.png` | Plaza / Acera | Placas agrietadas |
-| **T10** | 10 | `T10_manhole_1x.png` | Plaza / Acera | Alcantarilla circular de hierro fundido |
-| **T11** | 11 | `T11_roof_plain_1x.png` | Edificio | Cubierta superior de blindaje |
-| **T12** | 12 | `T12_vent_grate_1x.png` | Edificio | Respiradero industrial con aletas |
-| **T13** | 13 | `T13_roof_edge_shadow_1x.png` | Edificio | Borde de azotea con sombra arrojada |
-| **T14** | 14 | `T14_roof_ac_unit_1x.png` | Edificio | Unidad HVAC / climatizador exterior |
-| **T15** | 15 | `T15_roof_access_hut_1x.png` | Edificio | Caseta de acceso a la cubierta |
-| **T16** | 16 | `T16_bunker_door_1x.png` | Búnker | Compuerta blindada del Sanctum Core |
+## Material Histórico y Descartado (`archive/`)
+- `archive/`: Contiene los antiguos tiles ortogonales/cenitales a 90° de 16x16 px (`T00` a `T16`) y propuestas exploratorias previas, archivadas para evitar disonancia de perspectiva con los sprites isométricos de torretas y enemigos.
+- `archive/scrabling_source_pack/`: Paquete fuente completo de tiles de Scrabling.
