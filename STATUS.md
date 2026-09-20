@@ -55,6 +55,16 @@
     - Desbloqueo de sockets (1 a 4 torretas), automatización de gatillo y auto-aim.
     - Optimización de renderizado mediante Dirty Rects y caché de fondo en DMA para sostener 60 FPS.
     - Registro de Known Issues en `KNOWN_ISSUES.md` (pausa en hardware, estela residual, limpieza en reset, rendimiento en picos).
+  - [x] **Sesión 4: Eliminación del Concepto de Rango (Fuego Total en Pantalla Inferior) [COMPLETADA - rama `feat/no-range`]:**
+    - Retirada del horneado de la línea de demarcación de rango en $Y=64$ (franja de pintura vial amarilla); el empedrado queda limpio y sin indicador de alcance.
+    - `g_balance.turret_range[]` neutralizado a $0$ como **mecanismo dormido y reversible**: $0$ = campo inferior completo ($Y$ local $0..143$) targeteable, sin línea de fuego. Reintroducir una línea exige un valor $>0$.
+    - La puerta de auto-fuego (`local_gy >= range_line_y`) y el filtro táctil quedan inertes, por lo que toda la calzada es batible tanto por auto-aim como por stylus.
+    - Retirada de la mejora RANGE: 7 cartas en tienda (antes 8), sin costes (`range_upgrade_costs`) ni hitbox táctil asociados.
+    - Purga de código muerto y de controles de diagnóstico: `renderer_draw_range_perimeter()`, `WALL_TURRET_RANGE`, `DebugSandboxState.turret_range` (fila `TURRET RANGE` del sandbox + su círculo ámbar) y filas `RANGE LVn` de calibración en páginas 2 y 3, con renumeración de índices y de `max_rows`.
+    - Magia del balance `TOW5` → `TOW6` para descartar saves SD obsoletos que reintroducirían silenciosamente la línea en hardware real.
+    - **Evidencia A/B determinista** (ROM nueva crc `0A237779` vs `main` crc `767EBBAC`, misma secuencia de entrada): el baseline conserva 186-201 píxeles amarillos en $Y$ global 256-257 (local $Y=64$) y enemigos xenos vivos hasta la local 133; la ROM nueva tiene **0** píxeles amarillos y **0** píxeles xenos por debajo de la local 63 en 34 fotogramas de la secuencia de asedio. Capturas en `artifacts/baseline/run/` y `artifacts/no-range-full-screen/`.
+    - Regresión verde: `test_phase1_complete`, `test_wall_frontline_damage`, `test_wall_hp_and_crate`, `test_full_upgrade_progression`, `calibration_test`, `calibration_renumber_check`, `rebalance_verification`, `full_screen_targeting`.
+    - **Hallazgo preexistente (no introducido por esta sesión):** el sandbox de diagnóstico (`L+SELECT`) no se activa bajo escenarios DeSmuME; `sandbox_verification.json` falla con `screen_unchanged` de forma idéntica en `main` y en la ROM nueva. Los escenarios nuevos de evidencia usan modo oleada con la batería en overdrive (`L+R`) en lugar del sandbox.
 
 
 

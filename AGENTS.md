@@ -28,9 +28,10 @@
    - El suelo de combate de Sector 1 utiliza la proyección isométrica 2:1 (`dx=2, dy=1`) mediante tiles maestros de 32x32 px (`assets/tiles/sector1/master/tile_061_cobblestone_1x.png`, `tile_062_irregular_1x.png`, `tile_063_flagstone_1x.png`) generados por Scrabling.
    - En el motor de C (`source/tiles.c`, `source/renderer.c`), se renderizan en modo bitmap / modo 5 paletizado con solapamiento *back-to-front* (paso vertical $Y=8$ px y horizontal $X=16$ px alternado).
    - Queda estrictamente prohibido el uso de los antiguos tiles cenitales/ortogonales a 90° (archivados en `assets/tiles/sector1/archive/`).
-10. **Regla Canónica de la Línea de Fuego / Rango Defensivo ($Y=64$):**
-    - La línea de demarcación del rango balístico en $Y=64$ de la pantalla inferior es una franja discontinua de pintura vial amarilla trazada con textura orgánica de brocha y desgaste irregular directamente sobre el empedrado.
-    - No debe incluir respaldos metálicos, pestañas grises ni bases sólidas rectangulares que rompan la continuidad del empedrado.
+10. **Regla Canónica de Fuego Total en Pantalla Inferior (Sin Rango):**
+    - No existe el concepto de rango/alcance. La muralla puede batir a cualquier enemigo vivo sobre la superficie inferior completa ($Y$ local $0..143$), y el stylus puede seleccionar objetivos en toda esa superficie.
+    - Queda estrictamente prohibida cualquier franja, línea o indicador de demarcación de rango de tiro sobre el empedrado (incluida la antigua pintura vial amarilla en $Y=64$).
+    - `g_balance.turret_range[]` se conserva como mecanismo dormido con valor $0$, exclusivamente por reversibilidad; $0$ = campo inferior completo, y cualquier valor $>0$ reintroduciría una línea de fuego.
 
 ## Protocolo de Sesiones Atómicas, Ramas y Worktrees
 1. **Un Chat = Una Sesión Atómica (Feature-Scoped):** Cada nueva conversación con el asistente se dedica exclusivamente a una feature, fix o iteración concreta, evitando dispersión de contexto.

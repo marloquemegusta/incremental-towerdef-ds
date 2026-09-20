@@ -35,8 +35,8 @@ def compile_balance(root, output):
 
     with (cfg / "upgrades.csv").open(newline="", encoding="utf-8-sig") as f:
         upgrades = list(csv.DictReader(f))
-    if len(upgrades) != 8 or [int(r["upgrade_id"]) for r in upgrades] != list(range(8)):
-        raise ValueError("upgrades.csv debe contener las mejoras 0..7")
+    if len(upgrades) != 7 or [int(r["upgrade_id"]) for r in upgrades] != list(range(7)):
+        raise ValueError("upgrades.csv debe contener las mejoras 0..6")
     costs = []
     for row in upgrades:
         costs.extend(int(row[f"cost_{i}"] or 0) for i in range(5))

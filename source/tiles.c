@@ -548,32 +548,6 @@ void tiles_init(void) {
     generate_ground_to_buffer(s_ground_top_cache, 0);
     generate_ground_to_buffer(s_ground_bottom_cache, 192);
 
-    // Pre-bake organic brushed dashed yellow road line across battlefield (X: 16..240, Y: 64)
-    int range_y = 64;
-    for (int x = 16; x < 240; x++) {
-        int pos = (x - 16) % 22;
-        int dash_idx = (x - 16) / 22;
-        int dash_len = 12 + ((dash_idx * 5) % 4) - 1; // Organic variation: 11..14 px
-        
-        if (pos < dash_len) {
-            uint32_t n = hash_noise(x, range_y, 777);
-            // Brush extremity fraying / bristle gaps
-            if ((pos == 0 || pos == dash_len - 1) && (n < 75)) continue;
-            
-            uint16_t paint_hi  = (n > 190) ? (RGB15(31, 28, 8) | BIT(15)) : (RGB15(30, 24, 2) | BIT(15));
-            uint16_t paint_mid = (n < 70)  ? (RGB15(23, 17, 0) | BIT(15)) : (RGB15(27, 21, 2) | BIT(15));
-            
-            // Paint over stone floor with subtle stone weathering
-            if (n > 30) {
-                s_ground_bottom_cache[range_y * SCREEN_W + x]       = paint_hi;
-                s_ground_bottom_cache[(range_y + 1) * SCREEN_W + x] = paint_mid;
-                if (n > 230 && pos > 1 && pos < dash_len - 2) {
-                    s_ground_bottom_cache[(range_y + 2) * SCREEN_W + x] = RGB15(20, 15, 0) | BIT(15);
-                }
-            }
-        }
-    }
-
     // Pre-bake the Wall Base Parapet into the bottom ground cache at canonical WALL_DEFAULT_Y (144)
     wall_draw_base(s_ground_bottom_cache, WALL_DEFAULT_Y, 100, 100);
 
