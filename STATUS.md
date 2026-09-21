@@ -1,5 +1,7 @@
 # STATUS.md - Estado de Desarrollo
 
+> Los **hitos 1 y 2** son registro histórico: describen la arquitectura de su momento (telemetría por consola, camino en "S", torreta Vulcan, taller de 3 ramas), ya superada. El **estado vigente** es el hito más reciente y el código de `source/`.
+
 ## Fase Actual: Hito 1 (MVD - Mínimo Viable Jugable) - COMPLETADO
 
 - [x] Comprobación de toolchain BlocksDS y DeSmuME (`DS_TOOLCHAIN=PASS`).
@@ -65,6 +67,14 @@
     - **Evidencia A/B determinista** (ROM nueva crc `0A237779` vs `main` crc `767EBBAC`, misma secuencia de entrada): el baseline conserva 186-201 píxeles amarillos en $Y$ global 256-257 (local $Y=64$) y enemigos xenos vivos hasta la local 133; la ROM nueva tiene **0** píxeles amarillos y **0** píxeles xenos por debajo de la local 63 en 34 fotogramas de la secuencia de asedio. Capturas en `artifacts/baseline/run/` y `artifacts/no-range-full-screen/`.
     - Regresión verde: `test_phase1_complete`, `test_wall_frontline_damage`, `test_wall_hp_and_crate`, `test_full_upgrade_progression`, `calibration_test`, `calibration_renumber_check`, `rebalance_verification`, `full_screen_targeting`.
     - **Hallazgo preexistente (no introducido por esta sesión):** el sandbox de diagnóstico (`L+SELECT`) no se activa bajo escenarios DeSmuME; `sandbox_verification.json` falla con `screen_unchanged` de forma idéntica en `main` y en la ROM nueva. Los escenarios nuevos de evidencia usan modo oleada con la batería en overdrive (`L+R`) en lugar del sandbox.
+  - [x] **Sesión 5: Muerte de los enemigos — gore, licuado y trozos [COMPLETADA - commit `aa9af3a`]:**
+    - Retirada la salpicadura que se estampaba en **cada impacto** (vector bala nulo → se resolvía como norte): un impacto no letal ya no deja marca.
+    - **Muerte animada** (15 frames): el cuerpo cae píxel a píxel por gravedad hasta sus pies y cada píxel queda **permanente** en el suelo (licuado).
+    - **Trozos reales del sprite** (bloques de 3-4 px) que salen despedidos, rebotan y **se queman en el suelo** al aterrizar (también permanentes).
+    - **Sangre en paleta roja** (regla cromática xenos, `DESIGN.md` §7) para no confundirla con el enjambre.
+    - Cono direccional grande **disponible tras `DEATH_CONE_ENABLED`** (por defecto apagado, listo para activar).
+    - Fix de doble buffer: los charcos se borraban en el *page flip* (ahora cada estampado marca su área, `mark_ground_stamp`); fix de la normalización Q8 del vector bala.
+    - Evidencia y detalle: `walkthroughs/splatter-impact-direction/walkthrough.md` (A/B antes/después, estudio de ablación y coste medido).
 
 
 
