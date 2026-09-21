@@ -30,7 +30,9 @@
 
 - **Estela de puntos marrones tras enemigos:** Aunque se eliminó la estela de sprites enteros mediante dirty rects robustos, los enemigos dejan tras de sí una traza de puntos marrones que no se restaura del todo del fondo original.
 - **Limpieza de pantalla en Game Over / Reinicio:** Al morir el muro y reiniciar partida, los búferes y la pantalla no se limpian/redibujan por completo: permanecen salpicaduras de sangre previas y artefactos rojizos/amarillentos en el centro de la pantalla superior.
+  - *Revisado (sesión 5):* la sangre vive en el *ground cache* y sólo se reconstruye en `tiles_init()`, que se llama al **empezar partida nueva** (boot / reintento tras game over / reinicio). Por diseño no debería sobrevivir a un reinicio; queda por confirmar en hardware y por separado los "artefactos rojizos/amarillentos" de la pantalla superior.
 
 ## Rendimiento en Picos de Oleada
 
 - **Caída a 30 FPS en pico máximo:** Durante la saturación máxima de enemigos en pantalla, el framerate cae a ~30 FPS (a pesar de la optimización de los bucles de blit y el recorte de dirty rects a 32x32). Requiere optimización en ensamblador ARM9 o procesamiento por franjas/DMA.
+  - *Revisado (sesión 5):* en combate real (5 enemigos) el HUD da `FPS:60 T:44 B:204 P:53 S:31` (≈332/545 ticks). **No** se ha medido la saturación máxima (384 enemigos), así que el issue sigue abierto: pendiente de un escenario de estrés.
