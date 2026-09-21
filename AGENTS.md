@@ -22,6 +22,45 @@ Además, `STATUS.md` es un **registro de estado por hitos** (no es fuente de ver
 - Entorno de compilación: Docker Desktop (`skylyrac/blocksds:slim-latest`).
 - Entorno de emulación determinista: WSL2 + Python 3 + DeSmuME headless (`libdesmume.so`).
 
+## Reparto de Modelos por Rol (Subagentes)
+
+Los roles se implementan como subagentes de Command Code en `.commandcode/agents/` (ámbito **solo proyecto**: se cargan únicamente dentro de `towerds`, nunca en otros repos). El hilo principal delega en ellos con la herramienta `agent`; pueden correr varios en paralelo y cada uno tiene contexto aislado, su propio juego de herramientas y su modelo fijado. Los nombres `ds-*` no colisionan con los reservados (`explore`, `plan`, `review`, `general`).
+
+| Rol (agente) | Cuándo se usa | Modelo | Frente a `deepseek/deepseek-v4.1-flash` para todo |
+| :--- | :--- | :--- | :--- |
+| `ds-explore` | Localizar dónde vive un sistema del motor ARM9 antes de editar. | `poolside/laguna-s-2.1-free` | **Mejor: gratis.** $0/$0 frente a $0.15/$0.6 por 1M. Único rol con ganancia clara y sin contrapartida. |
+| `ds-log-triage` | Diagnosticar un fallo de build o de escenario (manifest, events, emulator.log). | `Qwen/Qwen3.7-Flash` | **Mejor en su caso de uso.** 5x más barato en input y ~4.6x en output, con 1M de contexto. Su trabajo es de un solo turno (leer un log grande y responder corto), donde manda el input, no la caché. |
+| `ds-asset-audit` | Auditar capturas PNG y spritesheets contra el croma y el escenario de `DESIGN.md`. | `deepseek/deepseek-v4.1-flash` | **Igual.** Mismo precio y misma visión. Se deja explícito para fijar ámbito, herramientas y prompt. |
+| `ds-scenario` | Compilar y ejecutar escenarios headless de DeSmuME; validar input táctil y de botones. | `deepseek/deepseek-v4.1-flash` | **Igual.** Revertido desde `MiniMaxAI/MiniMax-M3`, que costaba 20x en lectura de caché en un run largo. |
+| `ds-coder` | Implementar C/ARM9 en `source/` e `include/`. | `deepseek/deepseek-v4.1-flash` | **Igual.** Revertido desde `zai-org/GLM-5.3` (87x en caché) por falta de evidencia de mejor calidad: los commits de este repo están hechos con v4.1-flash. |
+| `ds-reviewer` | Revisar un diff contra los invariantes de `TECHNICAL.md`. | `deepseek/deepseek-v4-pro` | **Distinto, no mejor.** El valor es la decorrelación: no comparte los puntos ciegos del modelo que escribió. Coste acotado: lee un diff, no el repo. |
+| `ds-planner` | Diseñar el plan de una feature contra `DESIGN.md` y `TECHNICAL.md`. | `xai/grok-4.5` | **Distinto, no mejor.** Misma razón, y se invoca poco. Cuidado: 13x el input si se abusa. |
+| `ds-walkthrough` | Redactar `walkthroughs/<sesion>/walkthrough.md` y actualizar `STATUS.md`. | `deepseek/deepseek-v4.1-flash` | **Igual.** Revertido desde `z-ai/glm-5.3-flash`: mismo input, pero 10x la caché. |
+
+**Criterio (no obvio):** en un subagente de muchos turnos la factura la domina la **lectura de caché**, no el input. `deepseek-v4.1-flash` tiene una de las cachés más baratas del catálogo ($0.003/1M), así que varios modelos baratos de escaparate (`z-ai/glm-5.3-flash` $0.03, `MiniMaxAI/MiniMax-M3` $0.06) salen más caros en cuanto el agente itera. **Regla: los agentes que más tokens consumen (explorador, triaje de logs, ejecutor de escenarios) van a lo más barato; los de coste acotado o uso esporádico (revisor, planificador) pueden permitirse otro modelo, y ahí el motivo es la decorrelación, no la supuesta inteligencia.**
+
+Para cambiar el modelo de un rol, se edita el campo `model:` de su fichero en `.commandcode/agents/`. Los cambios cargan en el turno siguiente, sin reiniciar.
+
+### Tareas internas del bucle principal (ámbito usuario, fuera del repo)
+
+Estas claves viven en `~/.commandcode/config.json`, **no** en este repo: aplican a todos los proyectos.
+
+| Clave | Modelo | Motivo |
+| :--- | :--- | :--- |
+| `feature-model:vision` | `deepseek/deepseek-v4.1-flash` | **Corrección real.** El modelo principal no tiene visión y el flujo depende de capturas PNG de DeSmuME. |
+| `feature-model:titleGeneration` | `Qwen/Qwen3.7-Flash` | 5x más barato que el principal; tarea trivial. |
+| `feature-model:toolDescription` | `Qwen/Qwen3.7-Flash` | Idem. |
+| `feature-model:tasteLearning` | `deepseek/deepseek-v4-flash` | Alto volumen, bajo riesgo. |
+| `feature-model:tasteOnboarding` | `deepseek/deepseek-v4-flash` | Idem. |
+| `feature-model:compaction` | `z-ai/glm-5.3-flash` | 1M de contexto. Candidato a bajar a `Qwen/Qwen3.7-Flash` (5x) si la calidad del resumen aguanta. |
+| `feature-model:branchSummarization` | `z-ai/glm-5.3-flash` | Idem. |
+
+### Versionado de `.commandcode/`
+
+- `.commandcode/agents/` → **sí se versiona**; es la definición de los roles y es compartible.
+- `.commandcode/settings.json` → **no**; contiene rutas absolutas de la máquina y permisos locales.
+- `.commandcode/taste/` → aprendizaje personal derivado de las sesiones; a decidir.
+
 ## Flujo de Trabajo Autónomo
 1. Cualquier cambio de gameplay, UI o lógica de simulación debe acompañarse de pruebas de build y validación visual mediante escenarios DeSmuME.
 2. Los cambios visuales se contrastan con capturas en `artifacts/`.
@@ -38,6 +77,10 @@ Además, `STATUS.md` es un **registro de estado por hitos** (no es fuente de ver
    - **Sin rango** — fuego total en la pantalla inferior, sin franjas de demarcación → `DESIGN.md` `[OQ-06]`.
    - **Render y rendimiento** — punto fijo, framebuffer con dirty grid, presupuesto de 545 ticks → `TECHNICAL.md` y la skill (`references/performance-architecture.md`).
    - Si algo de esto cambia, se cambia **en su documento**; aquí no se duplica.
+7. **Revisión de coherencia documental al cerrar cada tarea (obligatoria):**
+   - Al terminar **cualquier** tarea, revisar `DESIGN.md`, `TECHNICAL.md`, `STATUS.md` y este `AGENTS.md` y **corregir lo que el avance haya dejado contradicho**: reglas, invariantes, estructuras de datos, cifras, nombres de ficheros, mecánicas retiradas o añadidas, flags, etc.
+   - Nada debe describir algo que el juego ya no hace (ni al revés). Si una mecánica se retira, su regla se retira o se marca como dormida en **su** documento; si un valor cambia (p. ej. `DEATH_CONE_ENABLED`, HP, precios), se actualiza donde vive.
+   - Se hace **en el mismo cierre de la tarea**, no después, y se reporta al usuario qué se ha actualizado y qué no se ha tocado por no verse afectado.
 
 ## Protocolo de Sesiones Atómicas, Ramas y Worktrees
 1. **Un Chat = Una Sesión Atómica (Feature-Scoped):** Cada nueva conversación con el asistente se dedica exclusivamente a una feature, fix o iteración concreta, evitando dispersión de contexto.
@@ -59,6 +102,7 @@ Además, `STATUS.md` es un **registro de estado por hitos** (no es fuente de ver
    - Validación visual determinista con `scripts/run-scenario.ps1 -RomPath <rom> -ScenarioPath <scenario> -OutputPath <dir>` (DeSmuME headless). Prohibido omitir argumentos mandatorios y usar escenarios con aserciones o hitboxes obsoletas.
    - Subida a la consola mediante `scripts/upload-rom.ps1 -ProjectPath . -RomPath game.nds -ConfirmUpload`:
      - El archivo remoto canónico en la microSD de la DS es invariablemente **`towerdefense.nds`** (configurado en `$RemoteName = 'towerdefense.nds'`). Queda terminantemente prohibido subir con `game.nds` u otro nombre no canónico.
+   - **Revisión de coherencia de los `.md`** (`DESIGN.md`, `TECHNICAL.md`, `STATUS.md`, `AGENTS.md`) según la regla 7 del flujo de trabajo, antes de dar la tarea por cerrada.
    - Commit semántico en la rama de la feature.
    - Aprobación explícita del usuario antes de merge a `main` o tagging de versión (`v0.1`, `v0.2`, etc.).
 5. **Regla Canónica de Incrustación de Media en Artefactos (`walkthrough.md`, reportes):**
