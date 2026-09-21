@@ -1,5 +1,6 @@
 #include "enemy_data.h"
 #include "game.h"
+#include "tiles.h"
 
 // 8-bit indexed palette in ultra-fast zero-wait-state DTCM memory
 DTCM_DATA uint16_t g_enemy_palette[256] = {
@@ -2180,6 +2181,109 @@ ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer(uint16
             uint8_t idx = row_src[x];
             if (idx) dst_row[x] = g_enemy_palette[idx];
         }
+    }
+}
+
+// Liquefaction death effect: the body crumbles under gravity. Every pixel keeps its
+// own X and drops straight down to the creature's ground line (its own feet), like a
+// 3D particle, turning to gore and settling into the puddle beneath. A few fragments
+// break off and tumble away instead of falling.
+#define DEATH_FLY_PX 16
+
+ITCM_CODE __attribute__((target("arm"))) void enemy_draw_melting_sprite(
+    uint16_t *buffer, int cx, int cy, int variant, int frame, int dir,
+    int progress, int dir_x, int dir_y,
+    int *out_bx, int *out_by, int *out_bw, int *out_bh)
+{
+    if (variant < 0 || variant >= ENEMY_VARIANT_COUNT || !buffer) return;
+    const EnemyTypeDef *type = &g_enemy_types[variant];
+
+    int d = dir & 7;
+    int source_dir = d - 2;
+    if (source_dir < 0) source_dir = 0;
+    if (source_dir > 4) source_dir = 4;
+
+    if (type->frame_count == 0) return;
+    int f = frame;
+    if (f >= type->frame_count) f %= type->frame_count;
+    const EnemyFrameDef *fd = &type->frames[source_dir][f];
+    int w = fd->w;
+    int h = fd->h;
+    const uint8_t *src = fd->pixels;
+    if (!src || w == 0 || h == 0) return;
+
+    if (progress < 0) progress = 0;
+    if (progress > 255) progress = 255;
+
+    int ox = cx + fd->offset_x;
+    int oy = cy + fd->offset_y;
+    int half_w = w >> 1;
+
+    int min_x = cx, min_y = cy, max_x = cx, max_y = cy;
+
+    int ground_y = oy + h - 1 - 20; // its feet line, lifted 20 px as requested
+
+    for (int sy = 0; sy < h; sy++) {
+        const uint8_t *row = &src[sy * w];
+        int row_y = oy + sy;
+        for (int sx = 0; sx < w; sx++) {
+            uint8_t idx = row[sx];
+            if (!idx) continue;
+
+            int px = ox + sx;
+            int py = row_y;
+            int col = g_enemy_palette[idx];
+
+            int phase = ((sx * 73) ^ (sy * 151)) & 255;
+            // Detach early enough that every pixel gets a full fall (fixed 150-unit
+            // span) and actually lands before the animation ends, so nothing is lost
+            // mid-air when the corpse is removed.
+            int detach = (phase * 105) >> 8;
+            if (progress > detach) {
+                int u = ((progress - detach) * 255) / 150;
+                if (u > 255) u = 255;
+                int rnd = ((sx * 29) ^ (sy * 57) ^ (sx * sy * 7)) & 255;
+
+                if ((rnd & 15) == 0) {
+                    // A few fragments break off and tumble away instead.
+                    if (progress > 200) continue;
+                    px += ((sx - half_w) * (progress / 6)) / 40;
+                    px += (dir_x * progress) >> 11;
+                    py -= (progress * progress * DEATH_FLY_PX) / (255 * 255);
+                    col = COLOR_XENOS_GORE_CORE;
+                } else {
+                    // Gravity: the pixel keeps its X and drops to its own ground
+                    // line. A little per-pixel scatter so the pile is not razor thin.
+                    int fall = ground_y - row_y + ((rnd >> 5) & 7);
+                    if (fall < 0) fall = 0; // never lift a pixel that is already at/below the line
+                    py = row_y + ((u * u * fall) / (255 * 255));
+                    // Spread the pile around the body so it is not swallowed by the
+                    // cone stamped at the same spot (it must read as its own puddle).
+                    px += ((sx - half_w) * u) / 260;
+                    px += ((rnd >> 2) & 5) - 2;
+                    col = ((sx + sy) & 1) ? COLOR_XENOS_GORE_MID : COLOR_XENOS_GORE_DARK;
+                    // Once it has landed, burn it into the ground so the puddle it
+                    // helps form is permanent.
+                    if (u >= 250) {
+                        tiles_stamp_ground_dot(px, py + 192, col);
+                    }
+                }
+            }
+
+            if (px < 0 || px >= SCREEN_W || py < 0 || py >= SCREEN_H) continue;
+            buffer[py * SCREEN_W + px] = col;
+            if (px < min_x) min_x = px;
+            if (px > max_x) max_x = px;
+            if (py < min_y) min_y = py;
+            if (py > max_y) max_y = py;
+        }
+    }
+
+    if (out_bx) {
+        *out_bx = min_x;
+        *out_by = min_y;
+        *out_bw = max_x - min_x + 1;
+        *out_bh = max_y - min_y + 1;
     }
 }
 

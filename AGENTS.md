@@ -24,6 +24,7 @@
 8. **Regla Canónica de Exclusividad Cromática Xenos:**
    - La gama púrpura/violeta/magenta (`RGB 115, 35, 155` a `RGB 240, 150, 255`) y el blanco hueso luminoso quedan **estrictamente reservados para el enjambre xenos**.
    - Queda estrictamente prohibido utilizar matices púrpuras en el escenario (suelo de metal, aceras, muros, conos o maquinaria del Mechanicus), garantizando un contraste visual inmediato y sin ambigüedades entre los enemigos y el entorno balístico.
+   - El **gore/sangre** usa una paleta **ROJA** (`COLOR_XENOS_GORE_*`: arterial → seca) y **nunca** púrpura, para no confundirse con el enjambre. La **chitina** desprendida (fragmentos de coraza) sí conserva el púrpura xenos.
 9. **Regla Canónica de Suelo Isométrico 2:1 y Assets Maestros de Escenario (Sector 1):**
    - El suelo de combate de Sector 1 utiliza la proyección isométrica 2:1 (`dx=2, dy=1`) mediante tiles maestros de 32x32 px (`assets/tiles/sector1/master/tile_061_cobblestone_1x.png`, `tile_062_irregular_1x.png`, `tile_063_flagstone_1x.png`) generados por Scrabling.
    - En el motor de C (`source/tiles.c`, `source/renderer.c`), se renderizan en modo bitmap / modo 5 paletizado con solapamiento *back-to-front* (paso vertical $Y=8$ px y horizontal $X=16$ px alternado).
@@ -65,7 +66,14 @@
 7. **Convención Canónica de Walkthroughs por Sesión (Resumen Acumulativo):**
    - El resumen de sesión (`walkthrough.md`) **nunca** se deja suelto en la raíz del repo. Se guarda en `walkthroughs/<nombre-sesion>/walkthrough.md`, dentro de una carpeta por sesión, con sus assets en `walkthroughs/<nombre-sesion>/assets/`. El nombre de la carpeta coincide con la rama `feat/<feature>`.
    - Estos archivos **sí se versionan** (a diferencia de `artifacts/`, que está en `.gitignore`); al mergear la rama `feat/<feature>` a `main` los resúmenes se acumulan como histórico de sesiones.
-   - Las imágenes y anexos se referencian con rutas relativas al propio `.md` (p. ej. `assets/foo.png`).
+   - Las imágenes y anexos se referencian con **rutas relativas al propio `.md`** (p. ej. `assets/foo.png`): es lo que renderiza la UI para ficheros del repo. El formato absoluto POSIX de la regla 5 es **solo** para la media copiada a `<appDataDir>\brain\<conv_id>\`, no para los `.md` versionados.
    - `walkthroughs/README.md` es el índice acumulativo de sesiones; cada sesión nueva añade su fila.
    - La regla 5 (incrustación para la UI de Antigravity) sigue aplicando al renderizar allí: en ese caso la media se copia a `<appDataDir>\brain\<conv_id>\` con ruta absoluta POSIX.
 
+
+<!-- lean-ctx -->
+## lean-ctx
+
+lean-ctx is active — the MCP tools replace native equivalents.
+Full rules: LEAN-CTX.md (open on demand — do not auto-load).
+<!-- /lean-ctx -->

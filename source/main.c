@@ -171,6 +171,7 @@ int main(void) {
             renderer_draw_wall(); // 3D Depth: Wall parapet occludes enemy heads & front limbs
             renderer_draw_bullets();
             renderer_draw_death_particles_bottom();
+            renderer_draw_gore_chunks_bottom();
             bot_fx_t = timerElapsed(0);
 
             if (g_game.mode == MODE_PREPARATION || g_game.mode == MODE_PAUSED) {

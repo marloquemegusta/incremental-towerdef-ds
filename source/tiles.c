@@ -372,6 +372,31 @@ static inline void stamp_ground_pixel(int px, int py, uint16_t c16, uint8_t c8) 
     }
 }
 
+// Ground stamps write straight into the ground cache, but the lower screen is
+// double-buffered and only dirty-marked rects are restored from that cache. Any
+// stamp outside a sprite's own dirty rect would be wiped by the next flip, so
+// every stamp marks its own area on both buffers (or the single top buffer).
+static void mark_ground_stamp(int x0, int y0, int x1, int y1, int is_bottom) {
+    if (x1 < x0 || y1 < y0) return;
+    int w = x1 - x0 + 1;
+    int h = y1 - y0 + 1;
+    if (is_bottom) {
+        tiles_dirty_mark_rect(x0, y0, w, h, 1, 0);
+        tiles_dirty_mark_rect(x0, y0, w, h, 1, 1);
+    } else {
+        tiles_dirty_mark_rect(x0, y0, w, h, 0, 0);
+    }
+}
+
+// Permanently burn a single gore pixel into the lower-screen ground (used by the
+// death animation so every falling body pixel stays behind as part of the puddle).
+void tiles_stamp_ground_dot(int x, int y, uint16_t color16) {
+    if (x < 0 || x >= SCREEN_W || y < 192 || y >= FIELD_H) return;
+    int ly = y - 192;
+    mark_ground_stamp(x, ly, x, ly, 1);
+    stamp_ground_pixel(x, y, color16, TOP_COLOR_XENOS_GORE_MID);
+}
+
 void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, int variant) {
     (void)variant;
     int is_bottom = (y >= 192);
@@ -386,22 +411,21 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
     int r_base = (size <= 1) ? 2 : ((size == 2) ? 3 : ((size == 3) ? 4 : 6));
     int max_cone = r_base * 3 + 3;
 
-    // Direction vector from bullet velocity
-    int len_sq = (bvx * bvx + bvy * bvy) >> 8;
+    // Direction vector from bullet velocity, normalized to Q8 (256 = 1.0).
+    // NOTE: the bullet velocity is in Q8 pixels/step (~4096), so the magnitude
+    // must be estimated from the raw components (a "len_sq >> 8" shortcut would
+    // collapse the cone to a few pixels).
+    int bax = (bvx < 0) ? -bvx : bvx;
+    int bay = (bvy < 0) ? -bvy : bvy;
+    int bmag = (bax > bay) ? (bax + (bay >> 1)) : (bay + (bax >> 1));
     int dir_x = 0;
     int dir_y = -256; // Default forward/north if zero
     int has_bullet_dir = 0;
 
-    if (len_sq > 16) {
-        int len = 256;
-        for (int it = 0; it < 5; it++) {
-            if (len > 0) len = (len + len_sq / len) >> 1;
-        }
-        if (len > 0) {
-            dir_x = (bvx << 8) / len;
-            dir_y = (bvy << 8) / len;
-            has_bullet_dir = 1;
-        }
+    if (bmag > 16) {
+        dir_x = (bvx << 8) / bmag;
+        dir_y = (bvy << 8) / bmag;
+        has_bullet_dir = 1;
     }
 
     int perp_x = -dir_y;
@@ -413,6 +437,7 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
     int x1 = (x + bb_rad >= SCREEN_W) ? SCREEN_W - 1 : (x + bb_rad);
     int y0 = (sy - bb_rad < 0) ? 0 : (sy - bb_rad);
     int y1 = (sy + bb_rad >= SCREEN_H) ? SCREEN_H - 1 : (sy + bb_rad);
+    mark_ground_stamp(x0, y0, x1, y1, is_bottom);
 
     uint32_t seed = (uint32_t)(x * 73 + y * 179 + size * 31);
 
@@ -494,8 +519,126 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
 }
 
 
+// Directional death cone: a large, clearly bullet-aligned fan of gore on the
+// ground. `length` is how far the cone reaches along the killing blow and
+// `half_width` its lateral spread at the tip. This is the primary ground stain
+// for enemy deaths (the compact splat is only the body pool).
+void tiles_stamp_death_cone(int x, int y, int bvx, int bvy, int length, int half_width) {
+    int is_bottom = (y >= 192);
+    int sy = is_bottom ? (y - 192) : y;
+    if (x < 3 || x >= SCREEN_W - 3 || sy < 3 || sy >= SCREEN_H - 3) return;
+    if (length < 8) length = 8;
+    if (half_width < 3) half_width = 3;
+
+    int bax = (bvx < 0) ? -bvx : bvx;
+    int bay = (bvy < 0) ? -bvy : bvy;
+    int bmag = (bax > bay) ? (bax + (bay >> 1)) : (bay + (bax >> 1));
+    int dir_x = 0;
+    int dir_y = -256; // Default forward/north if the bullet vector is zero
+    int has_dir = 0;
+    if (bmag > 16) {
+        dir_x = (bvx << 8) / bmag;
+        dir_y = (bvy << 8) / bmag;
+        has_dir = 1;
+    }
+    int perp_x = -dir_y;
+    int perp_y = dir_x;
+
+    // Mark only the cone's real footprint (oriented box: length+flecks along the
+    // bullet, half_width laterally) instead of a large square, so the dirty-restore
+    // phase stays inside its tick budget.
+    int tip = length + 14;      // includes the ballistic flecks
+    int lat = half_width + 6;
+    int tx = (dir_x * tip) >> 8;
+    int ty = (dir_y * tip) >> 8;
+    int lx = (perp_x * lat) >> 8;
+    int ly = (perp_y * lat) >> 8;
+    int mx0 = x, mx1 = x, my0 = sy, my1 = sy;
+    int cxs[4] = { x + tx + lx, x + tx - lx, x + lx, x - lx };
+    int cys[4] = { sy + ty + ly, sy + ty - ly, sy + ly, sy - ly };
+    for (int k = 0; k < 4; k++) {
+        if (cxs[k] < mx0) mx0 = cxs[k];
+        if (cxs[k] > mx1) mx1 = cxs[k];
+        if (cys[k] < my0) my0 = cys[k];
+        if (cys[k] > my1) my1 = cys[k];
+    }
+    mark_ground_stamp(mx0 - 3, my0 - 3, mx1 + 3, my1 + 3, is_bottom);
+
+    uint32_t seed = (uint32_t)(x * 73 + y * 179 + length * 31);
+    int bb = length + 4;
+    int x0 = (x - bb < 0) ? 0 : (x - bb);
+    int x1 = (x + bb >= SCREEN_W) ? SCREEN_W - 1 : (x + bb);
+    int y0 = (sy - bb < 0) ? 0 : (sy - bb);
+    int y1 = (sy + bb >= SCREEN_H) ? SCREEN_H - 1 : (sy + bb);
+
+    for (int py = y0; py <= y1; py++) {
+        int dy = py - sy;
+        for (int px = x0; px <= x1; px++) {
+            int dx = px - x;
+            int d_long = (dx * dir_x + dy * dir_y) >> 8;
+            int d_lat = (dx * perp_x + dy * perp_y) >> 8;
+            int abs_lat = (d_lat < 0) ? -d_lat : d_lat;
+            int dist_sq = dx * dx + dy * dy;
+            int abs_py = is_bottom ? (py + 192) : py;
+            int noise = (((px * 13) ^ (py * 37) ^ (int)seed) & 7) - 3;
+
+            // 1. Bright nucleus right beneath the body
+            if (dist_sq <= 2) {
+                stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_CORE, TOP_COLOR_XENOS_GORE_CORE);
+                continue;
+            }
+
+            // 2. Entry side: compact pool in front of the impact
+            if (d_long < 0) {
+                if (dist_sq + noise <= 9) {
+                    if (((px + py) & 1) == 0 || dist_sq <= 4) {
+                        stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
+                    }
+                }
+                continue;
+            }
+
+            // 3. Exit cone: fans outward from the body along the bullet path
+            int hw = 2 + (d_long * half_width) / length + (noise >> 1);
+            if (abs_lat > hw) continue;
+            if (d_long > length + noise) continue;
+
+            if (d_long <= length / 3 && abs_lat <= hw / 2) {
+                stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
+            } else if (d_long <= (length * 2) / 3) {
+                if (((px + py) & 1) == 0) {
+                    uint16_t c = (abs_lat <= hw / 2) ? COLOR_XENOS_GORE_MID : COLOR_XENOS_GORE_DARK;
+                    stamp_ground_pixel(px, abs_py, c, TOP_COLOR_XENOS_GORE_MID);
+                }
+            } else {
+                if (((px & 1) == 0) && ((py & 1) == 0)) {
+                    stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
+                }
+            }
+        }
+    }
+
+    // 4. Ballistic flecks flung past the tip
+    if (has_dir) {
+        int drops = 2 + length / 10;
+        for (int d = 0; d < drops; d++) {
+            int dist = length + 2 + d * 3;
+            int spread = ((d * 37 + (int)seed) % (2 * half_width + 1)) - half_width;
+            int ox = x + ((dir_x * dist + perp_x * spread) >> 8);
+            int oy = sy + ((dir_y * dist + perp_y * spread) >> 8);
+            if (ox >= 1 && ox < SCREEN_W - 1 && oy >= 1 && oy < SCREEN_H - 1) {
+                int abs_y = is_bottom ? (oy + 192) : oy;
+                stamp_ground_pixel(ox, abs_y, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
+            }
+        }
+    }
+}
+
 void tiles_stamp_particle_droplet(int x, int y, int size, uint16_t color) {
     if (x < 1 || x >= SCREEN_W - 1 || y < 1 || y >= FIELD_H - 1) return;
+    int is_bot = (y >= 192);
+    int ly = is_bot ? (y - 192) : y;
+    mark_ground_stamp(x - 1, ly - 1, x + 2, ly + 1, is_bot);
 
     if (size <= 0) {
         // 75% of light blood droplets dissipate in air without leaving a mark

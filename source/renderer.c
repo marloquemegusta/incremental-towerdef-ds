@@ -615,6 +615,7 @@ void renderer_draw_enemies_top(void) {
     // Render sorted back-to-front (smaller Y first, larger Y drawn on top)
     for (int idx = 0; idx < count; idx++) {
         int i = visible_indices[idx];
+        if (g_enemies[i].dying) continue; // liquefaction renders on the lower screen
         int gx = FROM_FP(g_enemies[i].x);
         int gy = FROM_FP(g_enemies[i].y);
         enemy_draw_sprite_to_buffer8(g_top_backbuffer, gx, gy, g_enemies[i].variant,
@@ -656,13 +657,21 @@ void renderer_draw_enemies_bottom(void) {
             continue;
         }
         int ex, ey, ew, eh;
-        enemy_draw_sprite_to_buffer(g_backbuffer, gx, ly, g_enemies[i].variant,
-                                   g_enemies[i].anim_frame, g_enemies[i].dir,
-                                   (g_enemies[i].biting_target == 99),
-                                   &ex, &ey, &ew, &eh);
+        if (g_enemies[i].dying) {
+            int prog = (g_enemies[i].death_timer * 255) / ENEMY_DEATH_FRAMES;
+            enemy_draw_melting_sprite(g_backbuffer, gx, ly, g_enemies[i].variant,
+                                      g_enemies[i].anim_frame, g_enemies[i].dir, prog,
+                                      g_enemies[i].death_dir_x, g_enemies[i].death_dir_y,
+                                      &ex, &ey, &ew, &eh);
+        } else {
+            enemy_draw_sprite_to_buffer(g_backbuffer, gx, ly, g_enemies[i].variant,
+                                       g_enemies[i].anim_frame, g_enemies[i].dir,
+                                       (g_enemies[i].biting_target == 99),
+                                       &ex, &ey, &ew, &eh);
+        }
         tiles_dirty_mark_rect(ex, ey, ew, eh, 1, s_bot_fb_idx);
         // Health bar if damaged
-        if (g_enemies[i].hp < g_enemies[i].max_hp) {
+        if (!g_enemies[i].dying && g_enemies[i].hp < g_enemies[i].max_hp) {
             int bw = 14;
             int bx = gx - bw / 2;
             int by = ly - 10;
@@ -800,6 +809,43 @@ void renderer_draw_death_particles_bottom(void) {
     }
 }
 
+
+void renderer_draw_gore_chunks_bottom(void) {
+    for (int i = 0; i < MAX_GORE_CHUNKS; i++) {
+        if (!g_gore_chunks[i].active) continue;
+        int cx = FROM_FP(g_gore_chunks[i].x);
+        int cy = FROM_FP(g_gore_chunks[i].y) - 192;
+        int cz = FROM_FP(g_gore_chunks[i].z);
+        int w = g_gore_chunks[i].w;
+        int h = g_gore_chunks[i].h;
+        int draw_y = cy - cz;
+
+        // Ground shadow while the chunk is airborne (converges as it lands)
+        if (cz > 1 && cy >= 0 && cy < SCREEN_H) {
+            uint16_t shd = RGB15(1, 1, 2) | BIT(15);
+            for (int xx = 0; xx < w; xx++) {
+                int px = cx + xx;
+                if (px < 0 || px >= SCREEN_W) continue;
+                renderer_draw_pixel(px, cy, shd);
+            }
+            tiles_dirty_mark_rect(cx - 1, cy - 1, w + 2, 3, 1, s_bot_fb_idx);
+        }
+
+        // The real sprite pixels
+        for (int yy = 0; yy < h; yy++) {
+            int py = draw_y + yy;
+            if (py < 0 || py >= SCREEN_H) continue;
+            for (int xx = 0; xx < w; xx++) {
+                int px = cx + xx;
+                if (px < 0 || px >= SCREEN_W) continue;
+                uint8_t v = g_gore_chunks[i].idx[yy * w + xx];
+                if (!v) continue;
+                g_backbuffer[py * SCREEN_W + px] = g_enemy_palette[v];
+            }
+        }
+        tiles_dirty_mark_rect(cx - 2, draw_y - 2, w + 4, h + 4, 1, s_bot_fb_idx);
+    }
+}
 
 void renderer_draw_ui_wave(void) {
     // Top HUD banner
