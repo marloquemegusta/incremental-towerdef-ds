@@ -1,0 +1,16 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 30, "capture": "01_prep"},
+    {"button_down": "L", "frames": 2},
+    {"button_down": "R", "frames": 4, "capture": "02_overdrive"},
+    {"button_up": "R", "frames": 2},
+    {"button_up": "L", "frames": 6},
+    {"tap": {"x": 210, "y": 176}, "frames": 6},
+    {"release": true, "frames": 20, "capture": "03_wave_started"},
+    {"frames": 600, "capture_sequence": "melt", "capture_every": 1, "capture": "04_end"}
+  ],
+  "assertions": {
+    "screen_changed": {"from": "01_prep", "to": "03_wave_started", "min_changed_pixels": 100}
+  }
+}

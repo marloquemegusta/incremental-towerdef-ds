@@ -15,6 +15,12 @@
 #define MAX_ENEMIES 384
 #define MAX_BULLETS 64
 #define MAX_DEATH_PARTICLES 256
+#define ENEMY_DEATH_FRAMES 15 // Liquefaction animation length (~0.25 s @ 60 FPS)
+
+// Death ground cone (the big directional blood fan). Disabled by default; the whole
+// implementation (tiles_stamp_death_cone) stays in place, so bringing it back is just
+// flipping this to 1 and rebuilding.
+#define DEATH_CONE_ENABLED 0
 #define MAX_TURRETS 4
 #define MAX_CASINGS 256
 #define MAX_BULLET_DARTS 64
@@ -55,9 +61,9 @@
 #define COLOR_XENOS_EYE      (RGB15(31, 5, 4) | BIT(15))
 #define COLOR_XENOS_ICHOR    (RGB15(8, 31, 6) | BIT(15))
 #define COLOR_BLOOD_DARK     (RGB15(16, 2, 8) | BIT(15))
-#define COLOR_XENOS_GORE_CORE (RGB15(25, 9, 28) | BIT(15))
-#define COLOR_XENOS_GORE_MID  (RGB15(15, 3, 17) | BIT(15))
-#define COLOR_XENOS_GORE_DARK (RGB15(5, 1, 7) | BIT(15))
+#define COLOR_XENOS_GORE_CORE (RGB15(31, 6, 8) | BIT(15))   // bright arterial blood
+#define COLOR_XENOS_GORE_MID  (RGB15(20, 2, 4) | BIT(15))   // blood red
+#define COLOR_XENOS_GORE_DARK (RGB15(9, 1, 2) | BIT(15))    // dried crimson
 
 // UI / Phosphor
 #define COLOR_PHOSPHOR_GREEN (RGB15(6, 31, 10) | BIT(15))
@@ -82,6 +88,11 @@ typedef struct {
     int anim_distance;   // Q8 distance accumulated for the next walk pose
     int biting_target;   // -1=None/Marching, 0..3=Turret ID, 99=Bunker Sanctum
     int bite_timer;
+
+    // Death liquefaction: the sprite melts into a puddle over ENEMY_DEATH_FRAMES
+    int dying;
+    int death_timer;
+    int death_dir_x, death_dir_y; // Q8 unit vector of the killing blow (256 = 1.0)
 
     // 60fps Dirty Rects tracking: independent for top and bottom screens
     int prev_top_active;
@@ -154,6 +165,22 @@ typedef struct {
     int prev_bot_x, prev_bot_y;
     int prev_bot_has_shadow, prev_bot_sy;
 } DeathParticle;
+
+// Solid xeno debris: small blocks literally cut out of the enemy sprite (same
+// palette indices), thrown ballistically and tumbling to the ground.
+#define MAX_GORE_CHUNKS 48
+typedef struct {
+    int x, y, z;       // Q8 global x/y, z = height above ground
+    int vx, vy, vz;    // Q8 velocities
+    int life;
+    int active;
+    int w, h;          // block size (max 4x4)
+    uint8_t idx[16];   // enemy palette indices (0 = transparent)
+
+    int prev_bot_active;
+    int prev_bot_x, prev_bot_y;
+    int prev_bot_has_shadow, prev_bot_sy;
+} GoreChunk;
 
 typedef struct {
     int x, y, z;       // Q8 local bottom screen coordinates (z = height above ground)
@@ -390,6 +417,7 @@ extern Turret g_turrets[MAX_TURRETS];
 extern Enemy g_enemies[MAX_ENEMIES];
 extern Bullet g_bullets[MAX_BULLETS];
 extern DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
+extern GoreChunk g_gore_chunks[MAX_GORE_CHUNKS];
 extern WallPlatform g_wall;
 extern CasingParticle g_casings[MAX_CASINGS];
 extern BulletDart g_bullet_darts[MAX_BULLET_DARTS];
@@ -453,6 +481,7 @@ void renderer_draw_bullets(void);
 void renderer_draw_splatters_bottom(void);
 void renderer_draw_splatters_top(void);
 void renderer_draw_death_particles_bottom(void);
+void renderer_draw_gore_chunks_bottom(void);
 void renderer_draw_death_particles_top(void);
 void renderer_draw_ui_prep(void);
 void renderer_draw_ui_wave(void);

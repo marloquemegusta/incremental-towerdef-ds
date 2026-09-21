@@ -9,6 +9,7 @@ Turret g_turrets[MAX_TURRETS];
 Enemy g_enemies[MAX_ENEMIES];
 Bullet g_bullets[MAX_BULLETS];
 DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
+GoreChunk g_gore_chunks[MAX_GORE_CHUNKS];
 
 #include <stdio.h>
 #include <fat.h>
@@ -173,72 +174,151 @@ void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration) 
     tiles_stamp_splatter_directional(x, y, size, 0, 0, 0);
 }
 
-void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
+static void game_stamp_death_puddle(int x, int y, int bvx, int bvy, int variant) {
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) variant = 0;
 
-    // Explosive burst particles: 12 base + variant * 2 (up to 24 for colossus)
-    int particle_count = 12 + variant * 2;
-    if (particle_count > 24) particle_count = 24;
+#if DEATH_CONE_ENABLED
+    // Primary ground stain: a large cone that fans out along the killing blow,
+    // so the puddle itself is unmistakably directional.
+    int length = 26 + variant * 3;
+    int half_width = 10 + variant * 2;
+    tiles_stamp_death_cone(x, y, bvx, bvy, length, half_width);
+#endif
 
-    uint16_t col_primary   = COLOR_XENOS_GORE_MID;
-    uint16_t col_secondary = COLOR_XENOS_GORE_CORE;
-    uint16_t col_chitin    = COLOR_XENOS_CHITIN;
-    uint16_t col_ichor     = COLOR_XENOS_GORE_CORE;
+    // Compact body pool right under the corpse.
+    tiles_stamp_splatter_directional(x, y, 1, bvx, bvy, variant);
+}
 
-    // Proportional organic puddle on ground (contained, builds up into carnage through multiple kills)
-    int pool_size = 1;
-    if (variant >= 2 && variant <= 4) pool_size = 2;
-    else if (variant >= 5 && variant <= 6) pool_size = 3;
-    else if (variant >= 7) pool_size = 4;
+void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
+    game_stamp_death_puddle(x, y, bvx, bvy, variant);
+}
 
-    // Single moderate puddle directly beneath the dying enemy
-    tiles_stamp_splatter_directional(x, y, pool_size, bvx, bvy, variant);
+// Cut a few small blocks straight out of the enemy sprite and throw them: solid
+// xeno debris (real sprite pixels, not recoloured dots) tumbling to the ground.
+static void spawn_gore_chunks(int gx, int gy, int variant, int anim_frame, int dir, int bvy) {
+    if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) return;
+    const EnemyTypeDef *type = &g_enemy_types[variant];
+    if (type->frame_count == 0) return;
 
-    // Airborne ballistic burst
-    int spawned = 0;
-    for (int i = 0; i < MAX_DEATH_PARTICLES && spawned < particle_count; i++) {
-        if (!g_death_particles[i].active) {
-            g_death_particles[i].active = 1;
+    int d = dir & 7;
+    int sd = d - 2;
+    if (sd < 0) sd = 0;
+    if (sd > 4) sd = 4;
+    int f = anim_frame;
+    if (f < 0) f = 0;
+    if (f >= type->frame_count) f %= type->frame_count;
+    const EnemyFrameDef *fd = &type->frames[sd][f];
+    const uint8_t *src = fd->pixels;
+    int fw = fd->w;
+    int fh = fd->h;
+    if (!src || fw < 4 || fh < 4) return;
 
-            if (spawned == 0) {
-                // Flash particle: instantaneous 2-frame kinetic impact pop at center
-                g_death_particles[i].x = TO_FP(x);
-                g_death_particles[i].y = TO_FP(y);
-                g_death_particles[i].z = TO_FP(3);
-                g_death_particles[i].vx = 0;
-                g_death_particles[i].vy = 0;
-                g_death_particles[i].vz = 0;
-                g_death_particles[i].life = 2;
-                g_death_particles[i].size = 3; // Flash diamond
-                g_death_particles[i].color = RGB15(31, 26, 31) | BIT(15);
-            } else {
-                // Energetic radial shrapnel flying in a high 3D arc
-                g_death_particles[i].x = TO_FP(x) + ((rand() % 5 - 2) << (FP_SHIFT - 1));
-                g_death_particles[i].y = TO_FP(y) + ((rand() % 5 - 2) << (FP_SHIFT - 1));
-                g_death_particles[i].z = TO_FP(2 + (rand() % 3));
+    int bs = (fw < 12 || fh < 12) ? 3 : 4; // block size
+    int cols = fw / bs;
+    int rows = fh / bs;
 
-                int ang = rand() % 256;
-                // Radial velocity: 1.0 to 2.75 px/frame
-                int spd = TO_FP(1) + (rand() % (FP_ONE * 7 / 4));
-                g_death_particles[i].vx = ((fixed_cos(ang) * spd) >> FP_SHIFT) + (bvx / 32);
-                g_death_particles[i].vy = ((fixed_sin(ang) * spd) >> FP_SHIFT) + (bvy / 32);
-                // High vertical pop: 2.0 to 4.5 px/frame upwards!
-                g_death_particles[i].vz = TO_FP(2) + (rand() % (FP_ONE * 5 / 2));
-                g_death_particles[i].life = 18 + (rand() % 16);
-
-                if ((spawned % 4) == 1) {
-                    g_death_particles[i].size = 2; // Heavy 2x2 chunk
-                    g_death_particles[i].color = col_chitin;
-                } else if ((spawned % 2) == 0) {
-                    g_death_particles[i].size = 1; // Medium 2x1 fragment
-                    g_death_particles[i].color = col_primary;
-                } else {
-                    g_death_particles[i].size = 0; // 1px droplet
-                    g_death_particles[i].color = ((spawned & 1) == 0) ? col_secondary : col_ichor;
+    const int want = 5;
+    int made = 0;
+    for (int by = 0; by < rows && made < want; by++) {
+        for (int bx = 0; bx < cols && made < want; bx++) {
+            int sx0 = bx * bs;
+            int sy0 = by * bs;
+            int opaque = 0;
+            for (int yy = 0; yy < bs; yy++) {
+                for (int xx = 0; xx < bs; xx++) {
+                    if (src[(sy0 + yy) * fw + (sx0 + xx)]) opaque++;
                 }
             }
-            spawned++;
+            if (opaque < 3) continue; // skip near-empty corners
+
+            int slot = -1;
+            for (int k = 0; k < MAX_GORE_CHUNKS; k++) {
+                if (!g_gore_chunks[k].active) { slot = k; break; }
+            }
+            if (slot < 0) return;
+            GoreChunk *c = &g_gore_chunks[slot];
+            c->active = 1;
+            c->w = bs;
+            c->h = bs;
+            for (int yy = 0; yy < bs; yy++) {
+                for (int xx = 0; xx < bs; xx++) {
+                    c->idx[yy * bs + xx] = src[(sy0 + yy) * fw + (sx0 + xx)];
+                }
+            }
+
+            int ox = gx + fd->offset_x + sx0 + bs / 2;
+            int oy = gy + fd->offset_y + sy0 + bs / 2;
+            c->x = TO_FP(ox);
+            c->y = TO_FP(oy);
+            c->z = TO_FP(2 + (rand() % 4));
+            c->vx = ((rand() % 7) - 3) << (FP_SHIFT - 2);
+            c->vy = (((rand() % 7) - 3) << (FP_SHIFT - 2)) + (bvy / 24);
+            c->vz = TO_FP(2) + (rand() % (FP_ONE * 3 / 2));
+            c->life = 40 + (rand() % 25);
+            c->prev_bot_active = 0;
+            made++;
         }
+    }
+}
+
+// Begin the liquefaction death: the enemy stays alive (rendered) for
+// ENEMY_DEATH_FRAMES while its sprite melts into the growing puddle.
+static void enemy_begin_death(int idx, int bvx, int bvy) {
+    Enemy *e = &g_enemies[idx];
+    e->dying = 1;
+    e->death_timer = 0;
+    // Q8 unit vector of the killing blow (default forward/north, legacy behaviour)
+    int len_sq = (bvx * bvx + bvy * bvy) >> 8;
+    int dx = 0, dy = -256;
+    if (len_sq > 16) {
+        int len = 256;
+        for (int it = 0; it < 5; it++) {
+            if (len > 0) len = (len + len_sq / len) >> 1;
+        }
+        if (len > 0) {
+            dx = (bvx << 8) / len;
+            dy = (bvy << 8) / len;
+        }
+    }
+    e->death_dir_x = dx;
+    e->death_dir_y = dy;
+    // The ground splash lands on impact, exactly like the bullet splash; solid
+    // chunks are thrown and the body then crumples on top of it.
+    game_stamp_death_puddle(FROM_FP(e->x), FROM_FP(e->y), bvx, bvy, e->variant);
+    spawn_gore_chunks(FROM_FP(e->x), FROM_FP(e->y), e->variant, e->anim_frame, e->dir, bvy);
+}
+
+// Advance a dying enemy: liquid keeps landing while the body dissolves; the full
+// directional puddle is stamped on the final frame, once the body is gone.
+static void enemy_update_death(int idx) {
+    Enemy *e = &g_enemies[idx];
+    int x = FROM_FP(e->x);
+    int y = FROM_FP(e->y);
+
+    // The body's pixels break off and fall: emit gore fragments inside the sprite
+    // footprint with a small outward nudge. Gravity drops them to the floor and
+    // each one leaves a droplet, so the puddle forms from the falling body itself.
+    for (int k = 0; k < 4; k++) {
+        for (int p = 0; p < MAX_DEATH_PARTICLES; p++) {
+            if (g_death_particles[p].active) continue;
+            g_death_particles[p].active = 1;
+            g_death_particles[p].x = TO_FP(x + ((rand() % 17) - 8));
+            g_death_particles[p].y = TO_FP(y - (rand() % 18));
+            g_death_particles[p].z = TO_FP(2 + (rand() % 6));
+            g_death_particles[p].vx = ((rand() % 5) - 2) << (FP_SHIFT - 1);
+            g_death_particles[p].vy = (((rand() % 5) - 2) << (FP_SHIFT - 1)) + (e->death_dir_y >> 2);
+            g_death_particles[p].vz = 0;
+            g_death_particles[p].life = 20 + (rand() % 12);
+            g_death_particles[p].size = ((rand() & 3) == 0) ? 1 : 0;
+            g_death_particles[p].color = (rand() & 1) ? COLOR_XENOS_GORE_MID : COLOR_XENOS_GORE_CORE;
+            break;
+        }
+    }
+
+    e->death_timer++;
+    if (e->death_timer >= ENEMY_DEATH_FRAMES) {
+        e->dying = 0;
+        e->active = 0;
     }
 }
 
@@ -279,6 +359,8 @@ static void spawn_enemy_ex(int variant, uint64_t hp, int base_spd, int initial_y
             g_enemies[i].anim_distance = 0;
             g_enemies[i].biting_target = -1;
             g_enemies[i].bite_timer = 0;
+            g_enemies[i].dying = 0;
+            g_enemies[i].death_timer = 0;
 
             g_game.enemies_spawned++;
             g_game.enemies_alive++;
@@ -611,7 +693,7 @@ void wall_update(void) {
     else active_mask = 0x0F;
 
     if (g_wall.locked_enemy_idx >= 0) {
-        if (!g_enemies[g_wall.locked_enemy_idx].active) {
+        if (!g_enemies[g_wall.locked_enemy_idx].active || g_enemies[g_wall.locked_enemy_idx].dying) {
             g_wall.locked_enemy_idx = -1;
         }
     }
@@ -627,7 +709,7 @@ void wall_update(void) {
         int candidate_count = enemy_grid_collect(128, 192 + g_wall.screen_y, 200, candidates);
         for (int ci = 0; ci < candidate_count; ci++) {
             int e = candidates[ci];
-            if (!g_enemies[e].active) continue;
+            if (!g_enemies[e].active || g_enemies[e].dying) continue;
             int gx = FROM_FP(g_enemies[e].x);
             int gy = FROM_FP(g_enemies[e].y);
             if (gy > 192 + g_wall.screen_y + 10) continue; // Behind wall
@@ -695,7 +777,6 @@ void wall_update(void) {
 
         int hit_enemy = 0;
         int hit_e_idx = -1;
-        int hit_x = 0, hit_y = 0;
 
         // 2 sub-steps of 8 px per frame (16 px/frame bullet velocity)
         for (int step = 0; step < 2; step++) {
@@ -713,7 +794,7 @@ void wall_update(void) {
             }
 
             int target_e = g_bullet_darts[i].target_enemy_idx;
-            if (target_e >= 0 && target_e < MAX_ENEMIES && g_enemies[target_e].active) {
+            if (target_e >= 0 && target_e < MAX_ENEMIES && g_enemies[target_e].active && !g_enemies[target_e].dying) {
                 int ex = FROM_FP(g_enemies[target_e].x);
                 int ey = FROM_FP(g_enemies[target_e].y);
                 int ddx = cur_x - ex;
@@ -721,8 +802,6 @@ void wall_update(void) {
                 if (ddx * ddx + ddy * ddy <= 14 * 14 || g_bullet_darts[i].dist_remaining <= 0) {
                     hit_enemy = 1;
                     hit_e_idx = target_e;
-                    hit_x = ex;
-                    hit_y = ey;
                     break;
                 }
             } else {
@@ -730,7 +809,7 @@ void wall_update(void) {
                 int candidate_count = enemy_grid_collect(cur_x, gy, 14, candidates);
                 for (int ci = 0; ci < candidate_count; ci++) {
                     int e = candidates[ci];
-                    if (!g_enemies[e].active) continue;
+                    if (!g_enemies[e].active || g_enemies[e].dying) continue;
                     int ex = FROM_FP(g_enemies[e].x);
                     int ey = FROM_FP(g_enemies[e].y);
                     int ddx = cur_x - ex;
@@ -738,8 +817,6 @@ void wall_update(void) {
                     if (ddx * ddx + ddy * ddy <= 12 * 12) {
                         hit_enemy = 1;
                         hit_e_idx = e;
-                        hit_x = ex;
-                        hit_y = ey;
                         break;
                     }
                 }
@@ -758,7 +835,6 @@ void wall_update(void) {
                 g_enemies[hit_e_idx].hp -= g_bullet_darts[i].damage;
             } else {
                 g_enemies[hit_e_idx].hp = 0;
-                g_enemies[hit_e_idx].active = 0;
                 g_game.enemies_killed++;
                 int v = g_enemies[hit_e_idx].variant;
                 if (v < 0) v = 0;
@@ -766,12 +842,12 @@ void wall_update(void) {
                 uint64_t base_scrap = g_balance.enemy_scrap[v];
                 uint64_t reward = base_scrap * (1 + g_game.upgrades.bio_harvest_lvl);
                 g_game.scrap += reward;
-                game_spawn_death_gore(hit_x, hit_y, g_bullet_darts[i].vx, g_bullet_darts[i].vy, g_enemies[hit_e_idx].variant);
+                enemy_begin_death(hit_e_idx, g_bullet_darts[i].vx, g_bullet_darts[i].vy);
             }
             g_bullet_darts[i].active = 0;
         } else if (hit_enemy == 2 || g_bullet_darts[i].dist_remaining <= 0) {
             int target_e = g_bullet_darts[i].target_enemy_idx;
-            if (target_e >= 0 && target_e < MAX_ENEMIES && g_enemies[target_e].active) {
+            if (target_e >= 0 && target_e < MAX_ENEMIES && g_enemies[target_e].active && !g_enemies[target_e].dying) {
                 if (g_enemies[target_e].incoming_damage >= (uint64_t)g_bullet_darts[i].damage) {
                     g_enemies[target_e].incoming_damage -= g_bullet_darts[i].damage;
                 } else {
@@ -826,6 +902,7 @@ void game_init(void) {
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_death_particles, 0, sizeof(g_death_particles));
+    memset(g_gore_chunks, 0, sizeof(g_gore_chunks));
 
     g_wall.hp = 0;
     wall_init();
@@ -897,6 +974,7 @@ void game_start_wave(void) {
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_death_particles, 0, sizeof(g_death_particles));
+    memset(g_gore_chunks, 0, sizeof(g_gore_chunks));
 
     // Reset locked targets
     for (int t = 0; t < MAX_TURRETS; t++) {
@@ -919,6 +997,7 @@ void game_reset_to_prep(void) {
     memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_death_particles, 0, sizeof(g_death_particles));
+    memset(g_gore_chunks, 0, sizeof(g_gore_chunks));
 
     // Repair turrets back to full between waves
     for (int t = 0; t < MAX_TURRETS; t++) {
@@ -1024,9 +1103,53 @@ void game_update_simulation(void) {
         }
     }
 
+    // 2b. Solid xeno debris chunks: tumble, then burn into the ground for good
+    for (int i = 0; i < MAX_GORE_CHUNKS; i++) {
+        if (!g_gore_chunks[i].active) continue;
+        GoreChunk *c = &g_gore_chunks[i];
+        int settled = 0;
+        c->x += c->vx;
+        c->y += c->vy;
+        c->z += c->vz;
+        c->vx = (c->vx * 63) / 64;
+        c->vy = (c->vy * 63) / 64;
+        c->vz -= (FP_ONE / 6); // a touch heavier than blood
+        if (c->z <= 0) {
+            c->z = 0;
+            c->vz = -(c->vz * 35) / 100;
+            c->vx = (c->vx * 55) / 100;
+            c->vy = (c->vy * 55) / 100;
+            if (c->vz < (FP_ONE / 2)) {
+                c->vz = 0;
+                c->vx = 0;
+                c->vy = 0;
+                settled = 1;
+            }
+        }
+        c->life--;
+        if (settled || c->life <= 0) {
+            // Burn the block into the ground cache so the debris stays forever,
+            // and free the slot right away.
+            int gx = FROM_FP(c->x);
+            int gy = FROM_FP(c->y);
+            for (int yy = 0; yy < c->h; yy++) {
+                for (int xx = 0; xx < c->w; xx++) {
+                    uint8_t v = c->idx[yy * c->w + xx];
+                    if (!v) continue;
+                    tiles_stamp_ground_dot(gx + xx, gy + yy, g_enemy_palette[v]);
+                }
+            }
+            c->active = 0;
+        }
+    }
+
     // 3. Update Enemies (Descending vertically and converging towards central bunker at x=128, y=360)
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) continue;
+        if (g_enemies[i].dying) {
+            enemy_update_death(i);
+            continue;
+        }
 
         int ex = g_enemies[i].x;
         int ey = g_enemies[i].y;
@@ -1107,7 +1230,7 @@ void game_update_simulation(void) {
                     int cell = near_y * ENEMY_GRID_W + near_x;
                     for (int j = s_enemy_grid_heads[cell]; j >= 0; j = s_enemy_grid_next[j]) {
                         g_game.prof_sep_checks++;
-                        if (i == j || !g_enemies[j].active) continue;
+                        if (i == j || !g_enemies[j].active || g_enemies[j].dying) continue;
                         int ody = ey - g_enemies[j].y;
                         int aody = (ody < 0) ? -ody : ody;
                         if (aody >= TO_FP(16)) continue;
@@ -1310,7 +1433,7 @@ void game_update_simulation(void) {
             for (int ci = 0; ci < candidate_count; ci++) {
                 int e = candidates[ci];
                 g_game.prof_target_candidates++;
-                if (!g_enemies[e].active) continue;
+                if (!g_enemies[e].active || g_enemies[e].dying) continue;
                 int gy = FROM_FP(g_enemies[e].y);
                 if (gy < 192) continue; // Only shoot enemies on bottom screen
                 int local_y = gy - 192;
@@ -1326,7 +1449,7 @@ void game_update_simulation(void) {
             }
         } else {
             // Manual locked enemy from stylus tap
-            if (tur->locked_enemy_idx >= 0 && g_enemies[tur->locked_enemy_idx].active) {
+            if (tur->locked_enemy_idx >= 0 && g_enemies[tur->locked_enemy_idx].active && !g_enemies[tur->locked_enemy_idx].dying) {
                 int gy = FROM_FP(g_enemies[tur->locked_enemy_idx].y);
                 if (gy >= 192) {
                     int local_y = gy - 192;
@@ -1348,7 +1471,7 @@ void game_update_simulation(void) {
             for (int ci = 0; ci < candidate_count; ci++) {
                 int e = candidates[ci];
                 g_game.prof_target_candidates++;
-                if (!g_enemies[e].active) continue;
+                if (!g_enemies[e].active || g_enemies[e].dying) continue;
                 int gy = FROM_FP(g_enemies[e].y);
                 if (gy < 192) continue;
                 int local_y = gy - 192;
@@ -1463,7 +1586,7 @@ void game_update_simulation(void) {
         for (int ci = 0; ci < candidate_count; ci++) {
             int e = candidates[ci];
             g_game.prof_collision_candidates++;
-            if (!g_enemies[e].active) continue;
+            if (!g_enemies[e].active || g_enemies[e].dying) continue;
             int gy = FROM_FP(g_enemies[e].y);
             if (gy < 192) continue; // Only collide in bottom screen
             int local_y = gy - 192;
@@ -1486,7 +1609,6 @@ void game_update_simulation(void) {
                     g_enemies[e].hp -= dmg;
                 } else {
                     g_enemies[e].hp = 0;
-                    g_enemies[e].active = 0;
                     g_game.enemies_alive--;
                     g_game.enemies_killed++;
 
@@ -1499,7 +1621,7 @@ void game_update_simulation(void) {
                     }
                     g_game.scrap += reward;
 
-                    game_spawn_death_gore(gx, gy, g_bullets[b].vx, g_bullets[b].vy, g_enemies[e].variant);
+                    enemy_begin_death(e, g_bullets[b].vx, g_bullets[b].vy);
                 }
 
                 int tid = g_bullets[b].turret_idx;
@@ -1523,7 +1645,7 @@ void game_update_simulation(void) {
     if (g_game.wave_timer <= 0) {
         int active_count = 0;
         for (int i = 0; i < MAX_ENEMIES; i++) {
-            if (g_enemies[i].active) active_count++;
+            if (g_enemies[i].active && !g_enemies[i].dying) active_count++;
         }
 
         if (active_count == 0) {
@@ -1635,7 +1757,7 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
         int hit_enemy = -1;
         int best_dsq = 0x7fffffff;
         for (int e = 0; e < MAX_ENEMIES; e++) {
-            if (!g_enemies[e].active) continue;
+            if (!g_enemies[e].active || g_enemies[e].dying) continue;
             int gy = FROM_FP(g_enemies[e].y);
             if (gy < 192) continue; // Must be on bottom screen
             int local_y = gy - 192;
@@ -2173,6 +2295,8 @@ void game_sandbox_spawn_enemy(int x, int y) {
             g_enemies[i].anim_frame = 0;
             g_enemies[i].biting_target = -1;
             g_enemies[i].bite_timer = 0;
+            g_enemies[i].dying = 0;
+            g_enemies[i].death_timer = 0;
             g_enemies[i].vx = 0;
             g_enemies[i].vy = (g_enemies[i].speed * FP_ONE) / 60;
             g_game.enemies_alive++;
