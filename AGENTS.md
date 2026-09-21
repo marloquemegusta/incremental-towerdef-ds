@@ -1,5 +1,20 @@
 # AGENTS.md
 
+## Taxonomía documental (qué va dónde)
+
+El repo tiene **cuatro fuentes de verdad** y **no se duplican**: cada una es canónica de su ámbito y las demás la referencian.
+
+| Documento | Contiene | **No** contiene |
+| :--- | :--- | :--- |
+| `DESIGN.md` | Producto y diseño: visión, mundo, mecánicas, economía, balance, **lenguaje visual** (croma, assets maestros, escenario) y registro de decisiones (`[OQ-*]`). | Cómo está implementado, ni proceso de agente. |
+| `TECHNICAL.md` | Invariantes de implementación: plataforma, punto fijo, pipeline de render, presupuestos de CPU y estructuras de datos. | Decisiones de producto, ni proceso de sesión. |
+| `AGENTS.md` (este) | Proceso del agente: roles, sesión/ramas/worktrees, evidencias, permisos, entrega y upload. | Diseño ni técnica: sólo los **referencia**. |
+| Skill `ds-game-dev` | Workflow genérico de Nintendo DS (toolchain, build, escenarios, evidencias, GDB, upload), válido para cualquier proyecto DS. | Nada específico de `towerds`. |
+
+Además, `STATUS.md` es un **registro de estado por hitos** (no es fuente de verdad: se apoya en la evidencia de `artifacts/` y en los walkthroughs).
+
+**Regla de conflicto:** si algo contradice a `DESIGN.md` o `TECHNICAL.md`, mandan ellos; aquí sólo se apunta. Si una regla de diseño o de técnica aparece escrita en este documento, es un error: se mueve a su fuente.
+
 ## Roles & Repositorio
 - Proyecto: Tower Defense Incremental para Nintendo DS (`towerds`).
 - Propietario del producto: Usuario.
@@ -17,22 +32,12 @@
    - Toda simulación visual, prueba de tiles/escenario, animación y demostración de combate DEBE compilarse directamente en la ROM (`scripts/build-project.ps1`) y ejecutarse dentro del motor real de C en ARM9 mediante escenarios headless de DeSmuME (`scripts/run-scenario.ps1`).
    - Esto garantiza que la física, las partículas balísticas, los casquillos, el retroceso hidráulico, los splatters de sangre con dithering y la lógica determinista real del juego sean los que generen invariablemente las capturas y GIFs de evidencia.
    - Al incorporar o proponer nuevos tiles o sprites, se deben convertir a los arrays C correspondientes, compilar la ROM y capturar el resultado con DeSmuME.
-6. **Definición de Assets Maestros de Sprites:** El asset maestro canónico de cualquier entidad con animación (torretas, enemigos, etc.) es SIEMPRE la cinta completa de animación (`*_strip_master_1x.png`). Los archivos GIF son exclusivamente recursos ilustrativos de previsualización para el usuario. Las hojas de propuestas exploratorias iniciales (p. ej. hojas de 12 propuestas) se archivan únicamente como referencia histórica.
-7. **Campo de Batalla Abierto y Muralla Defensiva:**
-   - **Superficie Abierta (256 px):** El campo de batalla abarca el ancho completo de 256 px de la pantalla, sin carriles cerrados ni calzadas estrechas de 32 px. Los enemigos avanzan libremente hacia el sur en formación de enjambre sobre la superficie urbana completa.
-   - **Muralla Defensiva:** La posición fortificada se sitúa en la cota canónica WALL_DEFAULT_Y (Y=144) de la pantalla inferior, sirviendo de anclaje para las torretas activas y la línea de defensa.
-8. **Regla Canónica de Exclusividad Cromática Xenos:**
-   - La gama púrpura/violeta/magenta (`RGB 115, 35, 155` a `RGB 240, 150, 255`) y el blanco hueso luminoso quedan **estrictamente reservados para el enjambre xenos**.
-   - Queda estrictamente prohibido utilizar matices púrpuras en el escenario (suelo de metal, aceras, muros, conos o maquinaria del Mechanicus), garantizando un contraste visual inmediato y sin ambigüedades entre los enemigos y el entorno balístico.
-   - El **gore/sangre** usa una paleta **ROJA** (`COLOR_XENOS_GORE_*`: arterial → seca) y **nunca** púrpura, para no confundirse con el enjambre. La **chitina** desprendida (fragmentos de coraza) sí conserva el púrpura xenos.
-9. **Regla Canónica de Suelo Isométrico 2:1 y Assets Maestros de Escenario (Sector 1):**
-   - El suelo de combate de Sector 1 utiliza la proyección isométrica 2:1 (`dx=2, dy=1`) mediante tiles maestros de 32x32 px (`assets/tiles/sector1/master/tile_061_cobblestone_1x.png`, `tile_062_irregular_1x.png`, `tile_063_flagstone_1x.png`) generados por Scrabling.
-   - En el motor de C (`source/tiles.c`, `source/renderer.c`), se renderizan en modo bitmap / modo 5 paletizado con solapamiento *back-to-front* (paso vertical $Y=8$ px y horizontal $X=16$ px alternado).
-   - Queda estrictamente prohibido el uso de los antiguos tiles cenitales/ortogonales a 90° (archivados en `assets/tiles/sector1/archive/`).
-10. **Regla Canónica de Fuego Total en Pantalla Inferior (Sin Rango):**
-    - No existe el concepto de rango/alcance. La muralla puede batir a cualquier enemigo vivo sobre la superficie inferior completa ($Y$ local $0..143$), y el stylus puede seleccionar objetivos en toda esa superficie.
-    - Queda estrictamente prohibida cualquier franja, línea o indicador de demarcación de rango de tiro sobre el empedrado (incluida la antigua pintura vial amarilla en $Y=64$).
-    - `g_balance.turret_range[]` se conserva como mecanismo dormido con valor $0$, exclusivamente por reversibilidad; $0$ = campo inferior completo, y cualquier valor $>0$ reintroduciría una línea de fuego.
+6. **Invariantes de diseño y técnica (viven en su documento canónico; aquí sólo se referencian):**
+   - **Lenguaje visual y croma** — púrpura reservado al enjambre, **sangre en paleta roja**, assets maestros de sprites (`*_strip_master_1x.png`) → `DESIGN.md` §7 y §11.
+   - **Escenario** — campo abierto de 256 px, muralla defensiva en `WALL_DEFAULT_Y`, suelo isométrico 2:1 (prohibido el cenital) → `DESIGN.md` §11 (y §2/§3).
+   - **Sin rango** — fuego total en la pantalla inferior, sin franjas de demarcación → `DESIGN.md` `[OQ-06]`.
+   - **Render y rendimiento** — punto fijo, framebuffer con dirty grid, presupuesto de 545 ticks → `TECHNICAL.md` y la skill (`references/performance-architecture.md`).
+   - Si algo de esto cambia, se cambia **en su documento**; aquí no se duplica.
 
 ## Protocolo de Sesiones Atómicas, Ramas y Worktrees
 1. **Un Chat = Una Sesión Atómica (Feature-Scoped):** Cada nueva conversación con el asistente se dedica exclusivamente a una feature, fix o iteración concreta, evitando dispersión de contexto.
