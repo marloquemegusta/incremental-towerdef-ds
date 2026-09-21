@@ -25,3 +25,6 @@ runtime/build/
 # Temporary scratch and staging
 scratch/
 
+# Command Code local-only state (machine-specific permissions and absolute paths)
+.commandcode/settings.json
+
