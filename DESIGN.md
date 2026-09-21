@@ -15,6 +15,7 @@ Documento canónico vivo de visión de juego, arquitectura de simulación balís
 8. [Sistema de Calibración en Hardware (`[CALIB]`)](#8-sistema-de-calibración-en-hardware-calib)
 9. [Hoja de Ruta de Fases de Desarrollo (De la Fricción al Megaproyecto)](#9-hoja-de-ruta-de-fases-de-desarrollo-de-la-fricción-al-megaproyecto)
 10. [Registro Vivo de Preguntas Abiertas (Open Questions)](#10-registro-vivo-de-preguntas-abiertas-open-questions)
+11. [Lenguaje Visual Canónico y Assets](#11-lenguaje-visual-canónico-y-assets)
 
 ---
 
@@ -134,6 +135,7 @@ Ocho especies canónicas con siluetas, comportamientos y paletas estrictas:
 ### Regla Canónica de Exclusividad Cromática Xenos
 - La gama **púrpura / violeta / magenta** (`RGB 115, 35, 155` a `RGB 240, 150, 255`) y el blanco hueso quedan **estrictamente reservados para el enjambre xenos**.
 - Prohibido emplear tonos púrpuras en el suelo metálico, muros o maquinaria imperial, garantizando lectura limpia figura-fondo.
+- El **gore / sangre** usa una paleta **ROJA** (`COLOR_XENOS_GORE_*`: arterial → seca) y **nunca** púrpura, para que no se confunda con el enjambre. La **chitina** desprendida (fragmentos de coraza) sí conserva el púrpura xenos.
 
 ---
 
@@ -239,3 +241,18 @@ Leyenda de Estados:
 - **Decisión:** Se prohíben las escalas artificiales por mero cambio de paleta cromática. La escala se basa en:
   1. **Colosos Terrestres de Asalto:** Criaturas masivas (~1/3 de pantalla táctil, 64-80 px) con $\times 20$ a $\times 50$ HP que absorben fuego y poseen mecánicas de nodriza/desove continuo.
   2. **Titán Colosal en Pantalla Superior:** Asedio a dos pantallas en el clímax de la run, dañado mediante balística vertical que cruza la bisagra y superarmas del Megaproyecto.
+
+---
+
+## 11. Lenguaje Visual Canónico y Assets
+
+### A. Assets maestros de sprites
+- El **asset maestro** canónico de cualquier entidad con animación (torretas, enemigos, etc.) es SIEMPRE la **cinta completa de animación** (`*_strip_master_1x.png`).
+- Los **GIF** son exclusivamente **previsualización** para el usuario. Las hojas de propuestas exploratorias iniciales se archivan como referencia histórica.
+- Al incorporar un sprite o tile nuevo se convierte al **array C** correspondiente, se compila la ROM y se captura con DeSmuME (proceso en `AGENTS.md`).
+
+### B. Escenario de combate
+- **Campo abierto (256 px):** el campo abarca el ancho completo de la pantalla, **sin carriles** ni calzadas estrechas de 32 px; el enjambre avanza libremente hacia el sur (§2).
+- **Muralla defensiva:** anclada en la cota canónica `WALL_DEFAULT_Y` (**Y = 144** de la pantalla inferior), sirve de anclaje a las torretas activas y a la línea de defensa (§3).
+- **Suelo isométrico 2:1** (`dx=2, dy=1`) con tiles maestros de 32×32 px (`assets/tiles/sector1/master/tile_061_cobblestone_1x.png`, `tile_062_irregular_1x.png`, `tile_063_flagstone_1x.png`), renderizados en modo bitmap / modo 5 paletizado con solapamiento *back-to-front*. Queda **prohibido** el uso de los tiles cenitales/ortogonales a 90° (archivados en `assets/tiles/sector1/archive/`).
+- **Sin rango:** la muralla bate toda la pantalla inferior y el stylus puede seleccionar cualquier enemigo de esa superficie; queda prohibida cualquier franja o línea de demarcación de alcance sobre el empedrado (`[OQ-06]`).
