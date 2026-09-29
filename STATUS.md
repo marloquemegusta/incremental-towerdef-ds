@@ -76,5 +76,21 @@
     - Fix de doble buffer: los charcos se borraban en el *page flip* (ahora cada estampado marca su área, `mark_ground_stamp`); fix de la normalización Q8 del vector bala.
     - Evidencia y detalle: `walkthroughs/splatter-impact-direction/walkthrough.md` (A/B antes/después, estudio de ablación y coste medido).
 
+## Fase Actual: Hito 4 (City Defense Full Incremental) - EN PROGRESO
+
+> Transición completa desde el modelo TD tradicional / híbrido hacia un City Defense Incremental puro: stream continuo de spawn regulado por diales del Atraedor, eliminación de Game Over, generador de 7 tiers de automatización con degradación por daño, batería unificada (1 lógica / 4 sprites visuales), y economía basada en chatarra directa y vetas minables.
+> 
+> **Genealogía de Ramas:**
+> - `classic-towerdefense`: Preservación histórica del TD inicial.
+> - `hybrid-clicker-td`: Preservación del híbrido previo (batería, recarga manual, gore 60 FPS).
+> - `full-incremental`: Rama activa de trabajo por defecto.
+
+- [ ] **Demo Vertical Slice (Bucle continuo y degradación sin Game Over):**
+  - [ ] Presupuesto de spawn continuo en enteros (`budget += rate * dt`).
+  - [ ] Normalización de tiers de enemigos (T1: 3 HP / 1 scrap, T2: 15 HP / 5 scrap).
+  - [ ] 1 torreta lógica / 4 sprites visuales con alternancia rotatoria de disparo en pantalla inferior.
+  - [ ] Andamio + Generador de 7 tiers (5 HP por tier) sustituyendo al muro con Game Over.
+  - [ ] Validación determinista de 60 FPS en DeSmuME con captura/GIF de evidencia.
+
 
 
