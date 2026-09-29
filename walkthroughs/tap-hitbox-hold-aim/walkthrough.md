@@ -88,6 +88,7 @@ Imagen recortada ×4 (fila 1: baseline; fila 2: nueva; columna 1: antes de dispa
 - **Verificado en emulador (headless DeSmuME):** el apuntado persistente (A/B 0 px vs 771 px con control del frame de disparo) y la geometría de cobertura de la hitbox (auditoría estática sobre las definiciones de sprite reales).
 - **No verificado como captura diferencial:** el A/B **funcional** de la hitbox. Para la variante 0 (el enemigo temprano más común) el círculo antiguo ya cubría casi toda la silueta (solo 7 px fuera), así que un tap diferencial con enemigos tempranos **no discrimina**. La evidencia de la hitbox es **geométrica**, y se declara como tal.
 - **No verificado en hardware:** la sensación táctil real (pantalla resistiva) y los botones físicos. Los escenarios inyectan input por el *frontend* del emulador; la validación física queda pendiente en la DS.
+- **Preexistente (ajeno a esta sesión):** `scenarios/full_screen_targeting.json` falla con `screen_unchanged` de forma **idéntica** en el baseline (`3F2535A3`) y en la ROM nueva (`2AF89A56`): su tap de arranque de oleada no inicia la ola en el frame que el escenario asume. No lo he tocado; por eso **no** puedo declarar «regresión verde» sobre ese escenario.
 - **Fuera de alcance (sin cambios):** la banda táctil de combate sigue siendo `py 14..169` (el canon dice `Y_local 0..143`); no se ha tocado la cadencia (verificado que ya era plana) ni el camino legacy `g_turrets` (inerte).
 
 ## 8. Ficheros Modificados
