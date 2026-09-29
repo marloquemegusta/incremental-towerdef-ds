@@ -794,14 +794,14 @@ void renderer_draw_ui_wave(void) {
     // Top HUD banner
     top_fill_rect(0, 0, SCREEN_W, 28, TOP_COLOR_BLACK);
     char buf[64];
-    int rate_int = g_game.dial_rate_q8 >> 8;
-    int rate_dec = ((g_game.dial_rate_q8 & 0xFF) * 10) / 256;
-    snprintf(buf, sizeof(buf), "DIAL:%d.%d/s", rate_int, rate_dec);
+    int rate_whole = g_game.dial_rate_ticks / 20;
+    int rate_frac = (g_game.dial_rate_ticks % 20) * 5;
+    snprintf(buf, sizeof(buf), "DIAL:%d.%02d/s", rate_whole, rate_frac);
     top_draw_text(6, 2, buf, TOP_COLOR_AMBER);
 
-    int tier_int = g_game.dial_tier_q8 >> 8;
-    int tier_dec = ((g_game.dial_tier_q8 & 0xFF) * 10) / 256;
-    snprintf(buf, sizeof(buf), "TIER:T%d.%d", tier_int, tier_dec);
+    int tier_whole = g_game.dial_tier_ticks / 20;
+    int tier_frac = (g_game.dial_tier_ticks % 20) * 5;
+    snprintf(buf, sizeof(buf), "TIER:T%d.%02d", tier_whole, tier_frac);
     top_draw_text(80, 2, buf, TOP_COLOR_WHITE);
 
     char scrap_buf[32];
@@ -1154,13 +1154,13 @@ void renderer_draw_ui_calibration(void) {
 
     for (int r = 0; r < 8; r++) {
         if (r == 0) {
-            int rate_int = g_game.dial_rate_q8 >> 8;
-            int rate_dec = ((g_game.dial_rate_q8 & 0xFF) * 10) / 256;
-            snprintf(buf, sizeof(buf), "%d.%d/s", rate_int, rate_dec);
+            int rate_whole = g_game.dial_rate_ticks / 20;
+            int rate_frac = (g_game.dial_rate_ticks % 20) * 5;
+            snprintf(buf, sizeof(buf), "%d.%02d/s", rate_whole, rate_frac);
         } else if (r == 1) {
-            int tier_int = g_game.dial_tier_q8 >> 8;
-            int tier_dec = ((g_game.dial_tier_q8 & 0xFF) * 10) / 256;
-            snprintf(buf, sizeof(buf), "T%d.%d", tier_int, tier_dec);
+            int tier_whole = g_game.dial_tier_ticks / 20;
+            int tier_frac = (g_game.dial_tier_ticks % 20) * 5;
+            snprintf(buf, sizeof(buf), "T%d.%02d", tier_whole, tier_frac);
         } else {
             int val = 0;
             switch (r) {

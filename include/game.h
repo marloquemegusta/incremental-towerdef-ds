@@ -385,11 +385,15 @@ typedef struct {
 
     // Stream Spawner (City Defense Incremental)
     int spawn_rate_q8;       // Enemies per second in Q8
-    int spawn_budget_q8;     // Fractional accumulator
+    int spawn_budget_q8;     // Fractional accumulator (units: rate_q8 * frames)
     int dial_quantity;       // Compatibility: integer enemies/s
     int dial_max_tier;       // Compatibility: integer max biocaste tier
-    int dial_rate_q8;        // Continuous enemies/s in Q8 (e.g. 512 = 2.0/s)
-    int dial_tier_q8;        // Continuous biocaste threat level in Q8 (e.g. 256 = T1.0, 333 = T1.3)
+    int dial_rate_ticks;     // Dial rate in 0.05/s units, source of truth (0..200 => 0.00..10.00/s)
+    int dial_tier_ticks;     // Dial threat tier in 0.05 units, source of truth (20..80 => T1.00..T4.00)
+    int dial_rate_hold_timer; // D-pad UP/DOWN autorepeat timer for the rate dial
+    int dial_tier_hold_timer; // D-pad LEFT/RIGHT autorepeat timer for the threat dial
+    int dial_rate_q8;        // Derived from dial_rate_ticks: continuous enemies/s in Q8 (512 = 2.0/s)
+    int dial_tier_q8;        // Derived from dial_tier_ticks: biocaste threat in Q8 (256 = T1.0, 333 = T1.3)
 
     int fast_forward;
     int sim_ticks_elapsed;
