@@ -363,76 +363,7 @@ void renderer_draw_wall(void) {
         }
     }
 
-    // 4. Diegetic 32 Cathode Bulbs Wall Health Row along the bottom edge (Y=188, X=4..252)
-    {
-        int num_bulbs = 32;
-        int max_hp = (g_wall.max_hp > 0) ? g_wall.max_hp : 1;
-        int lit_bulbs = (int)((g_wall.hp * num_bulbs + max_hp - 1) / max_hp);
-        if (g_wall.hp > 0 && lit_bulbs == 0) lit_bulbs = 1;
-        if (lit_bulbs > num_bulbs) lit_bulbs = num_bulbs;
 
-        int is_flashing = (g_wall.damage_flash_timer > 0);
-
-        uint16_t col_hot, col_glow;
-        if (is_flashing) {
-            // Trauma flash: bright white-gold shockwave across active bulbs
-            col_hot  = RGB15(31, 31, 28) | BIT(15);
-            col_glow = RGB15(31, 22, 4)  | BIT(15);
-        } else if (g_wall.hp * 4 > (uint64_t)max_hp) {
-            // Healthy (>25%): Emerald Green Phosphor
-            col_hot  = RGB15(24, 31, 24) | BIT(15);
-            col_glow = RGB15(2, 31, 6)   | BIT(15);
-        } else {
-            // Critical (<=25%): Pulsing Crimson Alert
-            static int s_pulse_timer = 0;
-            s_pulse_timer++;
-            if ((s_pulse_timer / 8) % 2 == 0) {
-                col_hot  = RGB15(31, 24, 24) | BIT(15);
-                col_glow = RGB15(31, 4, 4)   | BIT(15);
-            } else {
-                col_hot  = RGB15(24, 6, 6)   | BIT(15);
-                col_glow = RGB15(16, 2, 2)   | BIT(15);
-            }
-        }
-        // Distinct lifeless extinguished socket: dark gray ring, black hollow center
-        uint16_t col_dead_rim   = RGB15(6, 6, 7) | BIT(15);
-        uint16_t col_dead_core  = RGB15(1, 1, 2) | BIT(15);
-        uint16_t col_bezel      = RGB15(3, 3, 4) | BIT(15);
-
-        tiles_dirty_mark_rect(0, 186, SCREEN_W, 6, 1, s_bot_fb_idx);
-        int cy = 188;
-        for (int i = 0; i < num_bulbs; i++) {
-            int cx = 4 + i * 8;
-            int is_lit = (i < lit_bulbs);
-            uint16_t c_core = is_lit ? col_hot : col_dead_core;
-            uint16_t c_rim  = is_lit ? col_glow : col_dead_rim;
-
-            // 4x4 circular bezel housing
-            // Row 0 (cy - 1): . # # .
-            g_backbuffer[(cy - 1) * SCREEN_W + cx - 1] = col_bezel;
-            g_backbuffer[(cy - 1) * SCREEN_W + cx]     = c_rim;
-            g_backbuffer[(cy - 1) * SCREEN_W + cx + 1] = c_rim;
-            g_backbuffer[(cy - 1) * SCREEN_W + cx + 2] = col_bezel;
-
-            // Row 1 (cy):     # O O #
-            g_backbuffer[cy * SCREEN_W + cx - 1] = c_rim;
-            g_backbuffer[cy * SCREEN_W + cx]     = c_core;
-            g_backbuffer[cy * SCREEN_W + cx + 1] = c_core;
-            g_backbuffer[cy * SCREEN_W + cx + 2] = c_rim;
-
-            // Row 2 (cy + 1): # O O #
-            g_backbuffer[(cy + 1) * SCREEN_W + cx - 1] = c_rim;
-            g_backbuffer[(cy + 1) * SCREEN_W + cx]     = c_core;
-            g_backbuffer[(cy + 1) * SCREEN_W + cx + 1] = c_core;
-            g_backbuffer[(cy + 1) * SCREEN_W + cx + 2] = c_rim;
-
-            // Row 3 (cy + 2): . # # .
-            g_backbuffer[(cy + 2) * SCREEN_W + cx - 1] = col_bezel;
-            g_backbuffer[(cy + 2) * SCREEN_W + cx]     = c_rim;
-            g_backbuffer[(cy + 2) * SCREEN_W + cx + 1] = c_rim;
-            g_backbuffer[(cy + 2) * SCREEN_W + cx + 2] = col_bezel;
-        }
-    }
 
     // 3. Draw Casings (Heavy Tumbling Brass Artillery Particles)
     for (int i = 0; i < MAX_CASINGS; i++) {
@@ -855,11 +786,15 @@ void renderer_draw_ui_wave(void) {
     // Top HUD banner
     top_fill_rect(0, 0, SCREEN_W, 28, TOP_COLOR_BLACK);
     char buf[64];
-    snprintf(buf, sizeof(buf), "DIAL:%d/s", g_game.dial_quantity);
+    int rate_int = g_game.dial_rate_q8 >> 8;
+    int rate_dec = ((g_game.dial_rate_q8 & 0xFF) * 10) / 256;
+    snprintf(buf, sizeof(buf), "DIAL:%d.%d/s", rate_int, rate_dec);
     top_draw_text(6, 2, buf, TOP_COLOR_AMBER);
 
-    snprintf(buf, sizeof(buf), "TIER:T%d", g_game.dial_max_tier);
-    top_draw_text(74, 2, buf, TOP_COLOR_WHITE);
+    int tier_int = g_game.dial_tier_q8 >> 8;
+    int tier_dec = ((g_game.dial_tier_q8 & 0xFF) * 10) / 256;
+    snprintf(buf, sizeof(buf), "TIER:T%d.%d", tier_int, tier_dec);
+    top_draw_text(80, 2, buf, TOP_COLOR_WHITE);
 
     char scrap_buf[32];
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
@@ -872,16 +807,9 @@ void renderer_draw_ui_wave(void) {
              g_game.prof_pres_ticks, g_game.prof_sim_ticks, g_game.prof_enemies_active);
     top_draw_text(6, 10, buf, TOP_COLOR_WHITE);
 
-    // Row 3: Generator Tiers Status: A1..A7
-    snprintf(buf, sizeof(buf), "GEN:[%c%d][%c%d][%c%d][%c%d][%c%d][%c%d][%c%d]",
-             g_generator.tiers[0].active ? '1' : 'X', g_generator.tiers[0].hp,
-             g_generator.tiers[1].active ? '2' : 'X', g_generator.tiers[1].hp,
-             g_generator.tiers[2].active ? '3' : 'X', g_generator.tiers[2].hp,
-             g_generator.tiers[3].active ? '4' : 'X', g_generator.tiers[3].hp,
-             g_generator.tiers[4].active ? '5' : 'X', g_generator.tiers[4].hp,
-             g_generator.tiers[5].active ? '6' : 'X', g_generator.tiers[5].hp,
-             g_generator.tiers[6].active ? '7' : 'X', g_generator.tiers[6].hp);
-    uint8_t col = g_generator.tiers[0].active ? TOP_COLOR_PHOSPHOR_GREEN : TOP_COLOR_LED_RED;
+    // Row 3: Generator Status
+    snprintf(buf, sizeof(buf), "GENERATOR: %d/7 TIERS ACTIVE", g_generator.built_tiers);
+    uint8_t col = (g_generator.built_tiers > 0) ? TOP_COLOR_PHOSPHOR_GREEN : TOP_COLOR_AMBER;
     top_draw_text(6, 19, buf, col);
 
     // If currently dragging ammo crate
@@ -1217,16 +1145,25 @@ void renderer_draw_ui_calibration(void) {
     };
 
     for (int r = 0; r < 8; r++) {
-        int val = 0;
-        switch (r) {
-            case 0: val = g_game.dial_quantity; break;
-            case 1: val = g_game.dial_max_tier; break;
-            case 2: val = g_generator.built_tiers; break;
-            case 3: val = g_generator.tiers[0].hp; break;
-            case 4: val = g_generator.tiers[1].hp; break;
-            case 5: val = g_game.fast_forward; break;
-            case 6: val = (int)g_game.scrap; break;
-            case 7: val = (int)g_wall.hp; break;
+        if (r == 0) {
+            int rate_int = g_game.dial_rate_q8 >> 8;
+            int rate_dec = ((g_game.dial_rate_q8 & 0xFF) * 10) / 256;
+            snprintf(buf, sizeof(buf), "%d.%d/s", rate_int, rate_dec);
+        } else if (r == 1) {
+            int tier_int = g_game.dial_tier_q8 >> 8;
+            int tier_dec = ((g_game.dial_tier_q8 & 0xFF) * 10) / 256;
+            snprintf(buf, sizeof(buf), "T%d.%d", tier_int, tier_dec);
+        } else {
+            int val = 0;
+            switch (r) {
+                case 2: val = g_generator.built_tiers; break;
+                case 3: val = g_generator.tiers[0].hp; break;
+                case 4: val = g_generator.tiers[1].hp; break;
+                case 5: val = g_game.fast_forward; break;
+                case 6: val = (int)g_game.scrap; break;
+                case 7: val = (int)g_wall.hp; break;
+            }
+            snprintf(buf, sizeof(buf), "%d", val);
         }
 
         int y = 34 + r * 14;
@@ -1239,8 +1176,6 @@ void renderer_draw_ui_calibration(void) {
         renderer_draw_rect(6, y, 244, 13, row_border);
 
         renderer_draw_text(10, y + 2, stream_row_labels[r], txt_col);
-
-        snprintf(buf, sizeof(buf), "%d", val);
         renderer_draw_text(144, y + 3, buf, COLOR_PHOSPHOR_GREEN);
 
         // [-] button

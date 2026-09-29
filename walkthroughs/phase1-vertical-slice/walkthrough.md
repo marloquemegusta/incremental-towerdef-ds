@@ -1,66 +1,67 @@
-# Walkthrough: Fase 1 City Defense Incremental — Generador Aditivo y Fin de Demo
+# Walkthrough: Fase 1 Vertical Slice — City Defense Incremental
 
 ## 1. Resumen Ejecutivo
-
-En esta sesión se cierra el ciclo de la **Fase 1** (~primeros minutos / vertical slice contenido) del nuevo diseño City Defense Incremental:
-- **Generador Aditivo desde Cero**: La partida arranca con **0 tiers construidos** (`built_tiers = 0`). Las bahías del generador muestran un armazón industrial de andamio oscuro. Al comprar mejoras de automatización se erigen los módulos correspondientes con 5 HP cada uno.
-- **Árbol de Mejoras & Economía de Fase 1**:
-  - Mejoras numéricas de batería (Calibre, Cadencia, Cargador) con 5 niveles y escalado de costes $\times 2$ ($15, 30, 60, 120, 240$).
-  - **A1: Disparo Drag / Ráfaga Continua** (Coste: 100 chatarra): Construye el **Tier 1** del Generador (5 HP).
-  - **A2: Auto-apuntado Completo** (Coste: 350 chatarra, requiere A1): Construye el **Tier 2** del Generador (5 HP) y dispara la pantalla de **Fin de la Demo**.
-- **Pantalla de Fin de Demo (Hito Fase 1)**: Muestra "FIN DE LA DEMO - FASE 1", "AUTO-APUNTADO DESBLOQUEADO", estadísticas de combate y permite continuar en modo sandbox infinito con `A` o reiniciar con `B`.
-- **Menú de Calibración Recableado**: Sustitución de las viejas etapas de oleadas por la página canónica **ATRAEDOR & GENERADOR** (diales de cadencia de spawn, tier biocasta, tiers erectos, salud de tiers 1 y 2, chatarra, bunker) y la página de costes para los 14 nodos de la economía incremental.
+Se ha consolidado el diseño canónico de **City Defense Incremental** en el motor ARM9 a **60 FPS fijos** mediante ejecución determinista en DeSmuME:
+1. **Retirada de Bombillas Viejas del Muro:** Se elimina la hilera de 32 bombillas del zócalo inferior ($Y=188$), incoherente con el nuevo modelo sin Game Over de muro.
+2. **Bombillas de Cátodo Diegéticas por Bahía:** Cada una de las 7 bahías del Generador incorpora 5 micro-bombillas de cátodo de fósforo verde (5 HP por módulo). Al recibir impacto, parpadean en blanco/oro y se apagan una a una. En los andamios no construidos, los zócalos se muestran como anclajes vacíos.
+3. **Limpieza del HUD Superior:** Se retira la telemetría de depuración `GEN:[X0]...` sustituyéndola por el banner diegético `GENERATOR: X/7 TIERS ACTIVE`.
+4. **Dial del Atraedor Continuo:**
+   - **Tasa de Spawn Continua:** Acumulación en punto fijo Q8 (`spawn_budget_q8 += dial_rate_q8 / 60`), permitiendo ritmos continuos (ej: $2.0$/s, $2.25$/s, etc.).
+   - **Distribución de Biocastas Continua:** Interpolación probabilística continua basada en el valor Q8 del dial de amenaza ($T \ge 1.0$). Si $T = 1.3$, genera 70% T1 (Zergling) y 30% T2 (Scourge/Hydra) sin saltos discretos artificiales.
 
 ---
 
-## 2. Evidencia Visual Determinista (DeSmuME)
+## 2. Evidencias Visuales Deterministas (DeSmuME)
 
-### 2.1 Arranque con Andamio (0 Tiers Construidos)
-El generador comienza completamente vacío. En el HUD superior se lee `GEN: X0 X0 X0 X0 X0 X0 X0` en rojo, y las 7 bahías inferiores se dibujan con vigas de andamiaje de acero.
+### 1. Andamio inicial (Tier 0 — Inactivo)
+Estructura de acero con zócalos vacíos y zócalo inferior limpio sin bombillas redundantes.
+- [Abrir 01_scaffold_boot.png](assets/01_scaffold_boot.png)
 
-![Boot con Andamio](assets/01_scaffold_boot.png)
-*(Enlace directo: [01_scaffold_boot.png](assets/01_scaffold_boot.png))*
-
-### 2.2 Menú de Calibración: Atraedor & Generador (Página 1/4)
-Accesible con `SELECT` en cualquier momento. Permite ajustar en vivo la cadencia del stream, tier biocasta, tiers del generador y economía.
-
-![Menú de Calibración](assets/02_calib_stream_page0.png)
-*(Enlace directo: [02_calib_stream_page0.png](assets/02_calib_stream_page0.png))*
-
-### 2.3 Árbol de Mejoras: Adquisición de A1 y A2
-1. **Tienda Inicial**: A1 disponible por 100$, A2 bloqueado requiriendo A1 (`REQ A1 (TIER 1)`).
-
-![Tienda Inicial](assets/03_shop_unbought.png)
-*(Enlace directo: [03_shop_unbought.png](assets/03_shop_unbought.png))*
-
-2. **Tras comprar A1**: Tier 1 queda activo (`TIER 1 (ACTIVO)`), construyendo la bahía 1 del generador y desbloqueando A2 por 350$.
-
-![A1 Comprado](assets/04_shop_bought_a1.png)
-*(Enlace directo: [04_shop_bought_a1.png](assets/04_shop_bought_a1.png))*
-
-### 2.4 Pantalla de Fin de Demo (Fase 1 Completada)
-Al comprar A2, el juego entra automáticamente en la pantalla de celebración:
-
-![Fin de la Demo](assets/05_victory_phase1_complete.png)
-*(Enlace directo: [05_victory_phase1_complete.png](assets/05_victory_phase1_complete.png))*
-
-Se observa en el pie de pantalla que **Tier 1 y Tier 2** lucen sus 5 micro-lámparas verdes encendidas, mientras las bahías 3 a 7 permanecen en andamio.
-
-### 2.5 Modo Infinito con Auto-Apuntado Activo
-Al pulsar `A` se reanuda la simulación continua. Los 4 cañones rastrean y destruyen autónomamente a los enemigos a 60 FPS fijos.
-
-![Defensa Continua](assets/07_stream_defense_with_a2.png)
-*(Enlace directo: [07_stream_defense_with_a2.png](assets/07_stream_defense_with_a2.png))*
-
-Animación de combate continuo en el nuevo sistema:
-
-![Animación de Combate](assets/phase1_combat.gif)
-*(Enlace directo: [phase1_combat.gif](assets/phase1_combat.gif))*
+![01_scaffold_boot](assets/01_scaffold_boot.png)
 
 ---
 
-## 3. Verificación de Rendimiento & Invariantes
+### 2. Menú de Calibración (Página 0: Atraedor & Generador)
+Dial de cadencia continuo ($2.0$/s) y biocasta continua ($T1.0$), con ajuste decimal interactivo.
+- [Abrir 02_calib_stream_page0.png](assets/02_calib_stream_page0.png)
 
-- **Escenario Determinista**: `scenarios/phase1_vertical_slice.json` ejecutado en DeSmuME headless (`scripts/run-scenario.ps1`). Resultado: `DSM_SCENARIO_RESULT=PASS captures=7 events=94`.
-- **Frame Budget**: 60 FPS estables (`FPS:60 T:61 B:227 P:53 S:26 E:8`). Coste de renderizado y simulación muy por debajo del límite de 545 ticks.
-- **Sin Game Over**: El generador degrada sus automatizaciones al recibir impactos sin cortar la partida.
+![02_calib_stream_page0](assets/02_calib_stream_page0.png)
+
+---
+
+### 3. Tienda de Mejoras inicial
+7 cartas de mejoras: 3 balísticas en escala x2, automatizaciones A1 (Hold-to-shoot) y A2 (Auto-target).
+- [Abrir 03_shop_unbought.png](assets/03_shop_unbought.png)
+
+![03_shop_unbought](assets/03_shop_unbought.png)
+
+---
+
+### 4. Bahía 1 Montada con Bombillas de Cátodo
+Al comprar A1 (100 chatarra), la Bahía 1 se ilumina con sus 5 bombillas verdes de cátodo activas.
+- [Abrir 04_shop_bought_a1.png](assets/04_shop_bought_a1.png)
+
+![04_shop_bought_a1](assets/04_shop_bought_a1.png)
+
+---
+
+### 5. Pantalla de Victoria de Fase 1
+Al comprar A2 (350 chatarra), se levanta la Bahía 2 y se activa el fin de demo.
+- [Abrir 05_victory_phase1_complete.png](assets/05_victory_phase1_complete.png)
+
+![05_victory_phase1_complete](assets/05_victory_phase1_complete.png)
+
+---
+
+### 6. Defensa Continua con Auto-Apuntado y HUD Limpio
+HUD superior mostrando `DIAL: 2.0/s`, `TIER: T1.0` y `GENERATOR: 2/7 TIERS ACTIVE`, con la batería disparando ráfagas continuas contra el enjambre.
+- [Abrir 07_stream_defense_with_a2.png](assets/07_stream_defense_with_a2.png)
+
+![07_stream_defense_with_a2](assets/07_stream_defense_with_a2.png)
+
+---
+
+### 7. Demostración en GIF (Combate, Recoil, Cátodos y Casquillos)
+- [Abrir phase1_combat.gif](assets/phase1_combat.gif)
+
+![phase1_combat](assets/phase1_combat.gif)

@@ -952,9 +952,11 @@ void game_init(void) {
     g_game.stage_completed_flag = 0;
 
     // Atraedor Continuous Stream Dials
-    g_game.dial_quantity = 2; // 2 spawns / sec default
-    g_game.dial_max_tier = 1; // Tier 1 max
-    g_game.spawn_rate_q8 = 2 * 256;
+    g_game.dial_rate_q8 = 512; // 2.0 spawns / sec default (Q8)
+    g_game.dial_tier_q8 = 256; // Tier 1.0 default (Q8)
+    g_game.dial_quantity = 2;
+    g_game.dial_max_tier = 1;
+    g_game.spawn_rate_q8 = 512;
     g_game.spawn_budget_q8 = 0;
 
     // Upgrades initial state
@@ -1079,17 +1081,39 @@ void game_update_simulation(void) {
     // 1. Continuous Stream Spawning (City Defense Incremental)
     if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PREPARATION) {
         g_game.mode = MODE_WAVE;
-        if (g_game.dial_quantity > 0) {
-            g_game.spawn_budget_q8 += (g_game.dial_quantity * 256) / 60;
+        if (g_game.dial_rate_q8 > 0) {
+            g_game.spawn_budget_q8 += (g_game.dial_rate_q8 / 60);
             while (g_game.spawn_budget_q8 >= 256) {
                 g_game.spawn_budget_q8 -= 256;
+
+                // Continuous threat tier interpolation:
+                int base_tier = g_game.dial_tier_q8 >> 8;
+                int frac = g_game.dial_tier_q8 & 0xFF;
+                if (base_tier < 1) base_tier = 1;
+
+                int tier_spawned = base_tier;
+                if (frac > 0 && (rand() & 0xFF) < frac) {
+                    tier_spawned = base_tier + 1;
+                }
+
                 int chosen_variant = 1; // T1 Zergling
                 uint64_t chosen_hp = 3;  // D-02: 3 HP
                 int chosen_spd = 40;
-                if (g_game.dial_max_tier >= 2 && (rand() % 100) < 30) {
+
+                if (tier_spawned >= 2) {
                     chosen_variant = (rand() & 1) ? 2 : 0; // T2 Scourge or Hydra
                     chosen_hp = 15;                       // D-02: 15 HP
                     chosen_spd = 32;
+                }
+                if (tier_spawned >= 3) {
+                    chosen_variant = 3;                   // T3 Muta
+                    chosen_hp = 45;                       // D-02: 45 HP
+                    chosen_spd = 28;
+                }
+                if (tier_spawned >= 4) {
+                    chosen_variant = 4;                   // T4 Defiler
+                    chosen_hp = 120;
+                    chosen_spd = 22;
                 }
                 spawn_enemy(chosen_variant, chosen_hp, chosen_spd);
             }
@@ -1954,15 +1978,17 @@ static void calib_modify_val(int delta) {
         // ATRAEDOR & GENERADOR (8 tunable parameters)
         switch (g_game.calib_row) {
             case 0:
-                g_game.dial_quantity += delta;
-                if (g_game.dial_quantity < 0) g_game.dial_quantity = 0;
-                if (g_game.dial_quantity > 10) g_game.dial_quantity = 10;
-                g_game.spawn_rate_q8 = g_game.dial_quantity * 256;
+                g_game.dial_rate_q8 += delta * 64; // Steps of 0.25 spawns/sec
+                if (g_game.dial_rate_q8 < 0) g_game.dial_rate_q8 = 0;
+                if (g_game.dial_rate_q8 > 10 * 256) g_game.dial_rate_q8 = 10 * 256;
+                g_game.dial_quantity = g_game.dial_rate_q8 >> 8;
+                g_game.spawn_rate_q8 = g_game.dial_rate_q8;
                 break;
             case 1:
-                g_game.dial_max_tier += delta;
-                if (g_game.dial_max_tier < 1) g_game.dial_max_tier = 1;
-                if (g_game.dial_max_tier > 4) g_game.dial_max_tier = 4;
+                g_game.dial_tier_q8 += delta * 26; // Steps of 0.1 tier
+                if (g_game.dial_tier_q8 < 256) g_game.dial_tier_q8 = 256; // Min T1.0
+                if (g_game.dial_tier_q8 > 4 * 256) g_game.dial_tier_q8 = 4 * 256; // Max T4.0
+                g_game.dial_max_tier = g_game.dial_tier_q8 >> 8;
                 break;
             case 2:
                 if (delta > 0 && g_generator.built_tiers < GENERATOR_TIER_COUNT) {

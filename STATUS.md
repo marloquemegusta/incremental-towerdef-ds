@@ -101,6 +101,9 @@
   - [x] Validación determinista en DeSmuME (`scenarios/phase1_vertical_slice.json`: `DSM_SCENARIO_RESULT=PASS captures=7 events=94`).
   - [x] Documentación y evidencias registradas en `walkthroughs/phase1-vertical-slice/`.
 
-
-
-
+- [x] **Consolidación Estética y Simulación Continua [COMPLETADA]:**
+  - [x] Eliminada la fila obsoleta de 32 bombillas de muro en $Y=188$ (incompatible con City Defense).
+  - [x] Reutilizadas las bombillas de cátodo diegéticas: 5 micro-bombillas de filamento/fósforo verde por cada una de las 7 bahías del Generador (parpadeo de daño y apagado al recibir impacto).
+  - [x] Limpieza del HUD superior retirando la telemetría cruda `GEN:[X0]...` y sustituyéndola por `GENERATOR: X/7 TIERS ACTIVE`.
+  - [x] Dial del Atraedor 100% continuo: acumulación fraccionaria Q8 en tasa de spawn y mezcla probabilística suave entre tiers de biocastas ($T1.3 \rightarrow 70\%$ T1 / $30\%$ T2).
+  - [x] Validación determinista en DeSmuME (`scenarios/phase1_vertical_slice.json`: `DSM_SCENARIO_RESULT=PASS captures=7 events=94`).

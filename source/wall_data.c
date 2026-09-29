@@ -1557,24 +1557,45 @@ void generator_draw_bays(uint16_t *buffer, int base_y) {
             }
         }
 
-        // 5 Health pips inside bay
+        // 5 Diegetic Cathode Bulbs inside bay
         for (int pip = 0; pip < 5; pip++) {
-            int px0 = bx + 3 + pip * 5;
-            int py0 = by + 3;
-            uint16_t pip_col;
+            int cx = bx + 3 + pip * 5;
+            int cy = by + 3;
+
+            uint16_t c_core, c_rim;
             if (pip < tier->hp) {
-                pip_col = RGB15(3, 28, 20) | BIT(15);
-            } else if (tier->active) {
-                pip_col = RGB15(1, 8, 6) | BIT(15);
-            } else {
-                pip_col = RGB15(10, 2, 2) | BIT(15);
-            }
-            for (int dy = 0; dy < 4; dy++) {
-                int py = py0 + dy;
-                for (int dx = 0; dx < 3; dx++) {
-                    buffer[py * SCREEN_W + (px0 + dx)] = pip_col;
+                if (tier->damage_flash > 0) {
+                    c_core = RGB15(31, 31, 28) | BIT(15); // Trauma shockwave white-hot
+                    c_rim  = RGB15(31, 24, 6)  | BIT(15); // Incandescent golden rim
+                } else {
+                    c_core = RGB15(16, 31, 16) | BIT(15); // Healthy phosphor green core
+                    c_rim  = RGB15(2, 22, 8)   | BIT(15); // Glowing emerald bezel rim
                 }
+            } else {
+                c_core = RGB15(1, 1, 2) | BIT(15); // Lifeless extinguished socket
+                c_rim  = RGB15(5, 5, 6) | BIT(15); // Cold steel socket rim
             }
+
+            // 4x4 circular cathode housing
+            // Row 0 (cy):     . # # .
+            buffer[cy * SCREEN_W + cx + 1] = c_rim;
+            buffer[cy * SCREEN_W + cx + 2] = c_rim;
+
+            // Row 1 (cy + 1): # O O #
+            buffer[(cy + 1) * SCREEN_W + cx]     = c_rim;
+            buffer[(cy + 1) * SCREEN_W + cx + 1] = c_core;
+            buffer[(cy + 1) * SCREEN_W + cx + 2] = c_core;
+            buffer[(cy + 1) * SCREEN_W + cx + 3] = c_rim;
+
+            // Row 2 (cy + 2): # O O #
+            buffer[(cy + 2) * SCREEN_W + cx]     = c_rim;
+            buffer[(cy + 2) * SCREEN_W + cx + 1] = c_core;
+            buffer[(cy + 2) * SCREEN_W + cx + 2] = c_core;
+            buffer[(cy + 2) * SCREEN_W + cx + 3] = c_rim;
+
+            // Row 3 (cy + 3): . # # .
+            buffer[(cy + 3) * SCREEN_W + cx + 1] = c_rim;
+            buffer[(cy + 3) * SCREEN_W + cx + 2] = c_rim;
         }
     }
 }
