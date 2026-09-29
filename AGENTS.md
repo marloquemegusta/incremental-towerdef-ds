@@ -85,8 +85,11 @@ Estas claves viven en `~/.commandcode/config.json`, **no** en este repo: aplican
 ## Protocolo de Sesiones Atómicas, Ramas y Worktrees
 1. **Un Chat = Una Sesión Atómica (Feature-Scoped):** Cada nueva conversación con el asistente se dedica exclusivamente a una feature, fix o iteración concreta, evitando dispersión de contexto.
 2. **Estrategia de Ramas:**
-   - `main`: Rama de producción/estable. Solo contiene código probado en hardware/emulación y aprobado por el usuario.
-   - `feat/<nombre-feature>`: Rama de trabajo creada al inicio de la sesión.
+   - `full-incremental`: **Rama activa por defecto y foco de desarrollo actual**. Contiene la transición hacia el nuevo diseño City Defense Incremental (stream continuo, generador de 7 automatizaciones, 1 torreta lógica / 4 visuales, economía de chatarra/vetas).
+   - `hybrid-clicker-td`: Rama histórica preservada con el prototipo híbrido previo (batería balística, recarga diegética por stylus, gore con drag 3D, calibración y render 60 FPS fijos).
+   - `classic-towerdefense`: Rama histórica original con la primera implementación del Tower Defense tradicional.
+   - `main`: Rama de producción general.
+   - `feat/<nombre-feature>`: Ramas de trabajo atómicas creadas en worktree para features o experimentos antes de mergear en `full-incremental`.
 3. **Uso Obligatorio de Git Worktrees para Aislamiento:**
    - En cada nueva sesión, se debe instanciar obligatoriamente un worktree físico separado fuera del árbol principal para mantener el entorno aislado:
      ```bash
