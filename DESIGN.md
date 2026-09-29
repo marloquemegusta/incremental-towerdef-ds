@@ -245,6 +245,20 @@ Leyenda de Estados:
   1. **Colosos Terrestres de Asalto:** Criaturas masivas (~1/3 de pantalla táctil, 64-80 px) con $\times 20$ a $\times 50$ HP que absorben fuego y poseen mecánicas de nodriza/desove continuo.
   2. **Titán Colosal en Pantalla Superior:** Asedio a dos pantallas en el clímax de la run, dañado mediante balística vertical que cruza la bisagra y superarmas del Megaproyecto.
 
+### `[OQ-09]` Andamiaje Permeable y Progresión Física de Tiers
+- **Estado:** `[PROPUESTA]`
+- **Consenso en curso:**
+  1. **Estado Inicial (Tier 0):** Al comenzar la partida o reinicio, la muralla no es una pared sólida sino un armazón esquelético/andamio. Los enemigos no se detienen en $Y_{\text{local}}=144$; simplemente pasan por debajo hacia el abismo sur sin causar daño ni Game Over, permitiendo al jugador familiarizarse con el tiro y el stylus.
+  2. **Erección Física por Automatización:** Al comprar A1 (Hold-to-fire) se asienta el primer bloque físico con blindaje y sus 5 bombillas. A partir de ese momento, los enemigos sí colisionan y atacan ese bloque.
+  3. **Visualización Progresiva:** Cada tier comprado (A1..A7) levanta una estructura vertical o bahía física visible, sustituyendo el andamio vacío por maquinaria activa del generador.
+
+### `[OQ-10]` Control del Dial del Atraedor y Calibración de Flujo Base
+- **Estado:** `[PROPUESTA]`
+- **Consenso en curso:**
+  1. **Tasa Base Inicial Lenta:** El dial arranca en un goteo suave ($0.5$ o incluso $0.25$ enemigos por segundo) en lugar de $2.0$/s, dando un ritmo contemplativo de clicker/incremental al inicio.
+  2. **Interacción del Dial Analógico:** El jugador debe poder manipular el dial táctilmente arrastrando el stylus en ambos ejes (arriba/abajo o izquierda/derecha) con fricción analógica suave, permitiendo modular el flujo de ingresos y peligro de forma orgánica.
+  3. **Visualización de Telemetría Superior:** Sustituir telemetría de depuración cruda (`GEN: [X0]...`) por lecturas de estado diegéticas y limpias (`GENERATOR: X/7 TIERS ACTIVE`, `ATTRACTOR: X.X/s`).
+
 ---
 
 ## 11. Lenguaje Visual Canónico y Assets
