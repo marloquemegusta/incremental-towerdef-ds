@@ -308,32 +308,7 @@ void renderer_draw_wall(void) {
         wall_draw_turret_sprite(g_backbuffer, dest_x, dest_y, angle);
         tiles_dirty_mark_rect(dest_x - 3, dest_y - 3, TURRET_SPRITE_W + 6, TURRET_SPRITE_H + 22, 1, s_bot_fb_idx);
 
-        // Diegetic Ammo & Reload indicator beneath each turret cupola
-        int bar_w = 16;
-        int bar_x = sx - bar_w / 2;
-        int bar_y = sy + 5;
-        if (bar_y >= 0 && bar_y + 2 < SCREEN_H) {
-            renderer_fill_rect(bar_x - 1, bar_y - 1, bar_w + 2, 3, COLOR_BLACK);
-            if (g_wall.ammo[s] <= 0 || g_wall.is_reloading[s]) {
-                // Out of ammo: blinking RELOAD alert banner
-                static int s_blink_timer = 0;
-                s_blink_timer++;
-                uint16_t warn_col = ((s_blink_timer / 15) % 2 == 0) ? COLOR_LED_RED : COLOR_AMBER;
-                renderer_fill_rect(bar_x, bar_y, bar_w, 1, warn_col);
-                if ((s_blink_timer / 15) % 2 == 0) {
-                    renderer_draw_text(sx - 14, bar_y - 12, "RELOAD", COLOR_LED_RED);
-                }
-            } else {
-                // Ammo drum gauge: amber gold turning LED red when <= 2 rounds
-                int max_a = (g_wall.max_ammo[s] > 0) ? g_wall.max_ammo[s] : 1;
-                int ammo_fill = (g_wall.ammo[s] * bar_w) / max_a;
-                if (ammo_fill < 1 && g_wall.ammo[s] > 0) ammo_fill = 1;
-                uint16_t ammo_col = (g_wall.ammo[s] > 2) ? COLOR_AMBER : COLOR_LED_RED;
-                if (ammo_fill > 0) {
-                    renderer_fill_rect(bar_x, bar_y, ammo_fill, 1, ammo_col);
-                }
-            }
-        }
+
 
         // High-energy Muzzle Flash
         if (g_wall.muzzle_flash_timer[s] > 0) {
@@ -470,6 +445,39 @@ void renderer_draw_wall(void) {
             g_bullet_darts[i].prev_bx = bx;
             g_bullet_darts[i].prev_by = by;
             g_bullet_darts[i].prev_active = 1;
+        }
+    }
+
+    // 4. Common Unified Battery Ammo Gauge above Ammo Depot (AMMO_DEPOT_X=128, Y=166)
+    {
+        int cur_ammo = 0, max_ammo = 0;
+        for (int i = 0; i < WALL_SOCKET_COUNT; i++) {
+            cur_ammo += g_wall.ammo[i];
+            max_ammo += g_wall.max_ammo[i];
+        }
+        if (max_ammo < 1) max_ammo = 1;
+
+        int bar_w = 40;
+        int bar_x = AMMO_DEPOT_X - bar_w / 2;
+        int bar_y = 153;
+
+        renderer_fill_rect(bar_x - 1, bar_y - 1, bar_w + 2, 4, COLOR_BLACK);
+        tiles_dirty_mark_rect(bar_x - 2, bar_y - 2, bar_w + 4, 6, 1, s_bot_fb_idx);
+
+        if (cur_ammo <= 0) {
+            static int s_blink = 0;
+            s_blink++;
+            uint16_t warn_col = ((s_blink / 12) % 2 == 0) ? COLOR_LED_RED : COLOR_AMBER;
+            renderer_fill_rect(bar_x, bar_y, bar_w, 2, warn_col);
+            if ((s_blink / 12) % 2 == 0) {
+                renderer_draw_text(AMMO_DEPOT_X - 16, bar_y - 11, "RELOAD", COLOR_LED_RED);
+                tiles_dirty_mark_rect(AMMO_DEPOT_X - 18, bar_y - 12, 36, 10, 1, s_bot_fb_idx);
+            }
+        } else {
+            int fill = (cur_ammo * bar_w) / max_ammo;
+            if (fill < 1 && cur_ammo > 0) fill = 1;
+            uint16_t ammo_col = (cur_ammo * 4 > max_ammo) ? COLOR_AMBER : COLOR_LED_RED;
+            renderer_fill_rect(bar_x, bar_y, fill, 2, ammo_col);
         }
     }
 

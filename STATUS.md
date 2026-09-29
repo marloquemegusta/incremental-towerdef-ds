@@ -107,3 +107,15 @@
   - [x] Limpieza del HUD superior retirando la telemetría cruda `GEN:[X0]...` y sustituyéndola por `GENERATOR: X/7 TIERS ACTIVE`.
   - [x] Dial del Atraedor 100% continuo: acumulación fraccionaria Q8 en tasa de spawn y mezcla probabilística suave entre tiers de biocastas ($T1.3 \rightarrow 70\%$ T1 / $30\%$ T2).
   - [x] Validación determinista en DeSmuME (`scenarios/phase1_vertical_slice.json`: `DSM_SCENARIO_RESULT=PASS captures=7 events=94`).
+
+- [x] **Refactor de Batería, Cadencia y Munición Unificada [COMPLETADA]:**
+  - [x] Desvinculada la cadencia fija (6 ticks) para respetar `g_balance.turret_fire_interval` (nivel 0 = 12 ticks / ~5 disparos/s). Los cambios en menú de calibración surten efecto inmediato.
+  - [x] Indicador unificado de batería: eliminadas las barras individuales bajo las cúpulas; barra de munición compartida sobre el depósito ($X=128, Y=153$).
+  - [x] Consumo real de munición (1 bala por tiro) y bloqueo en `RELOAD`. Recarga táctil arrastrando con stylus desde el búnker ($X \in [110..146], Y \in [150..180]$) hacia la línea de batería.
+  - [x] ROM compilada con BlocksDS y subida a la consola física (`towerdefense.nds`).
+
+- [ ] **Bugs y Tareas Pendientes para Siguiente Agente:**
+  - [ ] **Tasa inicial de spawn del Atraedor:** arrancar en $0.5$ enemigos/segundo (o menos) en lugar de $2.0$/s al iniciar la run.
+  - [ ] **Interacción del Dial táctil:** revisar el control táctil del dial (arriba/abajo, izquierda/derecha) para asegurar que responda fluidamente al arrastre del stylus.
+  - [ ] **Permeabilidad del Andamio:** verificar que mientras `built_tiers == 0`, los enemigos atraviesen el andamio por debajo sin bloquearse ni acumularse.
+  - [ ] **Limpieza de conos en pantalla superior:** certificar que ningún trazador o salpicadura de cono se dibuje en la pantalla superior.

@@ -248,6 +248,7 @@ typedef struct {
 #define AMMO_DEPOT_H 16
 
 void wall_reload_socket(int socket_idx);
+void wall_reload_battery(void);
 void wall_fire_at_target(int target_x, int target_y, int enemy_idx);
 void wall_apply_balance_and_upgrades(void);
 

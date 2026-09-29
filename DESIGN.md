@@ -21,15 +21,15 @@ Documento canónico vivo de visión de juego, arquitectura de simulación balís
 
 ## 1. Visión General, Género y Loop Core
 - **Plataforma Objetivo:** Nintendo DS (Hardware físico con stylus y emulación determinista DeSmuME headless).
-- **Género:** Arcade-Incremental Balístico / Clicker de Asedio y Fortificación (*Grimdark Dieselpunk*).
-- **Ambientación:** Un Bastión perimetral del Adeptus Mechanicus bajo asedio implacable de un Enjambre Bio-Xenos.
+- **Género:** City Defense Incremental Balístico / Clicker de Asedio y Automatización (*Grimdark Dieselpunk*).
+- **Ambientación:** Un Bastión perimetral del Adeptus Mechanicus bajo asedio implacable de un Enjambre Bio-Xenos atraído a voluntad.
 - **Tasa de Refresco:** **60 FPS estables** en ARM9 sin caídas, con renderizado directo a VRAM (`VRAM_A` y sub-VRAM).
-- **Core Loop de la Partida:**
-  1. **Inicio Manual (Fricción Alta):** El jugador defiende a mano picando en la pantalla con el stylus (1 tap = 1 disparo, recolección manual de núcleos).
-  2. **Escalado de Marea:** El volumen de enemigos crece exponencialmente; las tareas manuales se vuelven cuellos de botella físicos inasumibles.
-  3. **Alivio por Automatización:** Inversión de Chatarra en mejoras que asumen las tareas manuales (ráfaga continua, auto-apuntado, succión de chatarra, servoreparación).
-  4. **Financiamiento del Megaproyecto:** Con la base estabilizada, los recursos se desvían a construir el Megaproyecto de escape de la etapa.
-  5. **Purga del Sector / Victoria de Etapa:** Al completar el 100% del Megaproyecto se detona la purga y se salta al siguiente sector con nuevas condiciones.
+- **Core Loop de la Partida (Sin Game Over clásico):**
+  1. **Inicio Manual (Fricción Alta):** El jugador defiende a mano picando en la pantalla con el stylus (1 tap = 1 disparo a enemigos vivos). La base comienza como un mero armazón de andamiaje permeable.
+  2. **Economía de Chatarra y Vetas:** Cada baja aporta Chatarra para desbloquear la escalera de 7 automatizaciones (A1 a A7) y financiar infraestructura minera sobre vetas.
+  3. **Generador Aditivo de 7 Tiers:** Cada mejora principal de automatización erige un tier físico del Generador con sus propias 5 bombillas catódicas de vida.
+  4. **Degradación en vez de Muerte:** Si los enemigos superan la defensa y destruyen tiers del Generador, la partida **NO termina en Game Over**: se degradan temporalmente las automatizaciones de los tiers dañados hasta ser reparadas.
+  5. **Regulación por el Atraedor:** El jugador controla mediante dial continuo la intensidad del enjambre (tasa de spawn continua y tier de biocastas) para maximizar ingresos sin colapsar el generador.
 
 ---
 
@@ -39,24 +39,26 @@ Documento canónico vivo de visión de juego, arquitectura de simulación balís
 El campo de batalla abarca las dos pantallas físicas de la Nintendo DS como un lienzo vertical unificado:
 - **Pantalla Superior ($Y \in [0..191]$):**
   - Zona de aproximación e incursión del enjambre xenos.
-  - Spawns aleatorios en $Y=0$ con ancho horizontal $X \in [16..240]$.
-  - HUD compacto de telemetría: progreso de la marea, porcentaje del Megaproyecto y estado del Reactor de Energía.
+  - Spawns aleatorios continuos en $Y=0$ con ancho horizontal $X \in [16..240]$ dictados por la tasa continua del Atraedor.
+  - HUD compacto de telemetría: estado del Generador (`GENERATOR: X/7 TIERS ACTIVE`), tasa del Atraedor y telemetría de rendimiento.
+  - **Limpia de proyectiles/conos:** no se dibujan conos de sangre ni salpicaduras en la pantalla superior.
 - **Pantalla Inferior / Táctil ($Y \in [192..383]$):**
   - Zona de combate directo e interacción con stylus.
-  - El enjambre converge hacia el frente de asedio.
-  - **Frontera de Impacto Infranqueable ($Y = 344$):** Labio superior de la Muralla. Los enemigos no pueden descender más allá; se anclan aquí e infligen daño directo por mordisco/ácido al blindaje.
-  - **La Muralla Fortificada ($Y \in [344..383]$):** Estructura que ocupa todo el borde inferior de la pantalla táctil (40 px de altura).
+  - El enjambre converge hacia el frente sur.
+  - **Frontera del Andamio / Generador ($Y = 344$ / $Y_{\text{local}} = 144$):**
+    - Si `built_tiers == 0`: el andamio es permeable; los enemigos cruzan por debajo de la estructura sin detenerse.
+    - Con tiers erigidos (`built_tiers > 0`): los enemigos impactan la estructura e infligen daño al tier superior activo (5 HP / bombillas por tier).
+  - **La Batería y Depósito de Munición ($Y \in [344..383]$):** Batería lógica única con 4 cúpulas visuales rotatorias, indicador unificado de munición sobre el depósito central ($X=128, Y=153$) y recarga diegética arrastrando desde el búnker ($X \in [110..146], Y \in [150..180]$).
 
 ---
 
-## 3. El Concepto de la Muralla Modular
+## 3. El Concepto del Generador Aditivo y Andamiaje Permeable
 
-En lugar de obligar al jugador a microgestionar posiciones simétricas en un frente recto, la base es una **Muralla Fortificada Única y Continua**:
-- **Un Solo Ente Defensivo:** La Muralla tiene una barra de integridad global (`wall_hp`).
-- **Mejoras Visuales Integradas:** Conforme se compran cañones pesados, bobinas Tesla, lanzallamas o blindaje reforzado, el sprite y los detalles de la muralla evolucionan estéticamente (de trinchera de sacos de arena a fortaleza brutalista de acero y alta tensión).
-- **Defensas de Campo Desplegables (Opcionales / Temporales):**
-  - Elementos que se pueden plantar en medio del asfalto con el stylus (barricadas de púas, minas balísticas o perforadoras de núcleos).
-  - Tienen vida limitada y los enemigos pueden atacarlos y destruirlos mientras avanzan hacia la muralla.
+En sustitución de una muralla fija tradicional con barra global de vida que destruye la partida:
+- **Andamiaje Inicial Permeable:** Al comenzar, la base es solo un andamio de soporte sin módulos construidos. Los enemigos caminan por debajo del andamio sin provocar colisión de bloqueo ni fin de juego.
+- **Construcción Aditiva de 7 Tiers:** Cada automatización erige físicamente un tier del Generador.
+- **Degradación de Automatización:** Cada tier tiene 5 bombillas de cátodo verde. Al recibir 5 impactos, el tier colapsa y desactiva su automatización asociada, exigiendo reparación con chatarra.
+- **Batería Defensiva Coordinada:** La defensa consta de 1 torreta lógica metrónomo repartida en 4 cúpulas de artillería que rotan disparo balístico estético, con un solo cargador de batería compartido.
 
 ---
 
@@ -192,28 +194,29 @@ Leyenda de Estados:
 - [DECIDIDO]: Consensuado y listo para especificación técnica / implementación.
 ```
 
-### `[OQ-01]` La Muralla Modular: ¿Unificación total o Bahías de Cañón?
+### `[OQ-01]` La Muralla vs. Generador Aditivo y Andamiaje Permeable
 - **Estado:** `[DECIDIDO]`
-- **Decisión:** Muralla fortificada continua unificada en el borde inferior ($Y=344..383$). No se dividirá en 4 bahías simétricas porque el frente es plano y homogéneo; las mejoras son globales/integradas en la muralla. Se permite desplegar defensas de campo temporales destructibles en el asfalto (minas, barricadas, perforadoras).
+- **Decisión:** Se descarta la muralla rígida con Game Over. La base arranca como un andamio permeable en $Y_{\text{local}}=144$. Si no hay tiers erigidos (`built_tiers == 0`), los enemigos cruzan por debajo. Conforme se compran las 7 mejoras clave (A1 a A7), se erigen físicamente los 7 tiers del Generador. El daño xenos destruye tiers individuales (5 HP cada uno) y degrada temporalmente las automatizaciones hasta ser reparadas.
 
 ### `[OQ-02]` Escalera de Automatización del Disparo
 - **Estado:** `[DECIDIDO]`
 - **Decisión:** 
   1. Nivel 0: Tap manual (1 tap = 1 disparo, limitado por cadencia).
-  2. Nivel 1: Hold continuo (mantener stylus presionado = ráfaga continua).
-  3. Nivel 2: Auto-target básico (disparo autónomo al más cercano).
-  4. Nivel 3: Auto-target con override manual táctil (tocar un bicho fija objetivo prioritario).
+  2. Nivel 1 (A1): Hold continuo (mantener stylus presionado = ráfaga continua). Erige Tier 1 del Generador.
+  3. Nivel 2 (A2): Auto-target básico (disparo autónomo al más cercano). Erige Tier 2 del Generador.
+  4. Nivel 3 (A3): Auto-target con override manual táctil (tocar un bicho fija objetivo prioritario).
 
-### `[OQ-03]` Marea Continua vs. Oleadas Discretas
+### `[OQ-03]` Marea Continua Regulada por el Atraedor (Continuous Stream)
 - **Estado:** `[DECIDIDO]`
-- **Decisión (Modelo C - Marea Pautada con Picos de Alarma):**
-  1. **Marea de Fondo Ininterrumpida:** Flujo base constante de xenos ligeros que garantiza un goteo continuo de chatarra (ingresos incrementales perpetuos sin tiempos muertos).
-  2. **Picos de Alarma ("¡BRECHA DETECTADA!"):** Momentos de máxima tensión que triplican el spawn durante 30-45 segundos con tanques y élites. Se disparan por cronómetro de sector o al avanzar una fase del Megaproyecto.
-  3. **Pausa Táctica en Tienda / Mejoras:** Al abrir el panel de mejoras o investigación, la simulación de combate se pausa por completo. Esto elimina la ansiedad de ser devorado mientras se analiza el árbol técnico y otorga al jugador un descanso físico natural para la mano y el stylus.
+- **Decisión:**
+  1. **Dial Continuo del Atraedor:** En lugar de oleadas rígidas o temporizadores de asedio, el flujo es 100% continuo regulado por diales analógicos táctiles (tasa en enemigos/segundo y tier medio de biocastas).
+  2. **Interpolación Fraccionaria de Spawn:** El acumulador de spawn corre en punto fijo Q8 (`budget += rate * dt`) para permitir tasas suaves (desde 0.25 hasta 20+ enemigos/s).
+  3. **Composición Continua de Biocastas:** Tiers fraccionarios (ej. Tier 1.3 = 70% T1, 30% T2) que introducen orgánicamente nuevas especies sin escalones bruscos.
+  4. **Pausa Táctica en Tienda / Menús:** Al abrir el panel de mejoras (`TIENDA`), la simulación de combate se pausa por completo para analizar compras y descansar el stylus.
 
-### `[OQ-04]` Mecánica del Recurso de Energía (Grid / Reactor)
+### `[OQ-04]` Mecánica del Recurso y Economía (Chatarra + Vetas Mineras)
 - **Estado:** `[DECIDIDO]`
-- **Decisión (Opción 1 - Sin Energía Pasiva):** Se descarta la mecánica de energía/megavatios pasivos para evitar impuestos burocráticos y saturación de la UI en la Nintendo DS. El juego opera con solo 2 recursos (**Chatarra** para mejoras y **Núcleos** para el Megaproyecto). El límite de armamento pesado instalado se gestiona de forma visual mediante **Ranuras (Sockets) en la Muralla**, expandibles con Chatarra.
+- **Decisión:** Economía basada en Chatarra inmediata (bajas del enjambre) e infraestructura de minería en vetas de chatarra/mineral. Se descarta la energía pasiva por impuestos burocráticos.
 
 ### `[OQ-05]` Adquisición y Activación de Consumibles ("Botones de Emergencia")
 - **Estado:** `[ABIERTO]`
@@ -221,16 +224,16 @@ Leyenda de Estados:
   - *Alternativa 1:* Ranuras fijas en la barra inferior para arrastrar al campo de batalla con stylus.
   - *Alternativa 2:* Cajas de suministros paracaidistas que caen en el campo de batalla y deben abrirse con un tap antes de ser destruidas.
 
-### `[OQ-06]` Balística Canónica, Metrónomo de Muralla, Salud Virtual y Logística Táctil
+### `[OQ-06]` Balística Canónica, Metrónomo de Batería, Salud Virtual y Logística Táctil
 - **Estado:** `[DECIDIDO]`
 - **Decisión:**
-  1. **La Muralla como Metrónomo Central:** La cadencia de disparo es un atributo unificado de la plataforma (`fire_interval`). Las torretas individuales son puntos de fuego visuales; al incorporar una 2ª torreta, la cadencia global de la muralla escala y el fuego se intercala homogéneamente.
-  2. **Alternancia Bidimensional (Torretas y Cañones):** El metrónomo alterna de forma continua tanto la torreta activa como los cañones izquierdo y derecho ($T_1 L \to T_2 L \to T_1 R \to T_2 R \dots$). A máxima cadencia, el frente se percibe como una batería pesada implacable y coordinada.
-  3. **Fuego Total en la Pantalla Inferior (Sin Rango):** El rango deja de existir como mecánica. La muralla bate a cualquier enemigo vivo sobre la calzada completa ($Y$ local $0..143$) y el stylus puede seleccionar objetivos en toda la superficie táctil. No hay línea ni demarcación de alcance sobre el empedrado.
-  4. **Salud Virtual Anti-Overkill (`incoming_damage`):** Los proyectiles vuelan visualmente a destino con daño garantizado. Cada enemigo acumula `incoming_damage`; la batería únicamente dispara a enemigos donde $\text{hp} - \text{incoming\_damage} > 0$, eliminando el desperdicio de munición por sobreaniquilación.
-  5. **Comportamiento Táctil Estricto (Prohibido Fuego a Asfalto Vacío):** Pulsar o arrastrar el stylus sobre asfalto vacío NO dispara. El fuego solo se activa si el stylus pulsa o pasa sobre un enemigo vivo (dentro de tolerancia táctil de ~16-20 px).
-  6. **Logística Táctil de Munición (Fricción Manual Fase 1):** Cajón único de munición en búnker ($X=128, Y=166$). Al vaciarse el tambor (10 disparos base), la torreta entra en bloqueo y requiere arrastrar suministros desde el depósito con el stylus para recargar.
-  7. **Indicador de Integridad Dieléctrico por Cátodos (32 Bombillas):** La barra de vida de la muralla se sustituye por una fila de 32 bombillas de filamento/cátodo verde a lo largo del zócalo inferior ($Y \in [186..191]$), integradas visualmente en la chapa del búnker.
+  1. **La Muralla como Metrónomo Central:** Cadencia global unificada (`fire_interval`). Las 4 cúpulas de la batería rotan estéticamente el fuego alternando cañones ($T_1 L \to T_2 L \to \dots$).
+  2. **Fuego Total en la Pantalla Inferior (Sin Rango):** Sin límite de alcance; el jugador y el auto-apuntado baten todo el campo táctil ($Y_{\text{local}} \in [0..143]$).
+  3. **Salud Virtual Anti-Overkill (`incoming_damage`):** Se evita sobreaniquilación rastreando daño en vuelo.
+  4. **Filtro Táctil Estricto:** Prohibido disparar tocando suelo vacío; el tap o arrastre solo abre fuego si toca o pasa sobre un enemigo vivo.
+  5. **Logística Táctil de Munición:** Depósito único de munición en búnker ($X=128, Y=166$). Al vaciarse el cargador compartido (10 balas base), la batería entra en bloqueo y exige arrastrar el suministro con stylus a la línea defensiva.
+  6. **Indicador de Integridad del Generador (35 Micro-Bombillas de Cátodo):** Eliminada la fila de 32 bombillas de muro. Cada una de las 7 bahías del Generador tiene 5 micro-bombillas de fósforo verde que parpadean en daño y se apagan al perder HP.
+  7. **Descarte de Conos de Muerte:** Se suprimen los conos y salpicaduras angulares en pantalla superior e inferior (`DEATH_CONE_ENABLED = 0`); las bajas se representan por licuado gravitatorio local y desprendimiento de trozos reales de sprite en paleta roja.
 
 ### `[OQ-07]` Automatización Visual Cinética (Drones y Logística de Munición)
 - **Estado:** `[DECIDIDO]` (Detalle en [`docs/SCALING_AND_AUTOMATION_IDEAS.md`](docs/SCALING_AND_AUTOMATION_IDEAS.md))
