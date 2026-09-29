@@ -19,24 +19,30 @@ En esta sesión se cierra el ciclo de la **Fase 1** (~primeros minutos / vertica
 El generador comienza completamente vacío. En el HUD superior se lee `GEN: X0 X0 X0 X0 X0 X0 X0` en rojo, y las 7 bahías inferiores se dibujan con vigas de andamiaje de acero.
 
 ![Boot con Andamio](assets/01_scaffold_boot.png)
+*(Enlace directo: [01_scaffold_boot.png](assets/01_scaffold_boot.png))*
 
 ### 2.2 Menú de Calibración: Atraedor & Generador (Página 1/4)
 Accesible con `SELECT` en cualquier momento. Permite ajustar en vivo la cadencia del stream, tier biocasta, tiers del generador y economía.
 
 ![Menú de Calibración](assets/02_calib_stream_page0.png)
+*(Enlace directo: [02_calib_stream_page0.png](assets/02_calib_stream_page0.png))*
 
 ### 2.3 Árbol de Mejoras: Adquisición de A1 y A2
 1. **Tienda Inicial**: A1 disponible por 100$, A2 bloqueado requiriendo A1 (`REQ A1 (TIER 1)`).
+
+![Tienda Inicial](assets/03_shop_unbought.png)
+*(Enlace directo: [03_shop_unbought.png](assets/03_shop_unbought.png))*
+
 2. **Tras comprar A1**: Tier 1 queda activo (`TIER 1 (ACTIVO)`), construyendo la bahía 1 del generador y desbloqueando A2 por 350$.
 
-| Tienda Previa | Tras Comprar A1 (Tier 1 Erecto) |
-| :---: | :---: |
-| ![Tienda Inicial](assets/03_shop_unbought.png) | ![A1 Comprado](assets/04_shop_bought_a1.png) |
+![A1 Comprado](assets/04_shop_bought_a1.png)
+*(Enlace directo: [04_shop_bought_a1.png](assets/04_shop_bought_a1.png))*
 
 ### 2.4 Pantalla de Fin de Demo (Fase 1 Completada)
 Al comprar A2, el juego entra automáticamente en la pantalla de celebración:
 
 ![Fin de la Demo](assets/05_victory_phase1_complete.png)
+*(Enlace directo: [05_victory_phase1_complete.png](assets/05_victory_phase1_complete.png))*
 
 Se observa en el pie de pantalla que **Tier 1 y Tier 2** lucen sus 5 micro-lámparas verdes encendidas, mientras las bahías 3 a 7 permanecen en andamio.
 
@@ -44,10 +50,12 @@ Se observa en el pie de pantalla que **Tier 1 y Tier 2** lucen sus 5 micro-lámp
 Al pulsar `A` se reanuda la simulación continua. Los 4 cañones rastrean y destruyen autónomamente a los enemigos a 60 FPS fijos.
 
 ![Defensa Continua](assets/07_stream_defense_with_a2.png)
+*(Enlace directo: [07_stream_defense_with_a2.png](assets/07_stream_defense_with_a2.png))*
 
 Animación de combate continuo en el nuevo sistema:
 
 ![Animación de Combate](assets/phase1_combat.gif)
+*(Enlace directo: [phase1_combat.gif](assets/phase1_combat.gif))*
 
 ---
 
