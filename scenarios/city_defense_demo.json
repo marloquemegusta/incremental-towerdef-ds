@@ -1,0 +1,68 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 20,
+      "capture": "01_stream_boot"
+    },
+    {
+      "tap": {
+        "x": 128,
+        "y": 70
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 10
+    },
+    {
+      "tap": {
+        "x": 80,
+        "y": 60
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 10
+    },
+    {
+      "tap": {
+        "x": 180,
+        "y": 50
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 10
+    },
+    {
+      "tap": {
+        "x": 128,
+        "y": 70
+      },
+      "frames": 60,
+      "capture": "02_turrets_firing"
+    },
+    {
+      "release": true,
+      "frames": 180,
+      "capture": "03_generator_defense"
+    },
+    {
+      "frames": 240,
+      "capture_sequence": "city_defense_stream",
+      "capture_every": 4,
+      "capture": "04_continuous_combat"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_stream_boot",
+      "to": "04_continuous_combat",
+      "min_changed_pixels": 100
+    }
+  }
+}

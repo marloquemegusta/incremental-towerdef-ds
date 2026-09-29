@@ -1504,6 +1504,62 @@ void wall_draw_turret_sprite(uint16_t *buffer, int dest_x, int dest_y, int angle
     }
 }
 
+void generator_draw_bays(uint16_t *buffer, int base_y) {
+    if (!buffer) return;
+    int start_x = 16;
+    int bay_w = 30;
+    int bay_h = 10;
+    for (int t = 0; t < GENERATOR_TIER_COUNT; t++) {
+        int bx = start_x + t * 32;
+        int by = base_y;
+        if (by < 0 || by + bay_h >= SCREEN_H) continue;
+
+        const GeneratorTier *tier = &g_generator.tiers[t];
+        uint16_t bg_col;
+        if (tier->damage_flash > 0) {
+            bg_col = RGB15(31, 31, 28) | BIT(15);
+        } else if (tier->active) {
+            bg_col = RGB15(2, 6, 8) | BIT(15);
+        } else {
+            bg_col = RGB15(6, 2, 2) | BIT(15);
+        }
+
+        // Draw bay container box
+        for (int dy = 0; dy < bay_h; dy++) {
+            int py = by + dy;
+            uint16_t *dst = &buffer[py * SCREEN_W + bx];
+            for (int dx = 0; dx < bay_w; dx++) {
+                if (dy == 0 || dy == bay_h - 1 || dx == 0 || dx == bay_w - 1) {
+                    dst[dx] = RGB15(7, 7, 8) | BIT(15);
+                } else {
+                    dst[dx] = bg_col;
+                }
+            }
+        }
+
+        // 5 Health pips inside bay
+        for (int pip = 0; pip < 5; pip++) {
+            int px0 = bx + 3 + pip * 5;
+            int py0 = by + 3;
+            uint16_t pip_col;
+            if (pip < tier->hp) {
+                pip_col = RGB15(3, 28, 20) | BIT(15);
+            } else if (tier->active) {
+                pip_col = RGB15(1, 8, 6) | BIT(15);
+            } else {
+                pip_col = RGB15(10, 2, 2) | BIT(15);
+            }
+            for (int dy = 0; dy < 4; dy++) {
+                int py = py0 + dy;
+                for (int dx = 0; dx < 3; dx++) {
+                    buffer[py * SCREEN_W + (px0 + dx)] = pip_col;
+                }
+            }
+        }
+    }
+}
+
+
 
 const uint16_t c_ammo_crate_sprite[AMMO_CRATE_W * AMMO_CRATE_H] __attribute__((aligned(4))) = {
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,

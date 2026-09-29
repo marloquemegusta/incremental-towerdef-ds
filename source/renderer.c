@@ -541,6 +541,10 @@ void renderer_draw_wall(void) {
             g_bullet_darts[i].prev_active = 1;
         }
     }
+
+    // 5. Draw Diegetic Generator Bays (7 tiers with 5 HP pips across base console)
+    generator_draw_bays(g_backbuffer, 176);
+    tiles_dirty_mark_rect(16, 176, 224, 12, 1, s_bot_fb_idx);
 }
 
 void renderer_draw_battlefield_bottom(void) {
@@ -851,13 +855,10 @@ void renderer_draw_ui_wave(void) {
     // Top HUD banner
     top_fill_rect(0, 0, SCREEN_W, 28, TOP_COLOR_BLACK);
     char buf[64];
-    snprintf(buf, sizeof(buf), "ETAPA %d/5", g_game.wave_number);
+    snprintf(buf, sizeof(buf), "DIAL:%d/s", g_game.dial_quantity);
     top_draw_text(6, 2, buf, TOP_COLOR_AMBER);
 
-    int sec_left = g_game.wave_timer / 60;
-    int m = sec_left / 60;
-    int s = sec_left % 60;
-    snprintf(buf, sizeof(buf), "TIME: %d:%02d", m, s);
+    snprintf(buf, sizeof(buf), "TIER:T%d", g_game.dial_max_tier);
     top_draw_text(74, 2, buf, TOP_COLOR_WHITE);
 
     char scrap_buf[32];
@@ -871,19 +872,17 @@ void renderer_draw_ui_wave(void) {
              g_game.prof_pres_ticks, g_game.prof_sim_ticks, g_game.prof_enemies_active);
     top_draw_text(6, 10, buf, TOP_COLOR_WHITE);
 
-    // Peak alert / telegraphing on row 3 (does NOT cover profiler stats)
-    if (g_game.wave_timer <= 2400 && g_game.wave_timer > 1800) {
-        int peak_sec = (g_game.wave_timer - 1800) / 60;
-        snprintf(buf, sizeof(buf), "! ALERTA PICO EN %ds !", peak_sec + 1);
-        uint8_t col = (g_game.sim_ticks_elapsed & 8) ? TOP_COLOR_AMBER : TOP_COLOR_WHITE;
-        top_draw_text(68, 19, buf, col);
-    } else if (g_game.wave_timer <= 1800 && g_game.wave_timer > 0) {
-        uint8_t col = (g_game.sim_ticks_elapsed & 12) ? TOP_COLOR_LED_RED : TOP_COLOR_AMBER;
-        top_draw_text(58, 19, "!! PICO DE ETAPA ACTIVO !!", col);
-    } else if (g_game.wave_timer <= 0) {
-        snprintf(buf, sizeof(buf), "! LIMPIAR REMANENTES: %d !", g_game.enemies_alive);
-        top_draw_text(52, 19, buf, TOP_COLOR_PHOSPHOR_GREEN);
-    }
+    // Row 3: Generator Tiers Status: A1..A7
+    snprintf(buf, sizeof(buf), "GEN:[%c%d][%c%d][%c%d][%c%d][%c%d][%c%d][%c%d]",
+             g_generator.tiers[0].active ? '1' : 'X', g_generator.tiers[0].hp,
+             g_generator.tiers[1].active ? '2' : 'X', g_generator.tiers[1].hp,
+             g_generator.tiers[2].active ? '3' : 'X', g_generator.tiers[2].hp,
+             g_generator.tiers[3].active ? '4' : 'X', g_generator.tiers[3].hp,
+             g_generator.tiers[4].active ? '5' : 'X', g_generator.tiers[4].hp,
+             g_generator.tiers[5].active ? '6' : 'X', g_generator.tiers[5].hp,
+             g_generator.tiers[6].active ? '7' : 'X', g_generator.tiers[6].hp);
+    uint8_t col = g_generator.tiers[0].active ? TOP_COLOR_PHOSPHOR_GREEN : TOP_COLOR_LED_RED;
+    top_draw_text(6, 19, buf, col);
 
     // If currently dragging ammo crate
     if (g_game.is_dragging_ammo) {

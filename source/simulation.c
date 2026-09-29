@@ -396,35 +396,63 @@ static void spawn_bullet(int x, int y, int angle, int turret_idx, uint64_t dmg) 
 WallPlatform g_wall;
 CasingParticle g_casings[MAX_CASINGS];
 BulletDart g_bullet_darts[MAX_BULLET_DARTS];
+Generator g_generator;
+
+void generator_init(void) {
+    memset(&g_generator, 0, sizeof(g_generator));
+    for (int t = 0; t < GENERATOR_TIER_COUNT; t++) {
+        g_generator.tiers[t].hp = GENERATOR_TIER_MAX_HP;
+        g_generator.tiers[t].max_hp = GENERATOR_TIER_MAX_HP;
+        g_generator.tiers[t].active = 1;
+        g_generator.tiers[t].damage_flash = 0;
+    }
+    g_generator.active_tier = GENERATOR_TIER_COUNT - 1;
+    g_generator.total_hits = 0;
+}
+
+void generator_take_hit(int enemy_tier) {
+    (void)enemy_tier;
+    for (int t = GENERATOR_TIER_COUNT - 1; t >= 0; t--) {
+        if (g_generator.tiers[t].active) {
+            g_generator.tiers[t].hp--;
+            g_generator.tiers[t].damage_flash = 8;
+            g_wall.damage_flash_timer = 6;
+            if (g_generator.tiers[t].hp <= 0) {
+                g_generator.tiers[t].hp = 0;
+                g_generator.tiers[t].active = 0;
+            }
+            g_generator.total_hits++;
+            return;
+        }
+    }
+    // If all breached, Tier 0 stays at 0 HP with flash, no Game Over
+    g_generator.tiers[0].damage_flash = 8;
+    g_wall.damage_flash_timer = 6;
+    g_generator.total_hits++;
+}
+
+void generator_repair_tier(int tier_idx, int amount) {
+    if (tier_idx < 0 || tier_idx >= GENERATOR_TIER_COUNT) return;
+    g_generator.tiers[tier_idx].hp += amount;
+    if (g_generator.tiers[tier_idx].hp > GENERATOR_TIER_MAX_HP) {
+        g_generator.tiers[tier_idx].hp = GENERATOR_TIER_MAX_HP;
+    }
+    if (g_generator.tiers[tier_idx].hp > 0) {
+        g_generator.tiers[tier_idx].active = 1;
+    }
+}
 
 void wall_apply_balance_and_upgrades(void) {
-    int act = 1 + g_game.upgrades.extra_turrets;
-    if (act < 1) act = 1;
-    if (act > 3) act = 3;
-    g_wall.active_turrets = act;
-
-    int dmg_lvl = g_game.upgrades.caliber_lvl;
-    if (dmg_lvl < 0) dmg_lvl = 0;
-    if (dmg_lvl > 4) dmg_lvl = 4;
-    g_wall.damage = g_balance.turret_damage[dmg_lvl];
-
-    int rof_lvl = g_game.upgrades.firerate_lvl;
-    if (rof_lvl < 0) rof_lvl = 0;
-    if (rof_lvl > 4) rof_lvl = 4;
-    g_wall.fire_interval = g_balance.turret_fire_interval[rof_lvl];
-
-    int rng_lvl = g_game.upgrades.range_lvl;
-    if (rng_lvl < 0) rng_lvl = 0;
-    if (rng_lvl > 4) rng_lvl = 4;
-    g_wall.range_line_y = g_balance.turret_range[rng_lvl];
-    g_wall.range = g_wall.screen_y - g_wall.range_line_y;
-
-    int mag_lvl = g_game.upgrades.mag_size_lvl;
-    if (mag_lvl < 0) mag_lvl = 0;
-    if (mag_lvl > 4) mag_lvl = 4;
-    int mag_cap = g_balance.turret_magazine[mag_lvl];
+    // 1 logical battery: 4 visual sockets active from minute 0
+    g_wall.active_turrets = 4;
+    g_wall.damage = 1;
+    g_wall.fire_interval = 6; // 10 shots/s maximum cadence
+    g_wall.range_line_y = 0;  // Full screen bottom targetable
+    g_wall.range = g_wall.screen_y;
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
-        g_wall.max_ammo[s] = mag_cap;
+        g_wall.max_ammo[s] = 9999;
+        g_wall.ammo[s] = 9999;
+        g_wall.is_reloading[s] = 0;
     }
 }
 
@@ -837,11 +865,8 @@ void wall_update(void) {
                 g_enemies[hit_e_idx].hp = 0;
                 g_game.enemies_killed++;
                 int v = g_enemies[hit_e_idx].variant;
-                if (v < 0) v = 0;
-                if (v >= ENEMY_VARIANT_COUNT) v = ENEMY_VARIANT_COUNT - 1;
-                uint64_t base_scrap = g_balance.enemy_scrap[v];
-                uint64_t reward = base_scrap * (1 + g_game.upgrades.bio_harvest_lvl);
-                g_game.scrap += reward;
+                uint64_t base_scrap = (v == 1) ? 1 : 5; // D-02: T1=1, T2=5 scrap
+                g_game.scrap += base_scrap;
                 enemy_begin_death(hit_e_idx, g_bullet_darts[i].vx, g_bullet_darts[i].vy);
             }
             g_bullet_darts[i].active = 0;
@@ -906,14 +931,21 @@ void game_init(void) {
 
     g_wall.hp = 0;
     wall_init();
-    g_game.mode = MODE_PAUSED;
+    generator_init();
+    g_game.mode = MODE_WAVE; // Start in continuous stream mode!
     g_game.wave_number = 1;
     g_game.total_waves = STAGE_COUNT;
-    g_game.bunker_hp = g_balance.bunker_start_hp;
-    g_game.bunker_max_hp = g_balance.bunker_start_hp;
-    g_game.scrap = 10;
+    g_game.bunker_hp = 35; // 7 tiers * 5 HP
+    g_game.bunker_max_hp = 35;
+    g_game.scrap = 0;
     g_game.fast_forward = 1;
     g_game.stage_completed_flag = 0;
+
+    // Atraedor Continuous Stream Dials
+    g_game.dial_quantity = 2; // 2 spawns / sec default
+    g_game.dial_max_tier = 1; // Tier 1 max
+    g_game.spawn_rate_q8 = 2 * 256;
+    g_game.spawn_budget_q8 = 0;
 
     // Upgrades initial state
     g_game.upgrades.caliber_lvl = 0;
@@ -1034,50 +1066,30 @@ void game_update_simulation(void) {
     wall_update();
     if (g_game.wave_timer > 0) g_game.wave_timer--;
 
-    int stage_idx = g_game.wave_number - 1;
-    if (stage_idx < 0) stage_idx = 0;
-    if (stage_idx >= STAGE_COUNT) stage_idx = STAGE_COUNT - 1;
-    const StageConfig *st = &g_balance.stages[stage_idx];
+    // 1. Continuous Stream Spawning (City Defense Incremental)
+    if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PREPARATION) {
+        g_game.mode = MODE_WAVE;
+        if (g_game.dial_quantity > 0) {
+            g_game.spawn_budget_q8 += (g_game.dial_quantity * 256) / 60;
+            while (g_game.spawn_budget_q8 >= 256) {
+                g_game.spawn_budget_q8 -= 256;
+                int chosen_variant = 1; // T1 Zergling
+                uint64_t chosen_hp = 3;  // D-02: 3 HP
+                int chosen_spd = 40;
+                if (g_game.dial_max_tier >= 2 && (rand() % 100) < 30) {
+                    chosen_variant = (rand() & 1) ? 2 : 0; // T2 Scourge or Hydra
+                    chosen_hp = 15;                       // D-02: 15 HP
+                    chosen_spd = 32;
+                }
+                spawn_enemy(chosen_variant, chosen_hp, chosen_spd);
+            }
+        }
+    }
 
-    // 1. Spawning per species (active only while stage countdown is running)
-    if (g_game.wave_timer > 0) {
-        int is_base = (g_game.wave_timer > 1800);
-        int z_delay = is_base ? st->zergling_delay_base : st->zergling_delay_peak;
-        int s_delay = is_base ? st->scourge_delay_base : st->scourge_delay_peak;
-        int h_delay = is_base ? st->hydralisk_delay_base : st->hydralisk_delay_peak;
-        int u_delay = is_base ? 0 : st->ultralisk_delay_peak;
-
-        // Zergling (Variant 1)
-        if (z_delay > 0) {
-            g_game.spawn_timer_zergling++;
-            if (g_game.spawn_timer_zergling >= z_delay) {
-                g_game.spawn_timer_zergling = 0;
-                spawn_enemy(1, g_balance.enemy_hp[1], g_balance.enemy_speed[1]);
-            }
-        }
-        // Scourge (Variant 0)
-        if (s_delay > 0) {
-            g_game.spawn_timer_scourge++;
-            if (g_game.spawn_timer_scourge >= s_delay) {
-                g_game.spawn_timer_scourge = 0;
-                spawn_enemy(0, g_balance.enemy_hp[0], g_balance.enemy_speed[0]);
-            }
-        }
-        // Hydralisk (Variant 2)
-        if (h_delay > 0) {
-            g_game.spawn_timer_hydra++;
-            if (g_game.spawn_timer_hydra >= h_delay) {
-                g_game.spawn_timer_hydra = 0;
-                spawn_enemy(2, g_balance.enemy_hp[2], g_balance.enemy_speed[2]);
-            }
-        }
-        // Ultralisk (Variant 7 - Coloso de Asedio)
-        if (u_delay > 0) {
-            g_game.spawn_timer_ultra++;
-            if (g_game.spawn_timer_ultra >= u_delay) {
-                g_game.spawn_timer_ultra = 0;
-                spawn_enemy(7, g_balance.enemy_hp[7], g_balance.enemy_speed[7]);
-            }
+    // Update Generator feedback
+    for (int t = 0; t < GENERATOR_TIER_COUNT; t++) {
+        if (g_generator.tiers[t].damage_flash > 0) {
+            g_generator.tiers[t].damage_flash--;
         }
     }
 
@@ -1279,18 +1291,9 @@ void game_update_simulation(void) {
                 // Scourge (Variant 0): Aerial kamikaze suicide detonation on wall impact!
                 int bpx = FROM_FP(g_enemies[i].x);
                 int bpy = 138;
-                uint64_t kamikaze_dmg = g_balance.enemy_bite_damage[0];
                 if (g_game.mode != MODE_DEBUG_SANDBOX) {
-                    if (g_wall.hp > kamikaze_dmg) {
-                        g_wall.hp -= kamikaze_dmg;
-                    } else {
-                        g_wall.hp = 0;
-                        g_game.bunker_hp = 0;
-                        g_game.mode = MODE_GAME_OVER;
-                        return;
-                    }
-                    g_game.bunker_hp = g_wall.hp;
-                    g_wall.damage_flash_timer = 8; // Trauma flash on wall
+                    generator_take_hit(0);
+                    g_game.bunker_hp = g_generator.tiers[g_generator.active_tier >= 0 ? g_generator.active_tier : 0].hp;
                 }
                 // Massive splatter & debris explosion
                 game_spawn_death_gore(bpx, 336, 0, 0, 0);
@@ -1323,15 +1326,8 @@ void game_update_simulation(void) {
                 uint64_t bite_dmg = g_balance.enemy_bite_damage[b_variant];
                 if (bite_dmg < 1) bite_dmg = 1;
                 if (g_game.mode != MODE_DEBUG_SANDBOX) {
-                    if (g_wall.hp > bite_dmg) {
-                        g_wall.hp -= bite_dmg;
-                    } else {
-                        g_wall.hp = 0;
-                        g_game.bunker_hp = 0;
-                        g_game.mode = MODE_GAME_OVER;
-                        return;
-                    }
-                    g_game.bunker_hp = g_wall.hp;
+                    generator_take_hit(b_variant);
+                    g_game.bunker_hp = g_generator.tiers[g_generator.active_tier >= 0 ? g_generator.active_tier : 0].hp;
                     g_wall.damage_flash_timer = 6; // Trigger visual cathode trauma feedback
 
                     // Wall impact sparks & concrete dust at the enemy's exact contact point along the wall
@@ -1638,43 +1634,11 @@ void game_update_simulation(void) {
             g_bullets[b].active = 0;
         }
     }
-
-    // 7. Stage Completion:
-    // When time expires (2 min), reinforcements cease.
-    // The stage is only won when all active remnants on the field have been eradicated!
-    if (g_game.wave_timer <= 0) {
-        int active_count = 0;
-        for (int i = 0; i < MAX_ENEMIES; i++) {
-            if (g_enemies[i].active && !g_enemies[i].dying) active_count++;
-        }
-
-        if (active_count == 0) {
-            int st_idx = g_game.wave_number - 1;
-            if (st_idx < 0) st_idx = 0;
-            if (st_idx >= STAGE_COUNT) st_idx = STAGE_COUNT - 1;
-            uint64_t stage_bonus = g_balance.stages[st_idx].stage_reward_scrap;
-            g_game.scrap += stage_bonus;
-
-            if (g_game.wave_number >= g_game.total_waves) {
-                g_game.mode = MODE_VICTORY;
-                return;
-            }
-            g_game.wave_number++;
-            g_game.stage_completed_flag = 1;
-            game_reset_to_prep();
-            tiles_full_screen_refresh();
-        }
-    }
 }
 
 void game_toggle_pause(void) {
     if (g_game.mode == MODE_PAUSED) {
-        if (g_game.enemies_spawned > 0 && g_game.wave_timer > 0) {
-            g_game.mode = MODE_WAVE;
-        } else {
-            game_start_wave();
-        }
-        g_game.stage_completed_flag = 0;
+        g_game.mode = MODE_WAVE;
         tiles_full_screen_refresh();
     } else if (g_game.mode == MODE_WAVE) {
         g_game.previous_mode = g_game.mode;
@@ -1697,6 +1661,22 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
         g_game.fast_forward = (g_game.fast_forward == 1) ? 2 : 1;
     }
 
+    // Atraedor dial controls via physical D-pad:
+    // UP/DOWN: spawn quantity (0..10/s)
+    // LEFT/RIGHT: max enemy tier (1..4)
+    if (keys_down & KEY_UP) {
+        if (g_game.dial_quantity < 10) g_game.dial_quantity++;
+    }
+    if (keys_down & KEY_DOWN) {
+        if (g_game.dial_quantity > 0) g_game.dial_quantity--;
+    }
+    if (keys_down & KEY_RIGHT) {
+        if (g_game.dial_max_tier < 4) g_game.dial_max_tier++;
+    }
+    if (keys_down & KEY_LEFT) {
+        if (g_game.dial_max_tier > 1) g_game.dial_max_tier--;
+    }
+
     static int s_wave_touching = 0;
     int is_touch = (keys_held & KEY_TOUCH) || (touch.px > 0 && touch.py > 0);
     int touch_press = ((keys_down & KEY_TOUCH) || (is_touch && !s_wave_touching));
@@ -1708,126 +1688,50 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
             game_toggle_pause();
             return;
         }
-
-        // Bunker Ammo Depot touch down: (AMMO_DEPOT_X=128, Y=166, W=24, H=16) -> (112..144, 154..178)
-        if (touch.px >= 112 && touch.px <= 144 && touch.py >= 154 && touch.py <= 180) {
-            g_game.is_dragging_ammo = 1;
-            g_game.drag_x = touch.px;
-            g_game.drag_y = touch.py;
-            return;
-        }
     }
 
-    // Dragging ammo crate following stylus
-    if (is_touch && g_game.is_dragging_ammo) {
-        g_game.drag_x = touch.px;
-        g_game.drag_y = touch.py;
+    // Diegetic Generator Repair: rubbing/tapping a generator bay on the bottom edge (Y=170..191)
+    if (is_touch && touch.py >= 170 && touch.py <= 191 && touch.px >= 16 && touch.px <= 240) {
+        int bay = (touch.px - 16) / 32;
+        generator_repair_tier(bay, 1);
         return;
     }
 
-    // Touch release while dragging ammo: drop onto active turret socket to reload
-    if (!is_touch && g_game.is_dragging_ammo) {
-        int num_act = g_wall.active_turrets;
-        static const int s_active_sockets[4][4] = {
-            { 1, -1, -1, -1 }, { 1, 2, -1, -1 }, { 0, 1, 2, -1 }, { 0, 1, 2, 3 }
-        };
-        for (int i = 0; i < num_act; i++) {
-            int s = s_active_sockets[num_act - 1][i];
-            if (s < 0) continue;
-            int sx = c_wall_sockets[s].x;
-            int sy = g_wall.screen_y + c_wall_sockets[s].y;
-            int dx = g_game.drag_x - sx;
-            int dy = g_game.drag_y - sy;
-            if (dx * dx + dy * dy <= 24 * 24) {
-                wall_reload_socket(s);
-                break;
+    // Combat interaction (Entire bottom screen: Y >= 14 && Y < 170)
+    // 1 TAP = 1 BULLET rotating across 4 turret sprites.
+    // If A1 (hold-to-fire) is active: continuous firing while held down.
+    // If A1 is broken: strictly distinct taps only!
+    if (is_touch && touch.px > 0 && touch.py >= 14 && touch.py < 170) {
+        int a1_active = g_generator.tiers[0].active;
+        int can_trigger = touch_press || a1_active;
+
+        if (can_trigger && g_wall.fire_cooldown == 0) {
+            // Find if touching near a specific enemy
+            int hit_enemy = -1;
+            int best_dsq = 24 * 24; // 24px proximity threshold
+            for (int e = 0; e < MAX_ENEMIES; e++) {
+                if (!g_enemies[e].active || g_enemies[e].dying) continue;
+                int gy = FROM_FP(g_enemies[e].y);
+                if (gy < 192) continue;
+                int local_y = gy - 192;
+                int gx = FROM_FP(g_enemies[e].x);
+                int ddx = touch.px - gx;
+                int ddy = touch.py - local_y;
+                int dsq = ddx * ddx + ddy * ddy;
+                if (dsq < best_dsq) {
+                    best_dsq = dsq;
+                    hit_enemy = e;
+                }
             }
+
+            int target_x = touch.px;
+            int target_y = touch.py;
+            if (hit_enemy >= 0) {
+                target_x = FROM_FP(g_enemies[hit_enemy].x);
+                target_y = FROM_FP(g_enemies[hit_enemy].y) - 192;
+            }
+            wall_fire_at_target(target_x, target_y, hit_enemy);
         }
-        g_game.is_dragging_ammo = 0;
-        return;
-    }
-
-    // Combat interaction (Upper & Mid road: Y >= 14 && Y < 144)
-    // STRICT RULE: Only fires when touching a living enemy anywhere on the bottom screen!
-    // Empty asphalt clicks DO NOT FIRE!
-    if (is_touch && touch.px > 0 && touch.py >= 14 && touch.py < g_wall.screen_y) {
-        int can_trigger = touch_press || g_game.upgrades.continuous_fire;
-
-        // The logical position is the sprite anchor, not its full visible bounds.
-        int hit_enemy = -1;
-        int best_dsq = 0x7fffffff;
-        for (int e = 0; e < MAX_ENEMIES; e++) {
-            if (!g_enemies[e].active || g_enemies[e].dying) continue;
-            int gy = FROM_FP(g_enemies[e].y);
-            if (gy < 192) continue; // Must be on bottom screen
-            int local_y = gy - 192;
-            if (local_y < g_wall.range_line_y) continue; // Dormant gate (0 = whole screen)
-
-            // Anti-overkill virtual health: must have positive effective health remaining!
-            if (g_enemies[e].hp <= g_enemies[e].incoming_damage) continue;
-
-            int v = g_enemies[e].variant;
-            if (v < 0 || v >= ENEMY_VARIANT_COUNT) continue;
-            const EnemyTypeDef *type = &g_enemy_types[v];
-
-            int d = g_enemies[e].dir & 7;
-            int source_dir = d - 2;
-            if (source_dir < 0) source_dir = 0;
-            if (source_dir > 4) source_dir = 4;
-
-            int f = g_enemies[e].anim_frame;
-            const EnemyFrameDef *fd = 0;
-            if (g_enemies[e].biting_target >= 0 && type->attack_frame_count > 0) {
-                if (f >= type->attack_frame_count) f %= type->attack_frame_count;
-                fd = &type->attack_frames[source_dir][f];
-            } else if (type->frame_count > 0) {
-                if (f >= type->frame_count) f %= type->frame_count;
-                fd = &type->frames[source_dir][f];
-            }
-
-            int cy = local_y;
-            if (type->is_flying && type->flight_altitude > 0) {
-                cy -= type->flight_altitude;
-            }
-
-            int min_x, max_x, min_y, max_y;
-            const int STYLUS_PAD = 4;
-            if (fd && fd->w > 0 && fd->h > 0) {
-                min_x = FROM_FP(g_enemies[e].x) + fd->offset_x - STYLUS_PAD;
-                max_x = FROM_FP(g_enemies[e].x) + fd->offset_x + fd->w + STYLUS_PAD;
-                min_y = cy + fd->offset_y - STYLUS_PAD;
-                max_y = cy + fd->offset_y + fd->h + STYLUS_PAD;
-            } else {
-                min_x = FROM_FP(g_enemies[e].x) - 16;
-                max_x = FROM_FP(g_enemies[e].x) + 16;
-                min_y = cy - 16;
-                max_y = cy + 16;
-            }
-
-            if (touch.px < min_x || touch.px > max_x ||
-                touch.py < min_y || touch.py > max_y) {
-                continue;
-            }
-
-            int gx = FROM_FP(g_enemies[e].x);
-            int ddx = touch.px - gx;
-            int ddy = touch.py - cy;
-            int dsq = ddx * ddx + ddy * ddy;
-            if (dsq < best_dsq) {
-                best_dsq = dsq;
-                hit_enemy = e;
-            }
-        }
-
-        if (hit_enemy >= 0) {
-            g_wall.locked_enemy_idx = hit_enemy;
-            if (can_trigger && g_wall.fire_cooldown == 0) {
-                int ex = FROM_FP(g_enemies[hit_enemy].x);
-                int ey = FROM_FP(g_enemies[hit_enemy].y) - 192;
-                wall_fire_at_target(ex, ey, hit_enemy);
-            }
-        }
-        // If hit_enemy < 0 (empty asphalt): DO NOTHING. Battery stays silent!
     }
 }
 

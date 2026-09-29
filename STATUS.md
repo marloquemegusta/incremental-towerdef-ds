@@ -85,12 +85,12 @@
 > - `hybrid-clicker-td`: Preservación del híbrido previo (batería, recarga manual, gore 60 FPS).
 > - `full-incremental`: Rama activa de trabajo por defecto.
 
-- [ ] **Demo Vertical Slice (Bucle continuo y degradación sin Game Over):**
-  - [ ] Presupuesto de spawn continuo en enteros (`budget += rate * dt`).
-  - [ ] Normalización de tiers de enemigos (T1: 3 HP / 1 scrap, T2: 15 HP / 5 scrap).
-  - [ ] 1 torreta lógica / 4 sprites visuales con alternancia rotatoria de disparo en pantalla inferior.
-  - [ ] Andamio + Generador de 7 tiers (5 HP por tier) sustituyendo al muro con Game Over.
-  - [ ] Validación determinista de 60 FPS en DeSmuME con captura/GIF de evidencia.
+- [x] **Demo Vertical Slice (Bucle continuo y degradación sin Game Over) [COMPLETADA]:**
+  - [x] Presupuesto de spawn continuo en enteros (`budget += rate * dt`).
+  - [x] Normalización de tiers de enemigos (T1: 3 HP / 1 scrap, T2: 15 HP / 5 scrap).
+  - [x] 1 torreta lógica / 4 sprites visuales con alternancia rotatoria de disparo en pantalla inferior.
+  - [x] Andamio + Generador de 7 tiers (5 HP por tier) sustituyendo al muro con Game Over.
+  - [x] Validación determinista de 60 FPS en DeSmuME con captura/GIF de evidencia (`walkthroughs/city-defense-prototype/`).
 
 
 
