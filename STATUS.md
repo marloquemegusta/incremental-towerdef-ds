@@ -114,8 +114,17 @@
   - [x] Consumo real de munición (1 bala por tiro) y bloqueo en `RELOAD`. Recarga táctil arrastrando con stylus desde el búnker ($X \in [110..146], Y \in [150..180]$) hacia la línea de batería.
   - [x] ROM compilada con BlocksDS y subida a la consola física (`towerdefense.nds`).
 
+- [x] **Dial de 0.05 con Autorepeat y Compuerta Correcta del Hold [COMPLETADA]:**
+  - [x] Dial del Atraedor reescrito en **ticks de 0.05** (tasa `0.00..10.00/s`, tier `T1.00..T4.00`) como fuente de verdad, con vistas Q8 derivadas (`dial_rate_sync`/`dial_tier_sync`); HUD con **dos decimales** (`DIAL:X.XX/s`, `TIER:TX.XX`).
+  - [x] **Autorepeat con rampa** al mantener la cruceta (retardo 10 f → cada 4 f → cada 2 f → cada frame).
+  - [x] **Acumulador de spawn corregido** (unidades `rate_q8 * frames`, umbral `60 * 256`): elimina el truncado por `/60` que impedía generar por debajo de ~0.23/s.
+  - [x] **Bug del Hold:** la compuerta usaba `generator.tiers[0].active`; ahora exige `upgrades.continuous_fire && tiers[0].active`. Erigir/reparar la bahía del Generador sin comprar A1 ya no desbloquea la ráfaga.
+  - [x] **Evidencia A/B determinista** en DeSmuME (mismo gesto: reparar bahía + hold 180 f): baseline (`full-incremental` @ `e938e38`) **15 disparos** (munición 40→25) vs ROM nueva **1 disparo** (40→39). Dial: `DIAL:0.50 → 0.55` (tap) `→ 2.20` (hold 60 f); `TIER:T1.00 → T1.10`.
+  - [x] Regresión verde: `scenarios/phase1_vertical_slice.json` (`DSM_SCENARIO_RESULT=PASS captures=7 events=94`).
+  - [x] Escenarios nuevos: `scenarios/dial_step_accel.json`, `scenarios/hold_gate_shop.json`, `scenarios/hold_gate_repair_repro.json`.
+
 - [ ] **Bugs y Tareas Pendientes para Siguiente Agente:**
-  - [ ] **Tasa inicial de spawn del Atraedor:** arrancar en $0.5$ enemigos/segundo (o menos) en lugar de $2.0$/s al iniciar la run.
-  - [ ] **Interacción del Dial táctil:** revisar el control táctil del dial (arriba/abajo, izquierda/derecha) para asegurar que responda fluidamente al arrastre del stylus.
+  - [x] **Tasa inicial de spawn del Atraedor:** arranca en $0.50$/s (`dial_rate_ticks = 10`) con paso fino de $0.05$.
+  - [ ] **Interacción del Dial táctil (stylus):** implementar el arrastre analógico con stylus (arriba/abajo e izquierda/derecha); el control por cruceta con pasos de $0.05$ y autorepeat ya está resuelto.
   - [ ] **Permeabilidad del Andamio:** verificar que mientras `built_tiers == 0`, los enemigos atraviesen el andamio por debajo sin bloquearse ni acumularse.
   - [ ] **Limpieza de conos en pantalla superior:** certificar que ningún trazador o salpicadura de cono se dibuje en la pantalla superior.

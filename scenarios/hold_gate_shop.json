@@ -1,0 +1,56 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    { "frames": 30, "capture": "g01_boot" },
+
+    { "button_down": "SELECT", "frames": 3 },
+    { "button_up": "SELECT", "frames": 15 },
+    { "button_down": "DOWN", "frames": 3 }, { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 3 }, { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 3 }, { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 3 }, { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 3 }, { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "DOWN", "frames": 3 }, { "button_up": "DOWN", "frames": 5 },
+    { "button_down": "RIGHT", "frames": 3 }, { "button_up": "RIGHT", "frames": 5 },
+    { "button_down": "RIGHT", "frames": 3 }, { "button_up": "RIGHT", "frames": 5 },
+    { "button_down": "RIGHT", "frames": 3 }, { "button_up": "RIGHT", "frames": 5 },
+    { "button_down": "RIGHT", "frames": 3 }, { "button_up": "RIGHT", "frames": 15, "capture": "g02_scrap_farmed" },
+
+    { "button_down": "START", "frames": 3 },
+    { "button_up": "START", "frames": 15 },
+    { "button_down": "START", "frames": 3 },
+    { "button_up": "START", "frames": 15, "capture": "g03_paused" },
+
+    { "tap": { "x": 40, "y": 160 }, "frames": 8 },
+    { "release": true, "frames": 15, "capture": "g04_shop" },
+
+    { "tap": { "x": 180, "y": 38 }, "frames": 8 },
+    { "release": true, "frames": 15, "capture": "g05_cadence_bought" },
+
+    { "tap": { "x": 160, "y": 178 }, "frames": 8 },
+    { "release": true, "frames": 15, "capture": "g06_wave_cadence_only" },
+
+    { "tap": { "x": 128, "y": 80 }, "frames": 180, "capture_sequence": "hold_no_a1", "capture_every": 10, "capture": "g07_hold_cadence_only" },
+    { "release": true, "frames": 10 },
+
+    { "button_down": "START", "frames": 3 },
+    { "button_up": "START", "frames": 15 },
+    { "tap": { "x": 40, "y": 160 }, "frames": 8 },
+    { "release": true, "frames": 15 },
+    { "tap": { "x": 180, "y": 78 }, "frames": 8 },
+    { "release": true, "frames": 15, "capture": "g08_a1_bought" },
+    { "tap": { "x": 160, "y": 178 }, "frames": 8 },
+    { "release": true, "frames": 15, "capture": "g09_wave_a1" },
+
+    { "tap": { "x": 128, "y": 80 }, "frames": 180, "capture_sequence": "hold_a1", "capture_every": 10, "capture": "g10_hold_a1" },
+    { "release": true, "frames": 10 }
+  ],
+  "assertions": {
+    "screen_changed": { "from": "g04_shop", "to": "g05_cadence_bought", "min_changed_pixels": 100 },
+    "screen_changes": [
+      { "from": "g06_wave_cadence_only", "to": "g07_hold_cadence_only", "min_changed_pixels": 50 },
+      { "from": "g09_wave_a1", "to": "g10_hold_a1", "min_changed_pixels": 50 },
+      { "from": "g07_hold_cadence_only", "to": "g10_hold_a1", "min_changed_pixels": 50 }
+    ]
+  }
+}

@@ -955,6 +955,29 @@ void wall_update(void) {
     }
 }
 
+// The Atraedor dials are authored in 0.05 units (ticks) so the whole control grid is
+// exact: 1 tick = 0.05/s for the rate, 1 tick = 0.05 for the threat tier. Q8 cannot
+// represent 0.05 exactly, so dial_rate_q8/dial_tier_q8 are derived views kept in sync
+// here for the fractional spawn accumulator and the spawn composition mix.
+#define DIAL_RATE_MAX_TICKS 200  // 200 * 0.05 = 10.00 enemies/s
+#define DIAL_TIER_MIN_TICKS 20   //  20 * 0.05 = T1.00
+#define DIAL_TIER_MAX_TICKS 80   //  80 * 0.05 = T4.00
+
+static void dial_rate_sync(void) {
+    if (g_game.dial_rate_ticks < 0) g_game.dial_rate_ticks = 0;
+    if (g_game.dial_rate_ticks > DIAL_RATE_MAX_TICKS) g_game.dial_rate_ticks = DIAL_RATE_MAX_TICKS;
+    g_game.dial_rate_q8 = (g_game.dial_rate_ticks * 256) / 20;
+    g_game.dial_quantity = g_game.dial_rate_q8 >> 8;
+    g_game.spawn_rate_q8 = g_game.dial_rate_q8;
+}
+
+static void dial_tier_sync(void) {
+    if (g_game.dial_tier_ticks < DIAL_TIER_MIN_TICKS) g_game.dial_tier_ticks = DIAL_TIER_MIN_TICKS;
+    if (g_game.dial_tier_ticks > DIAL_TIER_MAX_TICKS) g_game.dial_tier_ticks = DIAL_TIER_MAX_TICKS;
+    g_game.dial_tier_q8 = (g_game.dial_tier_ticks * 256) / 20;
+    g_game.dial_max_tier = g_game.dial_tier_q8 >> 8;
+}
+
 void game_init(void) {
     static int s_balance_inited = 0;
     if (!s_balance_inited) {
@@ -981,12 +1004,13 @@ void game_init(void) {
     g_game.fast_forward = 1;
     g_game.stage_completed_flag = 0;
 
-    // Atraedor Continuous Stream Dials
-    g_game.dial_rate_q8 = 128; // 0.5 spawns / sec default (Q8: 128/256 = 0.5)
-    g_game.dial_tier_q8 = 256; // Tier 1.0 default (Q8: 256/256 = 1.0)
-    g_game.dial_quantity = 0;
-    g_game.dial_max_tier = 1;
-    g_game.spawn_rate_q8 = 128;
+    // Atraedor Continuous Stream Dials (authored in 0.05 units; Q8 views derived)
+    g_game.dial_rate_ticks = 10; // 0.50 spawns / sec default
+    g_game.dial_tier_ticks = 20; // Tier 1.00 default
+    g_game.dial_rate_hold_timer = 0;
+    g_game.dial_tier_hold_timer = 0;
+    dial_rate_sync();
+    dial_tier_sync();
     g_game.spawn_budget_q8 = 0;
 
     // Upgrades initial state
@@ -1111,10 +1135,14 @@ void game_update_simulation(void) {
     // 1. Continuous Stream Spawning (City Defense Incremental)
     if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PREPARATION) {
         g_game.mode = MODE_WAVE;
-        if (g_game.dial_rate_q8 > 0) {
-            g_game.spawn_budget_q8 += (g_game.dial_rate_q8 / 60);
-            while (g_game.spawn_budget_q8 >= 256) {
-                g_game.spawn_budget_q8 -= 256;
+        if (g_game.dial_rate_ticks > 0) {
+            // Accumulate rate_q8 every frame and spend one whole enemy once a full
+            // second's worth of budget is reached (60 frames * 256). This keeps
+            // fractional rates exact all the way down to 0.05/s, where the previous
+            // integer division by 60 truncated to zero and never spawned.
+            g_game.spawn_budget_q8 += g_game.dial_rate_q8;
+            while (g_game.spawn_budget_q8 >= 60 * 256) {
+                g_game.spawn_budget_q8 -= 60 * 256;
 
                 // Continuous threat tier interpolation:
                 int base_tier = g_game.dial_tier_q8 >> 8;
@@ -1733,29 +1761,54 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     }
 
     // Atraedor dial controls via physical D-pad:
-    // UP/DOWN: spawn rate (0..10.0/s in 0.25 steps)
-    // LEFT/RIGHT: threat tier (1.0..4.0 in 0.1 steps)
+    // UP/DOWN: spawn rate (0.00..10.00/s), LEFT/RIGHT: threat tier (T1.00..T4.00).
+    // A tap steps one 0.05 unit; holding the direction accelerates the repeat.
+    int rate_step = 0;
     if (keys_down & KEY_UP) {
-        g_game.dial_rate_q8 += 64; // +0.25/s
-        if (g_game.dial_rate_q8 > 10 * 256) g_game.dial_rate_q8 = 10 * 256;
-        g_game.dial_quantity = g_game.dial_rate_q8 >> 8;
-        g_game.spawn_rate_q8 = g_game.dial_rate_q8;
+        rate_step = 1;
+        g_game.dial_rate_hold_timer = 0;
+    } else if (keys_down & KEY_DOWN) {
+        rate_step = -1;
+        g_game.dial_rate_hold_timer = 0;
+    } else if (keys_held & (KEY_UP | KEY_DOWN)) {
+        g_game.dial_rate_hold_timer++;
+        if (g_game.dial_rate_hold_timer >= 10) {
+            int rate_every = (g_game.dial_rate_hold_timer >= 40) ? 1 :
+                             ((g_game.dial_rate_hold_timer >= 22) ? 2 : 4);
+            if ((g_game.dial_rate_hold_timer % rate_every) == 0) {
+                rate_step = (keys_held & KEY_UP) ? 1 : -1;
+            }
+        }
+    } else {
+        g_game.dial_rate_hold_timer = 0;
     }
-    if (keys_down & KEY_DOWN) {
-        g_game.dial_rate_q8 -= 64; // -0.25/s
-        if (g_game.dial_rate_q8 < 0) g_game.dial_rate_q8 = 0;
-        g_game.dial_quantity = g_game.dial_rate_q8 >> 8;
-        g_game.spawn_rate_q8 = g_game.dial_rate_q8;
+    if (rate_step != 0) {
+        g_game.dial_rate_ticks += rate_step;
+        dial_rate_sync();
     }
+
+    int tier_step = 0;
     if (keys_down & KEY_RIGHT) {
-        g_game.dial_tier_q8 += 26; // +0.1 tier
-        if (g_game.dial_tier_q8 > 4 * 256) g_game.dial_tier_q8 = 4 * 256;
-        g_game.dial_max_tier = g_game.dial_tier_q8 >> 8;
+        tier_step = 1;
+        g_game.dial_tier_hold_timer = 0;
+    } else if (keys_down & KEY_LEFT) {
+        tier_step = -1;
+        g_game.dial_tier_hold_timer = 0;
+    } else if (keys_held & (KEY_LEFT | KEY_RIGHT)) {
+        g_game.dial_tier_hold_timer++;
+        if (g_game.dial_tier_hold_timer >= 10) {
+            int tier_every = (g_game.dial_tier_hold_timer >= 40) ? 1 :
+                             ((g_game.dial_tier_hold_timer >= 22) ? 2 : 4);
+            if ((g_game.dial_tier_hold_timer % tier_every) == 0) {
+                tier_step = (keys_held & KEY_RIGHT) ? 1 : -1;
+            }
+        }
+    } else {
+        g_game.dial_tier_hold_timer = 0;
     }
-    if (keys_down & KEY_LEFT) {
-        g_game.dial_tier_q8 -= 26; // -0.1 tier
-        if (g_game.dial_tier_q8 < 256) g_game.dial_tier_q8 = 256; // Min T1.0
-        g_game.dial_max_tier = g_game.dial_tier_q8 >> 8;
+    if (tier_step != 0) {
+        g_game.dial_tier_ticks += tier_step;
+        dial_tier_sync();
     }
 
     static int s_wave_touching = 0;
@@ -1807,10 +1860,10 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
 
     // Combat interaction (Entire bottom screen: Y >= 14 && Y < 170)
     // 1 TAP = 1 BULLET rotating across 4 turret sprites.
-    // If A1 (hold-to-fire) is active: continuous firing while held down.
-    // If A1 is broken: strictly distinct taps only!
+    // If A1 (hold-to-fire) was purchased AND its Tier 1 is still standing: continuous
+    // fire while held. Otherwise (no A1, or the tier was destroyed): distinct taps only!
     if (is_touch && touch.px > 0 && touch.py >= 14 && touch.py < 170 && !g_game.is_dragging_ammo) {
-        int a1_active = g_generator.tiers[0].active;
+        int a1_active = g_game.upgrades.continuous_fire && g_generator.tiers[0].active;
         int can_trigger = touch_press || a1_active;
 
         if (can_trigger && g_wall.fire_cooldown == 0) {
@@ -2052,17 +2105,12 @@ static void calib_modify_val(int delta) {
         // ATRAEDOR & GENERADOR (8 tunable parameters)
         switch (g_game.calib_row) {
             case 0:
-                g_game.dial_rate_q8 += delta * 64; // Steps of 0.25 spawns/sec
-                if (g_game.dial_rate_q8 < 0) g_game.dial_rate_q8 = 0;
-                if (g_game.dial_rate_q8 > 10 * 256) g_game.dial_rate_q8 = 10 * 256;
-                g_game.dial_quantity = g_game.dial_rate_q8 >> 8;
-                g_game.spawn_rate_q8 = g_game.dial_rate_q8;
+                g_game.dial_rate_ticks += delta; // Steps of 0.05 spawns/sec
+                dial_rate_sync();
                 break;
             case 1:
-                g_game.dial_tier_q8 += delta * 26; // Steps of 0.1 tier
-                if (g_game.dial_tier_q8 < 256) g_game.dial_tier_q8 = 256; // Min T1.0
-                if (g_game.dial_tier_q8 > 4 * 256) g_game.dial_tier_q8 = 4 * 256; // Max T4.0
-                g_game.dial_max_tier = g_game.dial_tier_q8 >> 8;
+                g_game.dial_tier_ticks += delta; // Steps of 0.05 tier
+                dial_tier_sync();
                 break;
             case 2:
                 if (delta > 0 && g_generator.built_tiers < GENERATOR_TIER_COUNT) {

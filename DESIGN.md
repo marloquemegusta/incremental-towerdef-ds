@@ -205,6 +205,7 @@ Leyenda de Estados:
   2. Nivel 1 (A1): Hold continuo (mantener stylus presionado = ráfaga continua). Erige Tier 1 del Generador.
   3. Nivel 2 (A2): Auto-target básico (disparo autónomo al más cercano). Erige Tier 2 del Generador.
   4. Nivel 3 (A3): Auto-target con override manual táctil (tocar un bicho fija objetivo prioritario).
+  5. **Compuerta única del Hold:** el disparo continuo exige **comprar A1**; ninguna otra vía (reparar/erigir el Tier 1 por reparación diegética o calibración) lo desbloquea. Además es una automatización **degradable**: si el Tier 1 del Generador cae por daño, el Hold se desactiva (vuelve a tap manual) hasta repararlo.
 
 ### `[OQ-03]` Marea Continua Regulada por el Atraedor (Continuous Stream)
 - **Estado:** `[DECIDIDO]`
@@ -258,6 +259,7 @@ Leyenda de Estados:
   1. **Tasa Base Inicial Lenta:** El dial arranca en un goteo suave ($0.5$ o incluso $0.25$ enemigos por segundo) en lugar de $2.0$/s, dando un ritmo contemplativo de clicker/incremental al inicio.
   2. **Interacción del Dial Analógico:** El jugador debe poder manipular el dial táctilmente arrastrando el stylus en ambos ejes (arriba/abajo o izquierda/derecha) con fricción analógica suave, permitiendo modular el flujo de ingresos y peligro de forma orgánica.
   3. **Visualización de Telemetría Superior:** Sustituir telemetría de depuración cruda (`GEN: [X0]...`) por lecturas de estado diegéticas y limpias (`GENERATOR: X/7 TIERS ACTIVE`, `ATTRACTOR: X.X/s`).
+  4. **Granularidad de 0.05 y Autorepeat:** el dial (tasa de spawn $0.00..10.00$/s y tier $T1.00..T4.00$) avanza en pasos exactos de **$0.05$** por pulsación; mantener la cruceta pulsada acelera el avance (repetición con rampa). El HUD muestra **dos decimales** (`DIAL:X.XX/s`, `TIER:TX.XX`) para que el escalón de $0.05$ sea visible.
 
 ---
 

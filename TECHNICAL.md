@@ -62,8 +62,15 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
 - **Enjambre de hasta 384 enemigos** (`MAX_ENEMIES`) sobre un campo vertical unificado 256×384.
 - **Spatial grid** de celdas de 16 px (`ENEMY_GRID_*` en `source/simulation.c`) para separación y
   colisiones: consultas de vecindad 3×3 en O(N).
-- **Atraedor Continuo (`AttractorState`):** acumulación fraccionaria Q8 (`budget += rate * dt`). Tasas
-  suaves continuas sin escalones de oleada. Mezcla probabilística de biocastas entre tiers.
+- **Atraedor Continuo (`AttractorState`):** los diales se **escriben en ticks de 0.05** (`dial_rate_ticks`
+  0..200 $\to$ 0.00..10.00 /s; `dial_tier_ticks` 20..80 $\to$ T1.00..T4.00) porque Q8 no representa $0.05$
+  de forma exacta. `dial_rate_q8` / `dial_tier_q8` son **vistas derivadas** (Q8) sincronizadas por
+  `dial_rate_sync()` / `dial_tier_sync()`. El acumulador de spawn corre en unidades de `rate_q8 * frames`
+  (`spawn_budget_q8 += dial_rate_q8` por frame, umbral `60 * 256`), de modo que no trunca y tasas de
+  hasta $0.05$/s siguen generando. Mezcla probabilística de biocastas entre tiers.
+- **Compuerta del Hold-to-Fire (A1):** el disparo continuo exige `upgrades.continuous_fire` **y**
+  `g_generator.tiers[0].active` (automatización erigida y viva). Erigir/reparar el Tier 1 por otras vías
+  (reparación diegética, calibración) **no** habilita el Hold; si el Tier 1 cae, el Hold se degrada a tap.
 - **Generador Aditivo y Andamio (`GeneratorState`):** 7 tiers físicos (5 HP cada uno). Sin Game Over:
   el daño degrada tiers y desactiva temporalmente automatizaciones hasta su reparación. Si
   `built_tiers == 0`, los enemigos cruzan por debajo del andamio sin colisión.
@@ -84,7 +91,7 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
 | :--- | :--- |
 | `Enemy` | `x,y` Q8 globales; `hp`/`max_hp`; `incoming_damage`; `dying` / `death_timer` / `death_dir_*`; dirty rects independientes por pantalla |
 | `GeneratorState` | `built_tiers` (0..7), `tier_hp[7]` (5 HP/tier), bombillas catódicas de estado, degradación de A1-A7 |
-| `AttractorState` | `rate_q8` (enemigos/s continuo), acumulador fraccionario, `tier_q8` (composición biocasta) |
+| `AttractorState` | Diales en ticks de 0.05 (`rate_ticks`, `tier_ticks`) como fuente de verdad; vistas Q8 derivadas (`rate_q8`, `tier_q8`), acumulador fraccionario en unidades de `rate_q8*frames` |
 | `GoreChunk` | Trozos sólidos: bloque de índices de paleta (≤ 4×4), `x,y,z` Q8, vida |
 | `DeathParticle` | Gotas/partículas 3D con `z`; al aterrizar estampan en el suelo |
 | `CasingParticle` | Casquillos con rebote, giro y zumbido de vida |

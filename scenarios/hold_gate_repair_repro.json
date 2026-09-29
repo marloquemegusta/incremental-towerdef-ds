@@ -1,0 +1,15 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    { "frames": 30, "capture": "r01_boot" },
+
+    { "tap": { "x": 30, "y": 180 }, "frames": 6 },
+    { "release": true, "frames": 12, "capture": "r02_bay_repaired" },
+
+    { "tap": { "x": 128, "y": 80 }, "frames": 180, "capture_sequence": "hold_repair", "capture_every": 10, "capture": "r03_hold_after_repair" },
+    { "release": true, "frames": 10 }
+  ],
+  "assertions": {
+    "screen_changed": { "from": "r01_boot", "to": "r03_hold_after_repair", "min_changed_pixels": 50 }
+  }
+}
