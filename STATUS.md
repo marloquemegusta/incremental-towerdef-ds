@@ -92,5 +92,15 @@
   - [x] Andamio + Generador de 7 tiers (5 HP por tier) sustituyendo al muro con Game Over.
   - [x] Validación determinista de 60 FPS en DeSmuME con captura/GIF de evidencia (`walkthroughs/city-defense-prototype/`).
 
+- [x] **Cierre de Fase 1 (Generador Aditivo, Tienda de 7 Nodos, Pantalla Fin de Demo y Calibración Recableada) [COMPLETADA]:**
+  - [x] Generador aditivo arranca en 0 tiers construidos (`built_tiers = 0`) con armazón industrial de andamiaje.
+  - [x] Compra de A1 (Hold-to-fire, 100 scrap) erige Tier 1 (5 HP).
+  - [x] Compra de A2 (Auto-apuntado, 350 scrap, req A1) erige Tier 2 (5 HP) y dispara la pantalla de Fin de Demo (`MODE_VICTORY`).
+  - [x] Pantalla de Fin de Demo interactiva: muestra estadísticas, permite continuar en modo infinito (`A`) con auto-apuntado activo o reiniciar (`B`).
+  - [x] Menú de calibración (`SELECT`) completamente recableado para el stream continuo: Página 0 (Atraedor & Generador) y Página 3 (Costes de los 14 nodos de la economía).
+  - [x] Validación determinista en DeSmuME (`scenarios/phase1_vertical_slice.json`: `DSM_SCENARIO_RESULT=PASS captures=7 events=94`).
+  - [x] Documentación y evidencias registradas en `walkthroughs/phase1-vertical-slice/`.
+
+
 
 

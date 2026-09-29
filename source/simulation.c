@@ -86,13 +86,13 @@ static const GameBalanceConfig s_default_balance = {
     .enemy_bite_interval = { 1, 25, 90, 25, 35, 30, 45, 40 },
 
     .upgrade_costs = {
-        { 15, 40, 100, 250, 0 },    // 0: Caliber Lv1..4 (Dmg 1 -> 2 -> 3 -> 5 -> 8)
-        { 15, 35, 90, 200, 0 },     // 1: Cadence Lv1..4 (Interval 12 -> 10 -> 8 -> 5 -> 3)
-        { 10, 25, 60, 130, 0 },     // 2: Mag Size Lv1..4 (Mag 10 -> 16 -> 25 -> 40 -> 60)
-        { 60, 180, 0, 0, 0 },       // 3: Bio Harvest Lv1..2 (Scrap multiplier +50%, +100%)
-        { 40, 80, 180, 350, 0 },    // 4: Supply Conveyor Lv1..4
-        { 25, 350, 0, 0, 0 },       // 5: Auto Fire (Lv1 Continuous/Hold: 25, Lv2 Auto Target: 350)
-        { 180, 500, 0, 0, 0 },      // 6: Extra Turrets (Socket 2: 180, Socket 3: 500)
+        { 15, 30, 60, 120, 240 },   // 0: Caliber Lv1..5 (Dmg 1 -> 2 -> 3 -> 5 -> 8)
+        { 15, 30, 60, 120, 240 },   // 1: Cadence Lv1..5 (Interval 12 -> 10 -> 8 -> 5 -> 3)
+        { 15, 30, 60, 120, 240 },   // 2: Mag Size Lv1..5 (Mag 10 -> 16 -> 25 -> 40 -> 60)
+        { 100, 0, 0, 0, 0 },        // 3: A1 Hold-to-fire / Drag (Cost 100, builds Tier 1)
+        { 350, 0, 0, 0, 0 },        // 4: A2 Auto-target (Cost 350, builds Tier 2, requires A1)
+        { 500, 0, 0, 0, 0 },        // 5: A3 Auto-supply (Phase 2)
+        { 1000, 0, 0, 0, 0 },       // 6: A4 Extra socket / veta (Phase 2)
     },
     .turret_damage = { 1, 2, 3, 5, 8 },
     .turret_fire_interval = { 12, 10, 8, 5, 3 },
@@ -400,33 +400,50 @@ Generator g_generator;
 
 void generator_init(void) {
     memset(&g_generator, 0, sizeof(g_generator));
+    g_generator.built_tiers = 0;
     for (int t = 0; t < GENERATOR_TIER_COUNT; t++) {
-        g_generator.tiers[t].hp = GENERATOR_TIER_MAX_HP;
+        g_generator.tiers[t].hp = 0;
         g_generator.tiers[t].max_hp = GENERATOR_TIER_MAX_HP;
-        g_generator.tiers[t].active = 1;
+        g_generator.tiers[t].active = 0;
         g_generator.tiers[t].damage_flash = 0;
     }
-    g_generator.active_tier = GENERATOR_TIER_COUNT - 1;
+    g_generator.active_tier = -1;
     g_generator.total_hits = 0;
+}
+
+void generator_build_tier(int tier_idx) {
+    if (tier_idx < 0 || tier_idx >= GENERATOR_TIER_COUNT) return;
+    g_generator.tiers[tier_idx].hp = GENERATOR_TIER_MAX_HP;
+    g_generator.tiers[tier_idx].max_hp = GENERATOR_TIER_MAX_HP;
+    g_generator.tiers[tier_idx].active = 1;
+    g_generator.tiers[tier_idx].damage_flash = 12; // Visual flash celebrating construction
+    if (tier_idx >= g_generator.built_tiers) {
+        g_generator.built_tiers = tier_idx + 1;
+    }
+    g_generator.active_tier = g_generator.built_tiers - 1;
 }
 
 void generator_take_hit(int enemy_tier) {
     (void)enemy_tier;
-    for (int t = GENERATOR_TIER_COUNT - 1; t >= 0; t--) {
-        if (g_generator.tiers[t].active) {
-            g_generator.tiers[t].hp--;
-            g_generator.tiers[t].damage_flash = 8;
-            g_wall.damage_flash_timer = 6;
-            if (g_generator.tiers[t].hp <= 0) {
-                g_generator.tiers[t].hp = 0;
-                g_generator.tiers[t].active = 0;
+    if (g_generator.built_tiers > 0) {
+        for (int t = g_generator.built_tiers - 1; t >= 0; t--) {
+            if (g_generator.tiers[t].active) {
+                g_generator.tiers[t].hp--;
+                g_generator.tiers[t].damage_flash = 8;
+                g_wall.damage_flash_timer = 6;
+                if (g_generator.tiers[t].hp <= 0) {
+                    g_generator.tiers[t].hp = 0;
+                    g_generator.tiers[t].active = 0;
+                }
+                g_generator.total_hits++;
+                return;
             }
-            g_generator.total_hits++;
-            return;
         }
     }
-    // If all breached, Tier 0 stays at 0 HP with flash, no Game Over
-    g_generator.tiers[0].damage_flash = 8;
+    // If no built tiers or all built tiers breached, frame flash, no Game Over
+    if (g_generator.built_tiers > 0) {
+        g_generator.tiers[0].damage_flash = 8;
+    }
     g_wall.damage_flash_timer = 6;
     g_generator.total_hits++;
 }
@@ -668,13 +685,6 @@ void wall_update(void) {
         if ((g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.turret_infinite_ammo) || g_wall.max_ammo[s] >= 9000) {
             g_wall.ammo[s] = g_wall.max_ammo[s];
             g_wall.is_reloading[s] = 0;
-        }
-
-        if (g_wall.max_ammo[s] >= 9000) {
-            g_game.upgrades.auto_target = 1;
-            g_wall.fire_interval = 3;
-            g_wall.active_turrets = 4;
-            g_wall.damage = 6; // High caliber: shred both zerglings and hydralisks cleanly
         }
 
 
@@ -1791,43 +1801,46 @@ void game_handle_input_game_over(touchPosition touch, int keys_down, int keys_he
 void game_handle_input_victory(touchPosition touch, int keys_down, int keys_held) {
     (void)touch;
     (void)keys_held;
-    if (keys_down & (KEY_B | KEY_START | KEY_A | KEY_TOUCH)) {
+    if (keys_down & (KEY_B | KEY_START)) {
         game_init();
+        return;
+    }
+    if (keys_down & (KEY_A | KEY_TOUCH)) {
+        // Continue infinite sandbox / gameplay with auto-target enabled
+        g_game.mode = MODE_WAVE;
+        tiles_full_screen_refresh();
         return;
     }
 }
 
 uint64_t upgrade_get_cost(int idx) {
-    if (idx >= 0 && idx < 7) {
-        int auto_fire_lvl = 0;
-        if (g_game.upgrades.continuous_fire) auto_fire_lvl = 1;
-        if (g_game.upgrades.auto_target) auto_fire_lvl = 2;
-
-        int levels[7] = {
-            g_game.upgrades.caliber_lvl,
-            g_game.upgrades.firerate_lvl,
-            g_game.upgrades.mag_size_lvl,
-            g_game.upgrades.bio_harvest_lvl,
-            g_game.upgrades.conveyor_lvl,
-            auto_fire_lvl,
-            g_game.upgrades.extra_turrets
-        };
-        int level = levels[idx];
-        int max_l = (idx == 3 || idx == 5 || idx == 6) ? 2 : 4;
-        if (level >= 0 && level < max_l && g_balance.upgrade_costs[idx][level] > 0)
+    if (idx >= 0 && idx < 3) {
+        int level = (idx == 0) ? g_game.upgrades.caliber_lvl :
+                    (idx == 1) ? g_game.upgrades.firerate_lvl :
+                                 g_game.upgrades.mag_size_lvl;
+        if (level >= 0 && level < 4 && g_balance.upgrade_costs[idx][level] > 0)
             return g_balance.upgrade_costs[idx][level];
         return 999999;
     }
+    if (idx == 3) {
+        // A1: Hold-to-fire / Drag aim
+        if (!g_game.upgrades.continuous_fire)
+            return g_balance.upgrade_costs[3][0] > 0 ? g_balance.upgrade_costs[3][0] : 100;
+        return 999999;
+    }
+    if (idx == 4) {
+        // A2: Auto-target (Requires A1)
+        if (g_game.upgrades.continuous_fire && !g_game.upgrades.auto_target)
+            return g_balance.upgrade_costs[4][0] > 0 ? g_balance.upgrade_costs[4][0] : 350;
+        return 999999;
+    }
+    // Nodes 5 and 6 locked for Phase 2
     return 999999;
 }
 
 int upgrade_can_afford(int idx) {
-    if (idx == 6) {
-        int lvl = g_game.upgrades.extra_turrets;
-        if (lvl == 0 && g_game.upgrades.firerate_lvl < 2) return 0; // Gated by Cadencia Lv2
-        if (lvl == 1 && g_game.upgrades.firerate_lvl < 4) return 0; // Gated by Cadencia Lv4
-        if (lvl >= 2) return 0;
-    }
+    if (idx == 4 && !g_game.upgrades.continuous_fire) return 0; // Gated by A1
+    if (idx >= 5) return 0; // Phase 2 locked
     uint64_t cost = upgrade_get_cost(idx);
     return (cost < 999999 && g_game.scrap >= cost);
 }
@@ -1843,72 +1856,79 @@ void upgrade_purchase(int idx) {
         case 0: g_game.upgrades.caliber_lvl++; break;
         case 1: g_game.upgrades.firerate_lvl++; break;
         case 2: g_game.upgrades.mag_size_lvl++; break;
-        case 3: g_game.upgrades.bio_harvest_lvl++; break;
-        case 4: g_game.upgrades.conveyor_lvl++; break;
-        case 5:
-            if (!g_game.upgrades.continuous_fire) {
-                g_game.upgrades.continuous_fire = 1;
-            } else {
-                g_game.upgrades.auto_target = 1;
-            }
+        case 3:
+            g_game.upgrades.continuous_fire = 1;
+            generator_build_tier(0); // Erects Tier 1 (5 HP)
             break;
-        case 6:
-            g_game.upgrades.extra_turrets++;
-            if (g_game.upgrades.extra_turrets > 2) g_game.upgrades.extra_turrets = 2;
+        case 4:
+            g_game.upgrades.auto_target = 1;
+            generator_build_tier(1); // Erects Tier 2 (5 HP)
+            g_game.mode = MODE_VICTORY; // Triggers Phase 1 End-of-Demo celebration screen!
+            tiles_full_screen_refresh();
             break;
     }
 
     wall_apply_balance_and_upgrades();
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
         if (g_wall.ammo[s] > g_wall.max_ammo[s]) g_wall.ammo[s] = g_wall.max_ammo[s];
-        if (idx == 6 && s == g_game.upgrades.extra_turrets) {
-            g_wall.ammo[s] = g_wall.max_ammo[s];
-            g_wall.is_reloading[s] = 0;
-        }
     }
 }
 
 void game_handle_input_upgrades(touchPosition touch, int keys_down, int keys_held) {
     (void)keys_held;
     if (keys_down & (KEY_B | KEY_START)) {
-        g_game.mode = MODE_PAUSED;
+        g_game.mode = MODE_WAVE;
+        tiles_full_screen_refresh();
+        return;
+    }
+    if (keys_down & KEY_SELECT) {
+        g_game.previous_mode = MODE_UPGRADES;
+        g_game.mode = MODE_CALIBRATION;
         tiles_full_screen_refresh();
         return;
     }
 
     if (keys_down & KEY_TOUCH) {
-        // Return button: (130, 174, 76, 16)
-        if (touch.px >= 120 && touch.px <= 215 && touch.py >= 165 && touch.py <= 191) {
-            g_game.mode = MODE_PAUSED;
+        // [CALIBRAR] Button: (10, 174, 76, 16)
+        if (touch.px >= 10 && touch.px <= 94 && touch.py >= 165 && touch.py <= 191) {
+            g_game.previous_mode = MODE_UPGRADES;
+            g_game.mode = MODE_CALIBRATION;
             tiles_full_screen_refresh();
             return;
         }
 
-        // Tab 1: Caliber (10, 24, 110, 32)
+        // [VOLVER] Button: (130, 174, 76, 16)
+        if (touch.px >= 120 && touch.px <= 215 && touch.py >= 165 && touch.py <= 191) {
+            g_game.mode = MODE_WAVE;
+            tiles_full_screen_refresh();
+            return;
+        }
+
+        // Card 0: Caliber (10, 24, 110, 32)
         if (touch.px >= 10 && touch.px <= 120 && touch.py >= 24 && touch.py <= 56) {
             upgrade_purchase(0);
         }
-        // Tab 2: Fire Rate (130, 24, 110, 32)
+        // Card 1: Fire Rate (130, 24, 110, 32)
         else if (touch.px >= 130 && touch.px <= 240 && touch.py >= 24 && touch.py <= 56) {
             upgrade_purchase(1);
         }
-        // Tab 3: Mag Size (10, 62, 110, 32)
+        // Card 2: Mag Size (10, 62, 110, 32)
         else if (touch.px >= 10 && touch.px <= 120 && touch.py >= 62 && touch.py <= 94) {
             upgrade_purchase(2);
         }
-        // Tab 4: Bio Harvest (130, 62, 110, 32)
+        // Card 3: A1 Hold to fire (130, 62, 110, 32)
         else if (touch.px >= 130 && touch.px <= 240 && touch.py >= 62 && touch.py <= 94) {
             upgrade_purchase(3);
         }
-        // Tab 5: Auto Supply Conveyor (10, 100, 110, 32)
+        // Card 4: A2 Auto Target (10, 100, 110, 32)
         else if (touch.px >= 10 && touch.px <= 120 && touch.py >= 100 && touch.py <= 132) {
             upgrade_purchase(4);
         }
-        // Tab 6: Auto Target (130, 100, 110, 32)
+        // Card 5: A3 Locked (130, 100, 110, 32)
         else if (touch.px >= 130 && touch.px <= 240 && touch.py >= 100 && touch.py <= 132) {
             upgrade_purchase(5);
         }
-        // Tab 7: Extra turrets (10, 138, 110, 32)
+        // Card 6: A4 Locked (10, 138, 110, 32)
         else if (touch.px >= 10 && touch.px <= 120 && touch.py >= 136 && touch.py <= 172) {
             upgrade_purchase(6);
         }
@@ -1921,7 +1941,7 @@ static void calib_commit_changes(void) {
         if (g_enemies[e].active) {
             int v = g_enemies[e].variant;
             if (v >= 0 && v < ENEMY_VARIANT_COUNT) {
-            g_enemies[e].speed = g_balance.enemy_speed[v];
+                g_enemies[e].speed = g_balance.enemy_speed[v];
             }
         }
     }
@@ -1931,21 +1951,63 @@ static void calib_commit_changes(void) {
 
 static void calib_modify_val(int delta) {
     if (g_game.calib_page == 0) {
-        // ETAPAS (1..5): exactly 8 parameters per stage
-        int s = g_game.calib_stage_idx;
-        if (s < 0) s = 0;
-        if (s >= STAGE_COUNT) s = STAGE_COUNT - 1;
-        StageConfig *st = &g_balance.stages[s];
-
+        // ATRAEDOR & GENERADOR (8 tunable parameters)
         switch (g_game.calib_row) {
-            case 0: st->zergling_delay_base += delta; if (st->zergling_delay_base < 0) st->zergling_delay_base = 0; break;
-            case 1: st->scourge_delay_base += delta; if (st->scourge_delay_base < 0) st->scourge_delay_base = 0; break;
-            case 2: st->hydralisk_delay_base += delta; if (st->hydralisk_delay_base < 0) st->hydralisk_delay_base = 0; break;
-            case 3: st->zergling_delay_peak += delta; if (st->zergling_delay_peak < 0) st->zergling_delay_peak = 0; break;
-            case 4: st->scourge_delay_peak += delta; if (st->scourge_delay_peak < 0) st->scourge_delay_peak = 0; break;
-            case 5: st->hydralisk_delay_peak += delta; if (st->hydralisk_delay_peak < 0) st->hydralisk_delay_peak = 0; break;
-            case 6: st->ultralisk_delay_peak += delta; if (st->ultralisk_delay_peak < 0) st->ultralisk_delay_peak = 0; break;
-            case 7: st->stage_reward_scrap += delta; if (st->stage_reward_scrap < 0) st->stage_reward_scrap = 0; break;
+            case 0:
+                g_game.dial_quantity += delta;
+                if (g_game.dial_quantity < 0) g_game.dial_quantity = 0;
+                if (g_game.dial_quantity > 10) g_game.dial_quantity = 10;
+                g_game.spawn_rate_q8 = g_game.dial_quantity * 256;
+                break;
+            case 1:
+                g_game.dial_max_tier += delta;
+                if (g_game.dial_max_tier < 1) g_game.dial_max_tier = 1;
+                if (g_game.dial_max_tier > 4) g_game.dial_max_tier = 4;
+                break;
+            case 2:
+                if (delta > 0 && g_generator.built_tiers < GENERATOR_TIER_COUNT) {
+                    generator_build_tier(g_generator.built_tiers);
+                } else if (delta < 0 && g_generator.built_tiers > 0) {
+                    g_generator.built_tiers--;
+                    g_generator.tiers[g_generator.built_tiers].active = 0;
+                    g_generator.tiers[g_generator.built_tiers].hp = 0;
+                    g_generator.active_tier = g_generator.built_tiers - 1;
+                }
+                break;
+            case 3:
+                if (g_generator.built_tiers < 1) generator_build_tier(0);
+                g_generator.tiers[0].hp += delta;
+                if (g_generator.tiers[0].hp < 0) g_generator.tiers[0].hp = 0;
+                if (g_generator.tiers[0].hp > GENERATOR_TIER_MAX_HP) g_generator.tiers[0].hp = GENERATOR_TIER_MAX_HP;
+                g_generator.tiers[0].active = (g_generator.tiers[0].hp > 0);
+                break;
+            case 4:
+                if (g_generator.built_tiers < 2) generator_build_tier(1);
+                g_generator.tiers[1].hp += delta;
+                if (g_generator.tiers[1].hp < 0) g_generator.tiers[1].hp = 0;
+                if (g_generator.tiers[1].hp > GENERATOR_TIER_MAX_HP) g_generator.tiers[1].hp = GENERATOR_TIER_MAX_HP;
+                g_generator.tiers[1].active = (g_generator.tiers[1].hp > 0);
+                break;
+            case 5:
+                g_game.fast_forward += delta;
+                if (g_game.fast_forward < 1) g_game.fast_forward = 1;
+                if (g_game.fast_forward > 4) g_game.fast_forward = 4;
+                break;
+            case 6:
+                if (delta > 0) g_game.scrap += 50;
+                else if (g_game.scrap >= 50) g_game.scrap -= 50;
+                else g_game.scrap = 0;
+                break;
+            case 7:
+                if (delta > 0) {
+                    g_wall.hp += 10;
+                    if (g_wall.hp > g_wall.max_hp) g_wall.hp = g_wall.max_hp;
+                } else {
+                    if (g_wall.hp > 10) g_wall.hp -= 10;
+                    else g_wall.hp = 1;
+                }
+                g_game.bunker_hp = g_wall.hp;
+                break;
         }
         calib_commit_changes();
         return;
@@ -2000,19 +2062,13 @@ static void calib_modify_val(int delta) {
             val_ptr = (int64_t *)&g_balance.upgrade_costs[1][r - 4];
         } else if (r >= 8 && r <= 11) {
             val_ptr = (int64_t *)&g_balance.upgrade_costs[2][r - 8];
-        } else if (r >= 12 && r <= 13) {
-            val_ptr = (int64_t *)&g_balance.upgrade_costs[3][r - 12];
-        } else if (r >= 14 && r <= 17) {
-            val_ptr = (int64_t *)&g_balance.upgrade_costs[4][r - 14];
-        } else if (r == 18) {
-            val_ptr = (int64_t *)&g_balance.upgrade_costs[5][0];
-        } else if (r == 19) {
-            val_ptr = (int64_t *)&g_balance.upgrade_costs[5][1];
-        } else if (r >= 20 && r <= 21) {
-            val_ptr = (int64_t *)&g_balance.upgrade_costs[6][r - 20];
+        } else if (r == 12) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[3][0];
+        } else if (r == 13) {
+            val_ptr = (int64_t *)&g_balance.upgrade_costs[4][0];
         }
         if (val_ptr) {
-            int64_t n = *val_ptr + delta;
+            int64_t n = *val_ptr + delta * 5;
             if (n < 0) n = 0;
             if (n > 999999) n = 999999;
             *val_ptr = n;
@@ -2023,10 +2079,17 @@ static void calib_modify_val(int delta) {
 }
 
 void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_held) {
-    // B exits calibration back to paused
+    // B exits calibration back to previous mode (MODE_UPGRADES or MODE_PAUSED)
     if (keys_down & KEY_B) {
         calib_commit_changes();
-        g_game.mode = MODE_PAUSED;
+        g_game.mode = (g_game.previous_mode != 0) ? g_game.previous_mode : MODE_UPGRADES;
+        tiles_full_screen_refresh();
+        return;
+    }
+    // START directly returns to active wave
+    if (keys_down & KEY_START) {
+        calib_commit_changes();
+        g_game.mode = MODE_WAVE;
         tiles_full_screen_refresh();
         return;
     }
@@ -2052,7 +2115,7 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     }
 
     // Up / Down: select parameter row. Held buttons repeat, then accelerate.
-    int max_rows = (g_game.calib_page == 0) ? 8 : ((g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 21 : 22));
+    int max_rows = (g_game.calib_page == 0) ? 8 : ((g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 21 : 14));
     int nav_dir = 0;
     if (keys_down & KEY_UP) {
         g_game.calib_row = (g_game.calib_row + max_rows - 1) % max_rows;
@@ -2078,14 +2141,14 @@ void game_handle_input_calibration(touchPosition touch, int keys_down, int keys_
     // Left / Right step size
     int step = 1;
     if (g_game.calib_page == 0) {
-        step = (g_game.calib_row == 7) ? 50 : 5;
+        step = 1;
     } else if (g_game.calib_page == 1) {
         int f = g_game.calib_row % 5;
         step = (f == 1) ? 2 : 1;
     } else if (g_game.calib_page == 2) {
         step = (g_game.calib_row == 0) ? 10 : 1;
     } else if (g_game.calib_page == 3) {
-        step = (g_game.calib_row >= 19 && g_game.calib_row <= 20) ? 50 : 10;
+        step = 5;
     }
 
     if (keys_down & KEY_LEFT) {

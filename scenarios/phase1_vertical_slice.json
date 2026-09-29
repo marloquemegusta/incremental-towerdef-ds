@@ -1,0 +1,237 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {
+      "frames": 30,
+      "capture": "01_scaffold_boot"
+    },
+    {
+      "button_down": "SELECT",
+      "frames": 5
+    },
+    {
+      "button_up": "SELECT",
+      "frames": 15,
+      "capture": "02_calib_stream_page0"
+    },
+    {
+      "button_down": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_up": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_down": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_up": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_down": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_up": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_down": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_up": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_down": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_up": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_down": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_up": "DOWN",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_down": "RIGHT",
+      "frames": 5
+    },
+    {
+      "button_up": "RIGHT",
+      "frames": 10
+    },
+    {
+      "button_down": "START",
+      "frames": 5
+    },
+    {
+      "button_up": "START",
+      "frames": 15
+    },
+    {
+      "button_down": "START",
+      "frames": 5
+    },
+    {
+      "button_up": "START",
+      "frames": 15
+    },
+    {
+      "tap": {
+        "x": 40,
+        "y": 160
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 20,
+      "capture": "03_shop_unbought"
+    },
+    {
+      "tap": {
+        "x": 180,
+        "y": 78
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 20,
+      "capture": "04_shop_bought_a1"
+    },
+    {
+      "tap": {
+        "x": 60,
+        "y": 116
+      },
+      "frames": 10
+    },
+    {
+      "release": true,
+      "frames": 30,
+      "capture": "05_victory_phase1_complete"
+    },
+    {
+      "button_down": "A",
+      "frames": 5
+    },
+    {
+      "button_up": "A",
+      "frames": 30,
+      "capture": "06_infinite_auto_target"
+    },
+    {
+      "frames": 240,
+      "capture_sequence": "phase1_demo_flow",
+      "capture_every": 4,
+      "capture": "07_stream_defense_with_a2"
+    }
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_scaffold_boot",
+      "to": "02_calib_stream_page0",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {
+        "from": "02_calib_stream_page0",
+        "to": "03_shop_unbought",
+        "min_changed_pixels": 100
+      },
+      {
+        "from": "03_shop_unbought",
+        "to": "05_victory_phase1_complete",
+        "min_changed_pixels": 100
+      },
+      {
+        "from": "05_victory_phase1_complete",
+        "to": "07_stream_defense_with_a2",
+        "min_changed_pixels": 100
+      }
+    ]
+  }
+}

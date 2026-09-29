@@ -263,6 +263,7 @@ typedef struct {
 
 typedef struct {
     GeneratorTier tiers[GENERATOR_TIER_COUNT];
+    int built_tiers;    // 0..7 (number of automation tiers erected by upgrades)
     int active_tier;    // index of highest intact tier (0..6)
     int total_hits;
 } Generator;
@@ -270,6 +271,7 @@ typedef struct {
 extern Generator g_generator;
 
 void generator_init(void);
+void generator_build_tier(int tier_idx);
 void generator_take_hit(int enemy_tier);
 void generator_repair_tier(int tier_idx, int amount);
 void generator_draw_bays(uint16_t *buffer, int y);

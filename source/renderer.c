@@ -1001,26 +1001,27 @@ void renderer_draw_ui_game_over(void) {
 }
 
 void renderer_draw_ui_victory(void) {
-    renderer_fill_rect(24, 28, 208, 136, COLOR_BLACK);
-    renderer_draw_rect(24, 28, 208, 136, COLOR_PHOSPHOR_GREEN);
-    renderer_draw_rect(26, 30, 204, 132, COLOR_AMBER);
+    renderer_fill_rect(20, 20, 216, 154, COLOR_BLACK);
+    renderer_draw_rect(20, 20, 216, 154, COLOR_PHOSPHOR_GREEN);
+    renderer_draw_rect(22, 22, 212, 150, COLOR_AMBER);
 
-    renderer_draw_text(48, 40, "SECTOR 1 ASEGURADO!", COLOR_PHOSPHOR_GREEN);
-    renderer_draw_text(72, 56, "VICTORIA TOTAL", COLOR_AMBER);
+    renderer_draw_text(36, 30, "FIN DE LA DEMO - FASE 1", COLOR_PHOSPHOR_GREEN);
+    renderer_draw_text(40, 46, "AUTO-APUNTADO DESBLOQUEADO", COLOR_AMBER);
 
     char buf[64];
-    snprintf(buf, sizeof(buf), "ETAPAS SUPERADAS: 5/5");
-    renderer_draw_text(40, 78, buf, COLOR_WHITE);
+    snprintf(buf, sizeof(buf), "GENERADOR: TIER 2 ERECTO (5 HP)");
+    renderer_draw_text(28, 68, buf, COLOR_WHITE);
 
     snprintf(buf, sizeof(buf), "ENEMIGOS ELIMINADOS: %llu", (unsigned long long)g_game.enemies_killed);
-    renderer_draw_text(40, 94, buf, COLOR_WHITE);
+    renderer_draw_text(28, 84, buf, COLOR_WHITE);
 
     char scrap_buf[32];
     format_number_compact(scrap_buf, sizeof(scrap_buf), g_game.scrap);
-    snprintf(buf, sizeof(buf), "CHATARRA RECOLECTADA: %s", scrap_buf);
-    renderer_draw_text(40, 110, buf, COLOR_AMBER);
+    snprintf(buf, sizeof(buf), "CHATARRA DISPONIBLE: %s", scrap_buf);
+    renderer_draw_text(28, 100, buf, COLOR_AMBER);
 
-    renderer_draw_text(35, 136, "TOCA O PULSA B PARA NUEVO CICLO", COLOR_PHOSPHOR_GREEN);
+    renderer_draw_text(28, 124, "TOCA O PULSA A PARA MODO INFINITO", COLOR_PHOSPHOR_GREEN);
+    renderer_draw_text(28, 140, "PULSA B PARA REINICIAR", RGB15(18, 18, 18) | BIT(15));
 }
 
 void renderer_draw_ui_upgrades(void) {
@@ -1036,15 +1037,14 @@ void renderer_draw_ui_upgrades(void) {
 
     static const struct {
         int x, y, w, h;
-        const char *title;
     } s_card_pos[7] = {
-        { 10, 24, 110, 32, "CALIBER" },
-        { 130, 24, 110, 32, "FIRE RATE" },
-        { 10, 62, 110, 32, "MAG SIZE" },
-        { 130, 62, 110, 32, "BIO HARVEST" },
-        { 10, 100, 110, 32, "AUTO SUPPLY" },
-        { 130, 100, 110, 32, "AUTO TARGET" },
-        { 10, 138, 110, 32, "EXTRA TURRETS" }
+        { 10, 24, 110, 32 },  // 0: Caliber
+        { 130, 24, 110, 32 }, // 1: Fire Rate
+        { 10, 62, 110, 32 },  // 2: Mag Size
+        { 130, 62, 110, 32 }, // 3: A1 Hold to fire
+        { 10, 100, 110, 32 }, // 4: A2 Auto target
+        { 130, 100, 110, 32 },// 5: A3 Auto supply (Locked)
+        { 10, 138, 110, 32 }  // 6: A4 (Locked)
     };
 
     for (int i = 0; i < 7; i++) {
@@ -1084,59 +1084,43 @@ void renderer_draw_ui_upgrades(void) {
             snprintf(buf, sizeof(buf), "+AMMO %s$", cost_str);
             renderer_draw_text(x + 4, y + 16, buf, cost_col);
         } else if (i == 3) {
-            snprintf(buf, sizeof(buf), "HARVEST LV%d", g_game.upgrades.bio_harvest_lvl);
-            renderer_draw_text(x + 4, y + 4, buf, text_col);
-            snprintf(buf, sizeof(buf), "+SCRAP %s$", cost_str);
-            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+            renderer_draw_text(x + 4, y + 4, "A1: DISPARO DRAG", text_col);
+            if (g_game.upgrades.continuous_fire) {
+                renderer_draw_text(x + 4, y + 16, "TIER 1 (ACTIVO)", COLOR_PHOSPHOR_GREEN);
+            } else {
+                snprintf(buf, sizeof(buf), "+T1  %s$", cost_str);
+                renderer_draw_text(x + 4, y + 16, buf, cost_col);
+            }
         } else if (i == 4) {
-            snprintf(buf, sizeof(buf), "SUPPLY LV%d", g_game.upgrades.conveyor_lvl);
-            renderer_draw_text(x + 4, y + 4, buf, text_col);
-            snprintf(buf, sizeof(buf), "FEED %s$", cost_str);
-            renderer_draw_text(x + 4, y + 16, buf, cost_col);
+            renderer_draw_text(x + 4, y + 4, "A2: AUTO-APUNTADO", text_col);
+            if (g_game.upgrades.auto_target) {
+                renderer_draw_text(x + 4, y + 16, "TIER 2 (ACTIVO)", COLOR_PHOSPHOR_GREEN);
+            } else if (!g_game.upgrades.continuous_fire) {
+                renderer_draw_text(x + 4, y + 16, "REQ A1 (TIER 1)", COLOR_AMBER);
+            } else {
+                snprintf(buf, sizeof(buf), "+T2  %s$", cost_str);
+                renderer_draw_text(x + 4, y + 16, buf, cost_col);
+            }
         } else if (i == 5) {
-            int auto_lvl = 0;
-            if (g_game.upgrades.continuous_fire) auto_lvl = 1;
-            if (g_game.upgrades.auto_target) auto_lvl = 2;
-
-            if (auto_lvl == 0) {
-                snprintf(buf, sizeof(buf), "FIRE: MANUAL");
-                renderer_draw_text(x + 4, y + 4, buf, text_col);
-                snprintf(buf, sizeof(buf), "+HOLD %s$", cost_str);
-                renderer_draw_text(x + 4, y + 16, buf, cost_col);
-            } else if (auto_lvl == 1) {
-                snprintf(buf, sizeof(buf), "FIRE: HOLD");
-                renderer_draw_text(x + 4, y + 4, buf, text_col);
-                snprintf(buf, sizeof(buf), "+AIM  %s$", cost_str);
-                renderer_draw_text(x + 4, y + 16, buf, cost_col);
-            } else {
-                snprintf(buf, sizeof(buf), "AUTO TARGET");
-                renderer_draw_text(x + 4, y + 4, buf, text_col);
-                snprintf(buf, sizeof(buf), "MAXED");
-                renderer_draw_text(x + 4, y + 16, buf, cost_col);
-            }
+            renderer_draw_text(x + 4, y + 4, "A3: AUTO-RECARGA", RGB15(12, 12, 14) | BIT(15));
+            renderer_draw_text(x + 4, y + 16, "BLOQUEADO FASE 2", RGB15(15, 12, 12) | BIT(15));
         } else if (i == 6) {
-            int ext = g_game.upgrades.extra_turrets;
-            snprintf(buf, sizeof(buf), "SOCKET %d", ext + 2);
-            renderer_draw_text(x + 4, y + 4, buf, text_col);
-            if (ext == 0 && g_game.upgrades.firerate_lvl < 2) {
-                renderer_draw_text(x + 4, y + 16, "REQ ROF 2", COLOR_AMBER);
-            } else if (ext == 1 && g_game.upgrades.firerate_lvl < 4) {
-                renderer_draw_text(x + 4, y + 16, "REQ ROF 4", COLOR_AMBER);
-            } else if (ext >= 2) {
-                renderer_draw_text(x + 4, y + 16, "MAXED", cost_col);
-            } else {
-                snprintf(buf, sizeof(buf), "+1  %s$", cost_str);
-                renderer_draw_text(x + 4, y + 16, buf, cost_col);
-            }
+            renderer_draw_text(x + 4, y + 4, "A4: CHATARRA VETA", RGB15(12, 12, 14) | BIT(15));
+            renderer_draw_text(x + 4, y + 16, "BLOQUEADO FASE 2", RGB15(15, 12, 12) | BIT(15));
         }
     }
 
     if (g_game.upgrade_flash_timer > 0) g_game.upgrade_flash_timer--;
 
-    // Return button
-    renderer_fill_rect(130, 174, 76, 16, COLOR_LED_GREEN);
-    renderer_draw_rect(130, 174, 76, 16, COLOR_WHITE);
-    renderer_draw_text(153, 178, "BACK", COLOR_BLACK);
+    // Calibration shortcut button (Left)
+    renderer_fill_rect(10, 174, 84, 16, COLOR_IRON_PANEL);
+    renderer_draw_rect(10, 174, 84, 16, COLOR_AMBER);
+    renderer_draw_text(22, 178, "CALIBRAR", COLOR_AMBER);
+
+    // Return button (Right)
+    renderer_fill_rect(130, 174, 84, 16, COLOR_LED_GREEN);
+    renderer_draw_rect(130, 174, 84, 16, COLOR_WHITE);
+    renderer_draw_text(152, 178, "VOLVER", COLOR_BLACK);
 }
 
 void renderer_draw_ui_calibration(void) {
@@ -1154,13 +1138,13 @@ void renderer_draw_ui_calibration(void) {
 
     if (g_game.calib_page != 0) {
         char buf[64];
-        static const char *page_titles[4] = { "ETAPAS (1..5)", "ENEMY STATS", "BASE / STATS MEJORAS", "COSTES TIENDA" };
+        static const char *page_titles[4] = { "ATRAEDOR & GENERADOR", "ENEMY STATS", "BASE / STATS MEJORAS", "COSTES TIENDA" };
         const char *title = page_titles[g_game.calib_page];
         renderer_draw_text(6, 18, title, COLOR_WHITE);
         snprintf(buf, sizeof(buf), "PAGE %d/4", g_game.calib_page + 1);
         renderer_draw_text(190, 18, buf, COLOR_AMBER);
         int first = (g_game.calib_row / 10) * 10;
-        int last = (g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 21 : 22);
+        int last = (g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 21 : 14);
         static const char *enemy_labels[40] = {
             "SCOURGE HP", "SCOURGE SPD", "SCOURGE SCRAP", "SCOURGE DMG", "SCOURGE FRM",
             "ZERGLING HP", "ZERGLING SPD", "ZERGLING SCRAP", "ZERGLING DMG", "ZERGLING FRM",
@@ -1178,14 +1162,11 @@ void renderer_draw_ui_calibration(void) {
             "CONVEYOR LV0 (FRM)", "CONVEYOR LV1 (FRM)", "CONVEYOR LV2 (FRM)", "CONVEYOR LV3 (FRM)", "CONVEYOR LV4 (FRM)",
             "MAGAZINE LV0", "MAGAZINE LV1", "MAGAZINE LV2", "MAGAZINE LV3", "MAGAZINE LV4"
         };
-        static const char *cost_labels[22] = {
+        static const char *cost_labels[14] = {
             "CALIBER LV1 COST", "CALIBER LV2 COST", "CALIBER LV3 COST", "CALIBER LV4 COST",
             "CADENCE LV1 COST", "CADENCE LV2 COST", "CADENCE LV3 COST", "CADENCE LV4 COST",
             "MAGAZINE LV1 COST", "MAGAZINE LV2 COST", "MAGAZINE LV3 COST", "MAGAZINE LV4 COST",
-            "BIO HARVEST LV1", "BIO HARVEST LV2",
-            "AUTO SUPPLY LV1", "AUTO SUPPLY LV2", "AUTO SUPPLY LV3", "AUTO SUPPLY LV4",
-            "HOLD FIRE COST", "AUTO TARGET COST",
-            "SOCKET 2 (ROF>=2)", "SOCKET 3 (ROF>=4)"
+            "A1 HOLD FIRE COST", "A2 AUTO TARGET COST"
         };
         for (int n = 0; n < 10 && first + n < last; n++) {
             int r = first + n, val = 0;
@@ -1203,11 +1184,8 @@ void renderer_draw_ui_calibration(void) {
                 if (r >= 0 && r <= 3) val = (int)g_balance.upgrade_costs[0][r];
                 else if (r >= 4 && r <= 7) val = (int)g_balance.upgrade_costs[1][r - 4];
                 else if (r >= 8 && r <= 11) val = (int)g_balance.upgrade_costs[2][r - 8];
-                else if (r >= 12 && r <= 13) val = (int)g_balance.upgrade_costs[3][r - 12];
-                else if (r >= 14 && r <= 17) val = (int)g_balance.upgrade_costs[4][r - 14];
-                else if (r == 18) val = (int)g_balance.upgrade_costs[5][0];
-                else if (r == 19) val = (int)g_balance.upgrade_costs[5][1];
-                else if (r >= 20 && r <= 21) val = (int)g_balance.upgrade_costs[6][r - 20];
+                else if (r == 12) val = (int)g_balance.upgrade_costs[3][0];
+                else if (r == 13) val = (int)g_balance.upgrade_costs[4][0];
             }
             int y = 32 + n * 13; int sel = (r == g_game.calib_row);
             renderer_fill_rect(6, y, 244, 12, sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL);
@@ -1222,50 +1200,36 @@ void renderer_draw_ui_calibration(void) {
         return;
     }
 
-    // Stage Selector Bar: [<] ETAPA X/5 [>]
-    renderer_fill_rect(8, 16, 26, 16, COLOR_IRON_PANEL);
-    renderer_draw_rect(8, 16, 26, 16, COLOR_AMBER);
-    renderer_draw_text(18, 20, "<", COLOR_AMBER);
-
-    renderer_fill_rect(222, 16, 26, 16, COLOR_IRON_PANEL);
-    renderer_draw_rect(222, 16, 26, 16, COLOR_AMBER);
-    renderer_draw_text(232, 20, ">", COLOR_AMBER);
-
+    // Page 0: ATRAEDOR & GENERADOR
     char buf[64];
-    snprintf(buf, sizeof(buf), "SELECT ETAPA: %d/5 (L/R)", g_game.calib_stage_idx + 1);
-    renderer_draw_text(52, 20, buf, COLOR_WHITE);
-    renderer_draw_text(190, 20, "TAB 1/4", COLOR_AMBER);
+    renderer_draw_text(6, 18, "ATRAEDOR & GENERADOR", COLOR_WHITE);
+    renderer_draw_text(190, 18, "PAGE 1/4", COLOR_AMBER);
 
-    int s = g_game.calib_stage_idx;
-    if (s < 0) s = 0;
-    if (s >= STAGE_COUNT) s = STAGE_COUNT - 1;
-    const StageConfig *st = &g_balance.stages[s];
-
-    static const char *stage_row_labels[8] = {
-        "1. ZERG BASE DELAY",
-        "2. SCOURGE BASE DEL",
-        "3. HYDRA BASE DELAY",
-        "4. ZERG PEAK DELAY",
-        "5. SCOURGE PEAK DEL",
-        "6. HYDRA PEAK DELAY",
-        "7. ULTRA PEAK DELAY",
-        "8. STAGE REWARD $"
+    static const char *stream_row_labels[8] = {
+        "1. ATRAEDOR CADENCIA (E/S)",
+        "2. ATRAEDOR TIER MAX (T1-4)",
+        "3. GENERADOR TIERS ERECTOS",
+        "4. TIER 1 (A1) HP (0..5)",
+        "5. TIER 2 (A2) HP (0..5)",
+        "6. VELOCIDAD SIM (1x..4x)",
+        "7. CHATARRA DISPONIBLE",
+        "8. SALUD BUNKER HP"
     };
 
     for (int r = 0; r < 8; r++) {
         int val = 0;
         switch (r) {
-            case 0: val = st->zergling_delay_base; break;
-            case 1: val = st->scourge_delay_base; break;
-            case 2: val = st->hydralisk_delay_base; break;
-            case 3: val = st->zergling_delay_peak; break;
-            case 4: val = st->scourge_delay_peak; break;
-            case 5: val = st->hydralisk_delay_peak; break;
-            case 6: val = st->ultralisk_delay_peak; break;
-            case 7: val = st->stage_reward_scrap; break;
+            case 0: val = g_game.dial_quantity; break;
+            case 1: val = g_game.dial_max_tier; break;
+            case 2: val = g_generator.built_tiers; break;
+            case 3: val = g_generator.tiers[0].hp; break;
+            case 4: val = g_generator.tiers[1].hp; break;
+            case 5: val = g_game.fast_forward; break;
+            case 6: val = (int)g_game.scrap; break;
+            case 7: val = (int)g_wall.hp; break;
         }
 
-        int y = 36 + r * 14;
+        int y = 34 + r * 14;
         int is_sel = (g_game.calib_row == r);
         uint16_t row_bg = is_sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL;
         uint16_t row_border = is_sel ? COLOR_AMBER : COLOR_IRON_BORDER;
@@ -1274,7 +1238,7 @@ void renderer_draw_ui_calibration(void) {
         renderer_fill_rect(6, y, 244, 13, row_bg);
         renderer_draw_rect(6, y, 244, 13, row_border);
 
-        renderer_draw_text(10, y + 2, stage_row_labels[r], txt_col);
+        renderer_draw_text(10, y + 2, stream_row_labels[r], txt_col);
 
         snprintf(buf, sizeof(buf), "%d", val);
         renderer_draw_text(144, y + 3, buf, COLOR_PHOSPHOR_GREEN);
@@ -1290,10 +1254,10 @@ void renderer_draw_ui_calibration(void) {
         renderer_draw_text(223, y + 3, "+", COLOR_WHITE);
     }
 
-    // Bottom action buttons: [RESTART E1] [RESET DEFAULTS] [RESUME]
+    // Bottom action buttons: [RESTART W1] [RESET DEFAULTS] [RESUME]
     renderer_fill_rect(8, 158, 76, 26, COLOR_LED_RED);
     renderer_draw_rect(8, 158, 76, 26, COLOR_WHITE);
-    renderer_draw_text(14, 166, "RESTART E1", COLOR_WHITE);
+    renderer_draw_text(14, 166, "RESTART W1", COLOR_WHITE);
 
     renderer_fill_rect(90, 158, 72, 26, COLOR_IRON_PANEL);
     renderer_draw_rect(90, 158, 72, 26, COLOR_AMBER);
