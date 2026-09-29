@@ -72,10 +72,11 @@ Estas claves viven en `~/.commandcode/config.json`, **no** en este repo: aplican
    - Esto garantiza que la física, las partículas balísticas, los casquillos, el retroceso hidráulico, los splatters de sangre con dithering y la lógica determinista real del juego sean los que generen invariablemente las capturas y GIFs de evidencia.
    - Al incorporar o proponer nuevos tiles o sprites, se deben convertir a los arrays C correspondientes, compilar la ROM y capturar el resultado con DeSmuME.
 6. **Invariantes de diseño y técnica (viven en su documento canónico; aquí sólo se referencian):**
-   - **Lenguaje visual y croma** — púrpura reservado al enjambre, **sangre en paleta roja**, assets maestros de sprites (`*_strip_master_1x.png`) → `DESIGN.md` §7 y §11.
-   - **Escenario** — campo abierto de 256 px, muralla defensiva en `WALL_DEFAULT_Y`, suelo isométrico 2:1 (prohibido el cenital) → `DESIGN.md` §11 (y §2/§3).
-   - **Sin rango** — fuego total en la pantalla inferior, sin franjas de demarcación → `DESIGN.md` `[OQ-06]`.
-   - **Render y rendimiento** — punto fijo, framebuffer con dirty grid, presupuesto de 545 ticks → `TECHNICAL.md` y la skill (`references/performance-architecture.md`).
+   - **Filosofía City Defense** — stream continuo por dial del Atraedor, sin Game Over; Generador aditivo de 7 tiers (5 HP/tier) con degradación de automatizaciones por daño; andamio permeable en $Y_{\text{local}}=144$ (los enemigos pasan por debajo si no hay tiers erigidos) → `DESIGN.md` §1, §3 y `[OQ-01]`.
+   - **Lenguaje visual y croma** — púrpura reservado al enjambre, **sangre en paleta roja**, assets maestros de sprites (`*_strip_master_1x.png`), sin conos de muerte en pantalla superior → `DESIGN.md` §7, §11 y `[OQ-06]`.
+   - **Batería defensiva unificada** — 1 entidad lógica / 4 cúpulas visuales con fuego alternado, indicador común de munición sobre depósito central ($X=128, Y=153$) y recarga diegética por arrastre táctil → `DESIGN.md` `[OQ-06]`.
+   - **Escenario y sin rango** — campo abierto de 256 px, suelo isométrico 2:1 (prohibido el cenital), fuego total en pantalla inferior sin franjas de demarcación → `DESIGN.md` §11 y `[OQ-06]`.
+   - **Render y rendimiento** — punto fijo Q8, framebuffer con dirty grid, presupuesto de 545 ticks → `TECHNICAL.md` y la skill (`references/performance-architecture.md`).
    - Si algo de esto cambia, se cambia **en su documento**; aquí no se duplica.
 7. **Revisión de coherencia documental al cerrar cada tarea (obligatoria):**
    - Al terminar **cualquier** tarea, revisar `DESIGN.md`, `TECHNICAL.md`, `STATUS.md` y este `AGENTS.md` y **corregir lo que el avance haya dejado contradicho**: reglas, invariantes, estructuras de datos, cifras, nombres de ficheros, mecánicas retiradas o añadidas, flags, etc.

@@ -462,14 +462,26 @@ void generator_repair_tier(int tier_idx, int amount) {
 void wall_apply_balance_and_upgrades(void) {
     // 1 logical battery: 4 visual sockets active from minute 0
     g_wall.active_turrets = 4;
-    g_wall.damage = 1;
-    g_wall.fire_interval = 6; // 10 shots/s maximum cadence
+    int dmg_lvl = g_game.upgrades.caliber_lvl;
+    if (dmg_lvl < 0) dmg_lvl = 0;
+    if (dmg_lvl > 4) dmg_lvl = 4;
+    g_wall.damage = g_balance.turret_damage[dmg_lvl];
+
+    int rof_lvl = g_game.upgrades.firerate_lvl;
+    if (rof_lvl < 0) rof_lvl = 0;
+    if (rof_lvl > 4) rof_lvl = 4;
+    g_wall.fire_interval = g_balance.turret_fire_interval[rof_lvl];
+
+    int mag_lvl = g_game.upgrades.mag_size_lvl;
+    if (mag_lvl < 0) mag_lvl = 0;
+    if (mag_lvl > 4) mag_lvl = 4;
+    int mag_cap = g_balance.turret_magazine[mag_lvl];
+
     g_wall.range_line_y = 0;  // Full screen bottom targetable
     g_wall.range = g_wall.screen_y;
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
-        g_wall.max_ammo[s] = 9999;
-        g_wall.ammo[s] = 9999;
-        g_wall.is_reloading[s] = 0;
+        g_wall.max_ammo[s] = mag_cap;
+        if (g_wall.ammo[s] > mag_cap) g_wall.ammo[s] = mag_cap;
     }
 }
 
@@ -511,6 +523,14 @@ void wall_reload_socket(int s) {
     g_wall.ammo[s] = g_wall.max_ammo[s];
     g_wall.is_reloading[s] = 0;
     g_wall.reload_timer[s] = 0;
+}
+
+void wall_reload_battery(void) {
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        g_wall.ammo[s] = g_wall.max_ammo[s];
+        g_wall.is_reloading[s] = 0;
+        g_wall.reload_timer[s] = 0;
+    }
 }
 
 int wall_angle_from_target(int turret_x, int turret_y, int target_x, int target_y) {
@@ -623,9 +643,11 @@ void wall_fire_at_target(int target_x, int target_y, int enemy_idx) {
 
     if (s < 0 || s >= WALL_SOCKET_COUNT) return;
 
-    // If turret is out of ammo, lock it in RELOAD state and cease firing
-    if (g_wall.ammo[s] <= 0) {
-        g_wall.is_reloading[s] = 1;
+    // Check battery ammo (unified across all sockets)
+    int total_ammo = 0;
+    for (int i = 0; i < WALL_SOCKET_COUNT; i++) total_ammo += g_wall.ammo[i];
+    if (total_ammo <= 0) {
+        for (int i = 0; i < WALL_SOCKET_COUNT; i++) g_wall.is_reloading[i] = 1;
         return;
     }
 
@@ -647,7 +669,13 @@ void wall_fire_at_target(int target_x, int target_y, int enemy_idx) {
 
     int spawned = wall_spawn_bullet_dart(mx, my, target_x, target_y, enemy_idx);
     if (spawned) {
-        g_wall.ammo[s]--;
+        // Deduct 1 round from the battery
+        for (int i = 0; i < WALL_SOCKET_COUNT; i++) {
+            if (g_wall.ammo[i] > 0) {
+                g_wall.ammo[i]--;
+                break;
+            }
+        }
         g_wall.battery_fire_step++;
         wall_spawn_casing(dx, dy, (barrel == 0 ? -1 : 1));
         g_wall.muzzle_flash_timer[s] = 2;
@@ -662,8 +690,10 @@ void wall_fire_at_target(int target_x, int target_y, int enemy_idx) {
             g_enemies[enemy_idx].incoming_damage += g_wall.damage;
         }
 
-        if (g_wall.ammo[s] <= 0) {
-            g_wall.is_reloading[s] = 1;
+        int rem_ammo = 0;
+        for (int i = 0; i < WALL_SOCKET_COUNT; i++) rem_ammo += g_wall.ammo[i];
+        if (rem_ammo <= 0) {
+            for (int i = 0; i < WALL_SOCKET_COUNT; i++) g_wall.is_reloading[i] = 1;
         }
     }
     g_wall.fire_cooldown = g_wall.fire_interval;
@@ -681,8 +711,8 @@ void wall_update(void) {
     if (g_wall.fire_cooldown > 0) g_wall.fire_cooldown--;
     if (g_wall.damage_flash_timer > 0) g_wall.damage_flash_timer--;
     for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
-        // Debug Sandbox & Overdrive: replenish ammo if infinite ammo toggle is enabled or max_ammo >= 9000
-        if ((g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.turret_infinite_ammo) || g_wall.max_ammo[s] >= 9000) {
+        // Debug Sandbox Overdrive: replenish ammo ONLY if infinite ammo toggle is explicitly enabled
+        if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.turret_infinite_ammo) {
             g_wall.ammo[s] = g_wall.max_ammo[s];
             g_wall.is_reloading[s] = 0;
         }
@@ -1739,6 +1769,33 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
             game_toggle_pause();
             return;
         }
+
+        // Bunker Ammo Depot touch down: (AMMO_DEPOT_X=128, Y=166, W=24, H=16) -> (112..144, 154..178)
+        if (touch.px >= 110 && touch.px <= 146 && touch.py >= 150 && touch.py <= 180) {
+            g_game.is_dragging_ammo = 1;
+            g_game.drag_x = touch.px;
+            g_game.drag_y = touch.py;
+            return;
+        }
+    }
+
+    // Dragging ammo crate following stylus
+    if (is_touch && g_game.is_dragging_ammo) {
+        g_game.drag_x = touch.px;
+        g_game.drag_y = touch.py;
+        return;
+    }
+
+    // Touch release while dragging ammo: drop onto battery sockets or bunker line to reload
+    if (!is_touch && g_game.is_dragging_ammo) {
+        int reloaded = 0;
+        // If dropped anywhere near the turrets or battery wall (Y in [120..165]):
+        if (g_game.drag_y >= 115 && g_game.drag_y <= 168 && g_game.drag_x >= 20 && g_game.drag_x <= 236) {
+            wall_reload_battery();
+            reloaded = 1;
+        }
+        g_game.is_dragging_ammo = 0;
+        if (reloaded) return;
     }
 
     // Diegetic Generator Repair: rubbing/tapping a generator bay on the bottom edge (Y=170..191)
@@ -1752,7 +1809,7 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     // 1 TAP = 1 BULLET rotating across 4 turret sprites.
     // If A1 (hold-to-fire) is active: continuous firing while held down.
     // If A1 is broken: strictly distinct taps only!
-    if (is_touch && touch.px > 0 && touch.py >= 14 && touch.py < 170) {
+    if (is_touch && touch.px > 0 && touch.py >= 14 && touch.py < 170 && !g_game.is_dragging_ammo) {
         int a1_active = g_generator.tiers[0].active;
         int can_trigger = touch_press || a1_active;
 

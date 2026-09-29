@@ -62,11 +62,19 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
 - **Enjambre de hasta 384 enemigos** (`MAX_ENEMIES`) sobre un campo vertical unificado 256×384.
 - **Spatial grid** de celdas de 16 px (`ENEMY_GRID_*` en `source/simulation.c`) para separación y
   colisiones: consultas de vecindad 3×3 en O(N).
-- **Salud virtual anti-overkill** (`incoming_damage`): la muralla no dispara si
+- **Atraedor Continuo (`AttractorState`):** acumulación fraccionaria Q8 (`budget += rate * dt`). Tasas
+  suaves continuas sin escalones de oleada. Mezcla probabilística de biocastas entre tiers.
+- **Generador Aditivo y Andamio (`GeneratorState`):** 7 tiers físicos (5 HP cada uno). Sin Game Over:
+  el daño degrada tiers y desactiva temporalmente automatizaciones hasta su reparación. Si
+  `built_tiers == 0`, los enemigos cruzan por debajo del andamio sin colisión.
+- **Batería Unificada:** 1 entidad lógica metrónomo (`WallPlatform`) coordinando 4 cúpulas visuales.
+  Cargador compartido de batería (10 balas base a Lv0). Consumo de 1 bala por disparo y recarga
+  táctil arrastrando desde el depósito diegético ($X \in [110..146], Y \in [150..180]$).
+- **Salud virtual anti-overkill** (`incoming_damage`): la batería no dispara si
   `hp - incoming_damage <= 0`.
-- **Muerte en dos fases:** `dying` (15 frames de animación; no avanza, no colisiona ni es objetivo) y
-  retirada.
-- Duración de etapa: 120 s (`STAGE_DURATION_FRAMES = 7200`).
+- **Muerte limpia:** licuado gravitatorio local (15 frames) y desprendimiento de trozos de sprite.
+  **Conos de muerte desactivados** (`DEATH_CONE_ENABLED = 0`); prohibido dibujar conos en pantalla
+  superior o sub-bancos.
 - **Sin rango (dormido):** `g_balance.turret_range[]` se conserva a `0` por reversibilidad; un valor
   `> 0` reintroduciría una línea de fuego (prohibida por diseño, `DESIGN.md` `[OQ-06]`).
 
@@ -75,12 +83,14 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
 | Estructura | Notas |
 | :--- | :--- |
 | `Enemy` | `x,y` Q8 globales; `hp`/`max_hp`; `incoming_damage`; `dying` / `death_timer` / `death_dir_*`; dirty rects independientes por pantalla |
+| `GeneratorState` | `built_tiers` (0..7), `tier_hp[7]` (5 HP/tier), bombillas catódicas de estado, degradación de A1-A7 |
+| `AttractorState` | `rate_q8` (enemigos/s continuo), acumulador fraccionario, `tier_q8` (composición biocasta) |
 | `GoreChunk` | Trozos sólidos: bloque de índices de paleta (≤ 4×4), `x,y,z` Q8, vida |
 | `DeathParticle` | Gotas/partículas 3D con `z`; al aterrizar estampan en el suelo |
 | `CasingParticle` | Casquillos con rebote, giro y zumbido de vida |
-| `Bullet` / `BulletDart` | Balas de torreta / dardos de muralla (`dist_remaining` + `target_enemy_idx`) |
-| `Turret` / `WallPlatform` | Torretas y muralla: sockets, ángulos, munición, `range_line_y` **dormido** en 0 |
-| `GameState` / `GameBalanceConfig` | Modos de juego, telemetría y balance serializable |
+| `Bullet` / `BulletDart` | Balas de batería (`dist_remaining` + `target_enemy_idx`) |
+| `WallPlatform` | Batería unificada: sockets visuales, ángulos, munición global de batería, recarga diegética |
+| `GameState` / `GameBalanceConfig` | Modos de juego, telemetría y balance serializable (recableado a Atraedor/Generador/Costes) |
 
 ## 7. Persistencia y configuración
 
