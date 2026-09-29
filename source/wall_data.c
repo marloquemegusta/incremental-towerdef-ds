@@ -1514,7 +1514,27 @@ void generator_draw_bays(uint16_t *buffer, int base_y) {
         int by = base_y;
         if (by < 0 || by + bay_h >= SCREEN_H) continue;
 
+        int is_built = (t < g_generator.built_tiers);
         const GeneratorTier *tier = &g_generator.tiers[t];
+
+        if (!is_built) {
+            // Unbuilt scaffold frame: dark steel framework lattice
+            for (int dy = 0; dy < bay_h; dy++) {
+                int py = by + dy;
+                uint16_t *dst = &buffer[py * SCREEN_W + bx];
+                for (int dx = 0; dx < bay_w; dx++) {
+                    int is_border = (dy == 0 || dy == bay_h - 1 || dx == 0 || dx == bay_w - 1);
+                    int is_cross = (dx == dy * 3 || dx == (bay_h - 1 - dy) * 3 || dx == 14 || dx == 15);
+                    if (is_border || is_cross) {
+                        dst[dx] = RGB15(3, 4, 5) | BIT(15);
+                    } else {
+                        dst[dx] = RGB15(1, 1, 1) | BIT(15);
+                    }
+                }
+            }
+            continue;
+        }
+
         uint16_t bg_col;
         if (tier->damage_flash > 0) {
             bg_col = RGB15(31, 31, 28) | BIT(15);

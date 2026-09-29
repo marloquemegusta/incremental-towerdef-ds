@@ -38,6 +38,13 @@ int main(void) {
                 game_toggle_pause();
                 start_toggled = 1;
             }
+        } else if (keys_down & KEY_SELECT) {
+            if (g_game.mode == MODE_WAVE || g_game.mode == MODE_PAUSED) {
+                g_game.previous_mode = g_game.mode;
+                g_game.mode = MODE_CALIBRATION;
+                tiles_full_screen_refresh();
+                start_toggled = 1;
+            }
         }
 
         // Invisible Debug Hotkey: L + SELECT toggles Test Sandbox Lab
