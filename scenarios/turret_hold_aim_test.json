@@ -1,0 +1,23 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 30, "capture": "a01_boot"},
+
+    {"tap": {"x": 210, "y": 176}, "frames": 6},
+    {"release": true, "frames": 24, "capture": "a02_wave_started"},
+
+    {"tap": {"x": 248, "y": 158}, "frames": 1, "capture": "a03_fire"},
+    {"release": true, "frames": 1},
+    {"frames": 40, "capture_sequence": "a04_after", "capture_every": 1, "capture": "a04_end"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "a01_boot",
+      "to": "a02_wave_started",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {"from": "a02_wave_started", "to": "a04_end", "min_changed_pixels": 50}
+    ]
+  }
+}

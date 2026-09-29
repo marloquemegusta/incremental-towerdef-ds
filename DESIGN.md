@@ -25,7 +25,7 @@ Documento canónico vivo de visión de juego, arquitectura de simulación balís
 - **Ambientación:** Un Bastión perimetral del Adeptus Mechanicus bajo asedio implacable de un Enjambre Bio-Xenos atraído a voluntad.
 - **Tasa de Refresco:** **60 FPS estables** en ARM9 sin caídas, con renderizado directo a VRAM (`VRAM_A` y sub-VRAM).
 - **Core Loop de la Partida (Sin Game Over clásico):**
-  1. **Inicio Manual (Fricción Alta):** El jugador defiende a mano picando en la pantalla con el stylus (1 tap = 1 disparo a enemigos vivos). La base comienza como un mero armazón de andamiaje permeable.
+  1. **Inicio Manual (Fricción Alta):** El jugador defiende a mano picando en la pantalla con el stylus (1 tap = 1 disparo a cualquier punto del campo inferior; tocar la silueta de un enemigo lo fija como objetivo perseguido). La base comienza como un mero armazón de andamiaje permeable.
   2. **Economía de Chatarra y Vetas:** Cada baja aporta Chatarra para desbloquear la escalera de 7 automatizaciones (A1 a A7) y financiar infraestructura minera sobre vetas.
   3. **Generador Aditivo de 7 Tiers:** Cada mejora principal de automatización erige un tier físico del Generador con sus propias 5 bombillas catódicas de vida.
   4. **Degradación en vez de Muerte:** Si los enemigos superan la defensa y destruyen tiers del Generador, la partida **NO termina en Game Over**: se degradan temporalmente las automatizaciones de los tiers dañados hasta ser reparadas.
@@ -228,10 +228,10 @@ Leyenda de Estados:
 ### `[OQ-06]` Balística Canónica, Metrónomo de Batería, Salud Virtual y Logística Táctil
 - **Estado:** `[DECIDIDO]`
 - **Decisión:**
-  1. **La Muralla como Metrónomo Central:** Cadencia global unificada (`fire_interval`). Las 4 cúpulas de la batería rotan estéticamente el fuego alternando cañones ($T_1 L \to T_2 L \to \dots$).
+  1. **La Muralla como Metrónomo Central:** Cadencia global unificada (`fire_interval`). Las 4 cúpulas de la batería rotan el fuego alternando cañones ($T_1 L \to T_2 L \to \dots$). Cada cúpula **conserva la última marcación a la que disparó** como postura de reposo cuando no hay objetivo (no vuelve a un ángulo fijo tras disparar); ver `[OQ-11]`.
   2. **Fuego Total en la Pantalla Inferior (Sin Rango):** Sin límite de alcance; el jugador y el auto-apuntado baten todo el campo táctil ($Y_{\text{local}} \in [0..143]$).
   3. **Salud Virtual Anti-Overkill (`incoming_damage`):** Se evita sobreaniquilación rastreando daño en vuelo.
-  4. **Filtro Táctil Estricto:** Prohibido disparar tocando suelo vacío; el tap o arrastre solo abre fuego si toca o pasa sobre un enemigo vivo.
+  4. **Disparo Libre (revoca el antiguo «Filtro Táctil Estricto»):** El tap abre fuego hacia cualquier punto del campo táctil inferior, haya o no enemigo; **tocar suelo vacío también consume bala y cadencia**. El tap sobre la **silueta** de un enemigo lo fija como objetivo perseguido. La resolución táctil usa la **caja real del sprite** (con su `offset` y su cota de vuelo) unida a un radio de gracia de 24 px alrededor de su centro, y gana el enemigo más cercano. *(El antiguo filtro `[OQ-06].4` «prohibido disparar tocando suelo vacío» nunca llegó a implementarse; este punto lo revoca formalmente.)*
   5. **Logística Táctil de Munición:** Depósito único de munición en búnker ($X=128, Y=166$). Al vaciarse el cargador compartido (10 balas base), la batería entra en bloqueo y exige arrastrar el suministro con stylus a la línea defensiva.
   6. **Indicador de Integridad del Generador (35 Micro-Bombillas de Cátodo):** Eliminada la fila de 32 bombillas de muro. Cada una de las 7 bahías del Generador tiene 5 micro-bombillas de fósforo verde que parpadean en daño y se apagan al perder HP.
   7. **Descarte de Conos de Muerte:** Se suprimen los conos y salpicaduras angulares en pantalla superior e inferior (`DEATH_CONE_ENABLED = 0`); las bajas se representan por licuado gravitatorio local y desprendimiento de trozos reales de sprite en paleta roja.
@@ -261,6 +261,10 @@ Leyenda de Estados:
   3. **Visualización de Telemetría Superior:** Sustituir telemetría de depuración cruda (`GEN: [X0]...`) por lecturas de estado diegéticas y limpias (`GENERATOR: X/7 TIERS ACTIVE`, `ATTRACTOR: X.X/s`).
   4. **Granularidad de 0.05 y Autorepeat:** el dial (tasa de spawn $0.00..10.00$/s y tier $T1.00..T4.00$) avanza en pasos exactos de **$0.05$** por pulsación; mantener la cruceta pulsada acelera el avance (repetición con rampa). El HUD muestra **dos decimales** (`DIAL:X.XX/s`, `TIER:TX.XX`) para que el escalón de $0.05$ sea visible.
 
+### `[OQ-11]` Postura de Reposo de la Batería (Apuntado Persistente)
+- **Estado:** `[DECIDIDO]`
+- **Decisión:** Cada cúpula de la batería **mantiene la dirección de su último disparo** como postura de reposo cuando no hay objetivo que batir; ya no vuelve a un ángulo fijo tras disparar. Mientras exista objetivo (auto-apuntado o fijado con el stylus) la cúpula apunta a él; al cesar, se queda en la última marcación. La postura inicial de fábrica de cada socket la define la tabla de sockets (`c_wall_sockets[].default_angle`), única fuente de verdad.
+
 ---
 
 ## 11. Lenguaje Visual Canónico y Assets
@@ -274,4 +278,4 @@ Leyenda de Estados:
 - **Campo abierto (256 px):** el campo abarca el ancho completo de la pantalla, **sin carriles** ni calzadas estrechas de 32 px; el enjambre avanza libremente hacia el sur (§2).
 - **Muralla defensiva:** anclada en la cota canónica `WALL_DEFAULT_Y` (**Y = 144** de la pantalla inferior), sirve de anclaje a las torretas activas y a la línea de defensa (§3).
 - **Suelo isométrico 2:1** (`dx=2, dy=1`) con tiles maestros de 32×32 px (`assets/tiles/sector1/master/tile_061_cobblestone_1x.png`, `tile_062_irregular_1x.png`, `tile_063_flagstone_1x.png`), renderizados en modo bitmap / modo 5 paletizado con solapamiento *back-to-front*. Queda **prohibido** el uso de los tiles cenitales/ortogonales a 90° (archivados en `assets/tiles/sector1/archive/`).
-- **Sin rango:** la muralla bate toda la pantalla inferior y el stylus puede seleccionar cualquier enemigo de esa superficie; queda prohibida cualquier franja o línea de demarcación de alcance sobre el empedrado (`[OQ-06]`).
+- **Sin rango:** la muralla bate toda la pantalla inferior; el stylus dispara a cualquier punto de esa superficie y fija como objetivo al enemigo cuya **silueta** toca (hitbox = caja del sprite ∪ radio de gracia de 24 px, `[OQ-06].4`). Queda prohibida cualquier franja o línea de demarcación de alcance sobre el empedrado.

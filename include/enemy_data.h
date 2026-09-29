@@ -31,6 +31,7 @@ extern uint16_t g_enemy_palette[256];
 extern const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT];
 
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir);
+void enemy_get_frame_bounds(int cx, int cy, int variant, int frame, int dir, int is_attacking, int *out_x, int *out_y, int *out_w, int *out_h);
 void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking, int *out_bx, int *out_by, int *out_bw, int *out_bh);
 void enemy_draw_sprite_to_buffer8(uint8_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking, int *out_bx, int *out_by, int *out_bw, int *out_bh);
 void enemy_draw_melting_sprite(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir, int progress, int dir_x, int dir_y, int *out_bx, int *out_by, int *out_bw, int *out_bh);

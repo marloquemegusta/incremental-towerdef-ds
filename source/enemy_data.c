@@ -2438,3 +2438,43 @@ ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer8(
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
     enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir, 0, NULL, NULL, NULL, NULL);
 }
+
+// Computes the on-screen bounding box of the sprite that WOULD be drawn for the
+// given state, without blitting any pixels. Shares the exact frame-selection and
+// offset math used by the draw path so hit-testing matches what the player sees.
+void enemy_get_frame_bounds(int cx, int cy, int variant, int frame, int dir, int is_attacking, int *out_x, int *out_y, int *out_w, int *out_h) {
+    if (out_x) *out_x = cx;
+    if (out_y) *out_y = cy;
+    if (out_w) *out_w = 0;
+    if (out_h) *out_h = 0;
+    if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) return;
+
+    const EnemyTypeDef *type = &g_enemy_types[variant];
+
+    int d = dir & 7;
+    int source_dir = d - 2;
+    if (source_dir < 0) source_dir = 0;
+    if (source_dir > 4) source_dir = 4;
+
+    const EnemyFrameDef *fd = 0;
+    if (is_attacking && type->attack_frame_count > 0) {
+        int f = frame;
+        if (f >= type->attack_frame_count) f %= type->attack_frame_count;
+        fd = &type->attack_frames[source_dir][f];
+    } else {
+        if (type->frame_count == 0) return;
+        int f = frame;
+        if (f >= type->frame_count) f %= type->frame_count;
+        fd = &type->frames[source_dir][f];
+    }
+
+    if (!fd->pixels || fd->w == 0 || fd->h == 0) return;
+
+    // Flying units are drawn lifted by their flight altitude (see the draw path).
+    if (type->is_flying && type->flight_altitude > 0) cy -= type->flight_altitude;
+
+    if (out_x) *out_x = cx + fd->offset_x;
+    if (out_y) *out_y = cy + fd->offset_y;
+    if (out_w) *out_w = fd->w;
+    if (out_h) *out_h = fd->h;
+}

@@ -79,6 +79,19 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
   táctil arrastrando desde el depósito diegético ($X \in [110..146], Y \in [150..180]$).
 - **Salud virtual anti-overkill** (`incoming_damage`): la batería no dispara si
   `hp - incoming_damage <= 0`.
+- **Hitbox táctil (anclada al sprite dibujado):** el tap resuelve el objetivo contra la **caja real del
+  sprite** — `enemy_get_frame_bounds()` en `source/enemy_data.c`, que replica el `offset_x/offset_y` del frame
+  y la cota de vuelo (`flight_altitude`) igual que la ruta de dibujo — **unida** a un radio de gracia
+  `TAP_HIT_RADIUS` (24 px) alrededor del centro del sprite y con `TAP_HIT_MARGIN` (6 px) de margen. Gana el
+  enemigo más cercano al centro. Al ser una unión, la región nunca es más estricta que el antiguo círculo
+  fijo de 24 px sobre el punto lógico.
+- **Disparo libre:** no hay filtro de suelo vacío; el tap abre fuego a cualquier punto del campo inferior y
+  consume bala y cadencia igual que un impacto (ver `DESIGN.md` `[OQ-06].4`).
+- **Apuntado persistente y traverse:** al disparar se fija `turret_angles[s] = target_angles[s] =
+  last_aim_angle[s] = angle` (snap instantáneo, necesario para que la boca y el proyectil casen
+  geométricamente). Sin objetivo, la postura de reposo es `last_aim_angle[s]`, no un ángulo fijo
+  (`DESIGN.md` `[OQ-11]`). El traverse motorizado avanza **1 paso cada 2 frames** cuando el ángulo actual
+  difiere del deseado.
 - **Muerte limpia:** licuado gravitatorio local (15 frames) y desprendimiento de trozos de sprite.
   **Conos de muerte desactivados** (`DEATH_CONE_ENABLED = 0`); prohibido dibujar conos en pantalla
   superior o sub-bancos.
@@ -96,7 +109,7 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
 | `DeathParticle` | Gotas/partículas 3D con `z`; al aterrizar estampan en el suelo |
 | `CasingParticle` | Casquillos con rebote, giro y zumbido de vida |
 | `Bullet` / `BulletDart` | Balas de batería (`dist_remaining` + `target_enemy_idx`) |
-| `WallPlatform` | Batería unificada: sockets visuales, ángulos, munición global de batería, recarga diegética |
+| `WallPlatform` | Batería unificada: sockets visuales, `turret_angles`/`target_angles`/`last_aim_angle` (0..4 por socket), munición global de batería, recarga diegética |
 | `GameState` / `GameBalanceConfig` | Modos de juego, telemetría y balance serializable (recableado a Atraedor/Generador/Costes) |
 
 ## 7. Persistencia y configuración
@@ -109,6 +122,10 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
 ## 8. Verificación
 
 - Escenarios deterministas en `scenarios/` ejecutados con `scripts/run-scenario.ps1` (capturas,
-  `events.jsonl`, aserciones de estado y de píxeles).
-- Analizador de capturas: `tools/gore_probe.py` (`region` / `count` / `bbox` / `scan`).
+  `events.jsonl`, aserciones **de píxeles**: `screen_changed` / `screen_changes`). El runner **no**
+  implementa aserciones de estado (hp / ammo / ángulos); éstas se infieren midiendo las capturas.
+- Analizadores de capturas: `tools/gore_probe.py` (sangre), `tools/enemy_probe.py` (enjambre púrpura en
+  pantalla inferior), `tools/ab_frame_diff.py` (`seq` / `pair`: diff A/B de píxeles con bbox),
+  `tools/make_ab_image.py` (recorte + reescalado + composición 2×2) y `tools/hitbox_geometry.py`
+  (auditoría geométrica de la cobertura de la hitbox sobre los sprites definidos).
 - Un `PASS` del runner no es una prueba de comportamiento: exige comparar capturas y medir.
