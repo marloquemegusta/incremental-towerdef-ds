@@ -952,11 +952,11 @@ void game_init(void) {
     g_game.stage_completed_flag = 0;
 
     // Atraedor Continuous Stream Dials
-    g_game.dial_rate_q8 = 512; // 2.0 spawns / sec default (Q8)
-    g_game.dial_tier_q8 = 256; // Tier 1.0 default (Q8)
-    g_game.dial_quantity = 2;
+    g_game.dial_rate_q8 = 128; // 0.5 spawns / sec default (Q8: 128/256 = 0.5)
+    g_game.dial_tier_q8 = 256; // Tier 1.0 default (Q8: 256/256 = 1.0)
+    g_game.dial_quantity = 0;
     g_game.dial_max_tier = 1;
-    g_game.spawn_rate_q8 = 512;
+    g_game.spawn_rate_q8 = 128;
     g_game.spawn_budget_q8 = 0;
 
     // Upgrades initial state
@@ -1313,10 +1313,10 @@ void game_update_simulation(void) {
         g_enemies[i].x = ex;
 
         // Check if reaching Wall fortification rim or Hydralisk ranged firing line:
-        // Hydralisks anchor at Y_global=272 (Y_local=80, safely inside turret range Y=64) to bombard with acid spines.
-        // Other ground xenos press against the wall parapet at Y_global=336 (Y_local=144).
+        // When built_tiers == 0, the unbuilt generator is an open steel scaffold: enemies pass right underneath!
+        int has_built_modules = (g_generator.built_tiers > 0);
         int reach_y = (g_enemies[i].variant == 2) ? 272 : 336;
-        if (py >= reach_y) {
+        if (has_built_modules && py >= reach_y) {
             int b_variant = g_enemies[i].variant;
             if (b_variant < 0) b_variant = 0;
             if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
@@ -1378,6 +1378,13 @@ void game_update_simulation(void) {
         g_enemies[i].y += spd;
         g_enemies[i].vy = spd;
         g_enemies[i].vx = sep_force_x;
+
+        // If passing through unbuilt scaffold and exiting the bottom screen: recycle enemy
+        if (FROM_FP(g_enemies[i].y) >= FIELD_H) {
+            g_enemies[i].active = 0;
+            g_game.enemies_alive--;
+            continue;
+        }
 
         int move_dx = g_enemies[i].x - old_x;
         int move_dy = g_enemies[i].y - old_y;
@@ -1696,19 +1703,29 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
     }
 
     // Atraedor dial controls via physical D-pad:
-    // UP/DOWN: spawn quantity (0..10/s)
-    // LEFT/RIGHT: max enemy tier (1..4)
+    // UP/DOWN: spawn rate (0..10.0/s in 0.25 steps)
+    // LEFT/RIGHT: threat tier (1.0..4.0 in 0.1 steps)
     if (keys_down & KEY_UP) {
-        if (g_game.dial_quantity < 10) g_game.dial_quantity++;
+        g_game.dial_rate_q8 += 64; // +0.25/s
+        if (g_game.dial_rate_q8 > 10 * 256) g_game.dial_rate_q8 = 10 * 256;
+        g_game.dial_quantity = g_game.dial_rate_q8 >> 8;
+        g_game.spawn_rate_q8 = g_game.dial_rate_q8;
     }
     if (keys_down & KEY_DOWN) {
-        if (g_game.dial_quantity > 0) g_game.dial_quantity--;
+        g_game.dial_rate_q8 -= 64; // -0.25/s
+        if (g_game.dial_rate_q8 < 0) g_game.dial_rate_q8 = 0;
+        g_game.dial_quantity = g_game.dial_rate_q8 >> 8;
+        g_game.spawn_rate_q8 = g_game.dial_rate_q8;
     }
     if (keys_down & KEY_RIGHT) {
-        if (g_game.dial_max_tier < 4) g_game.dial_max_tier++;
+        g_game.dial_tier_q8 += 26; // +0.1 tier
+        if (g_game.dial_tier_q8 > 4 * 256) g_game.dial_tier_q8 = 4 * 256;
+        g_game.dial_max_tier = g_game.dial_tier_q8 >> 8;
     }
     if (keys_down & KEY_LEFT) {
-        if (g_game.dial_max_tier > 1) g_game.dial_max_tier--;
+        g_game.dial_tier_q8 -= 26; // -0.1 tier
+        if (g_game.dial_tier_q8 < 256) g_game.dial_tier_q8 = 256; // Min T1.0
+        g_game.dial_max_tier = g_game.dial_tier_q8 >> 8;
     }
 
     static int s_wave_touching = 0;

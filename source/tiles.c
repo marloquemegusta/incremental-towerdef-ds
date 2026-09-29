@@ -399,40 +399,16 @@ void tiles_stamp_ground_dot(int x, int y, uint16_t color16) {
 
 void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, int variant) {
     (void)variant;
-    int is_bottom = (y >= 192);
-    int sy = is_bottom ? (y - 192) : y;
+    (void)bvx;
+    (void)bvy;
+    if (y < 192) return; // Strictly prohibit blood splatters on top screen
+    int is_bottom = 1;
+    int sy = y - 192;
     if (x < 2 || x >= SCREEN_W - 2 || sy < 2 || sy >= SCREEN_H - 2) return;
 
-    // Compact core + extended conical spray range
-    // size 1 (Zergling/Scourge): r_base = 2, max_cone = 9
-    // size 2 (Hydralisk):        r_base = 3, max_cone = 14
-    // size 3 (Lurker/Guardian):  r_base = 4, max_cone = 18
-    // size 4 (Ultralisk):        r_base = 6, max_cone = 24
-    int r_base = (size <= 1) ? 2 : ((size == 2) ? 3 : ((size == 3) ? 4 : 6));
-    int max_cone = r_base * 3 + 3;
-
-    // Direction vector from bullet velocity, normalized to Q8 (256 = 1.0).
-    // NOTE: the bullet velocity is in Q8 pixels/step (~4096), so the magnitude
-    // must be estimated from the raw components (a "len_sq >> 8" shortcut would
-    // collapse the cone to a few pixels).
-    int bax = (bvx < 0) ? -bvx : bvx;
-    int bay = (bvy < 0) ? -bvy : bvy;
-    int bmag = (bax > bay) ? (bax + (bay >> 1)) : (bay + (bax >> 1));
-    int dir_x = 0;
-    int dir_y = -256; // Default forward/north if zero
-    int has_bullet_dir = 0;
-
-    if (bmag > 16) {
-        dir_x = (bvx << 8) / bmag;
-        dir_y = (bvy << 8) / bmag;
-        has_bullet_dir = 1;
-    }
-
-    int perp_x = -dir_y;
-    int perp_y = dir_x;
-
-    // Bounding box: spans entry puddle and extended exit cone
-    int bb_rad = max_cone + 2;
+    // Compact organic corpse puddle (no artificial triangular cones)
+    int r_base = (size <= 1) ? 3 : ((size == 2) ? 4 : 6);
+    int bb_rad = r_base + 2;
     int x0 = (x - bb_rad < 0) ? 0 : (x - bb_rad);
     int x1 = (x + bb_rad >= SCREEN_W) ? SCREEN_W - 1 : (x + bb_rad);
     int y0 = (sy - bb_rad < 0) ? 0 : (sy - bb_rad);
@@ -445,74 +421,21 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
         int dy = py - sy;
         for (int px = x0; px <= x1; px++) {
             int dx = px - x;
-
-            // Longitude (along bullet vector: >0 is exit spray behind enemy)
-            // Latitude (perpendicular to bullet vector)
-            int d_long = (dx * dir_x + dy * dir_y) >> 8;
-            int d_lat  = (dx * perp_x + dy * perp_y) >> 8;
-            int abs_lat = (d_lat < 0) ? -d_lat : d_lat;
-
             int dist_sq = dx * dx + dy * dy;
-            int abs_py = is_bottom ? (py + 192) : py;
+            int abs_py = py + 192;
 
-            // 1. Compact nucleus right under enemy body (radius <= 1 or 2)
-            if (dist_sq <= ((r_base <= 2) ? 1 : 2)) {
+            if (dist_sq <= 2) {
                 stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_CORE, TOP_COLOR_XENOS_GORE_CORE);
                 continue;
             }
 
-            int noise = (((px * 13) ^ (py * 37) ^ (int)seed) & 7) - 3; // -3..+4
-
-            // 2. Entry side (in front of bullet impact, d_long < 0): small compact entry pool
-            if (d_long < 0) {
-                if (dist_sq + noise <= (r_base * r_base)) {
-                    if (((px + py) & 1) == 0 || dist_sq <= 2) {
-                        stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
-                    }
-                }
-                continue;
-            }
-
-            // 3. Exit spray cone (d_long >= 0): fanning outward behind the enemy
-            // Cone half-width expands with distance: W = r_base + (d_long * 5) / 8 (~32 degree half angle)
-            int cone_width = r_base + ((d_long * 5) >> 3) + (noise >> 1);
-            if (abs_lat > cone_width) continue;
-            if (d_long > max_cone + noise) continue;
-
-            // Zone A: Viscous mid within inner cone
-            if (d_long <= (r_base + 2) && abs_lat <= (r_base + 1)) {
-                stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
-            }
-            // Zone B: Mid-cone spray (50% Bayer checkerboard dither)
-            else if (d_long <= (max_cone * 2 / 3)) {
-                if (((px + py) & 1) == 0) {
-                    uint16_t c = (abs_lat <= (cone_width / 2)) ? COLOR_XENOS_GORE_MID : COLOR_XENOS_GORE_DARK;
-                    stamp_ground_pixel(px, abs_py, c, TOP_COLOR_XENOS_GORE_MID);
-                }
-            }
-            // Zone C: Extended fade-out perimeter (25% Bayer dither: (px&1)==0 && (py&1)==0)
-            // Allows overlapping stains from multiple nearby enemies to naturally accumulate into thick blood!
-            else {
-                if (((px & 1) == 0) && ((py & 1) == 0)) {
+            int noise = (((px * 13) ^ (py * 37) ^ (int)seed) & 7) - 3;
+            if (dist_sq + noise <= (r_base * r_base)) {
+                if (((px + py) & 1) == 0 || dist_sq <= (r_base * r_base) / 2) {
+                    stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_MID, TOP_COLOR_XENOS_GORE_MID);
+                } else if (((px & 1) == 0) && ((py & 1) == 0)) {
                     stamp_ground_pixel(px, abs_py, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
                 }
-            }
-        }
-    }
-
-    // 4. Directional ballistic flecks at the apex of the exit cone
-    if (has_bullet_dir && size >= 1) {
-        int drop_count = 1 + (size / 2);
-        for (int d = 0; d < drop_count; d++) {
-            int dist = max_cone + 2 + d * 3;
-            int spread = ((d * 37 + (int)seed) % 19) - 9;
-            int ox = (dir_x * dist + perp_x * spread) >> 8;
-            int oy = (dir_y * dist + perp_y * spread) >> 8;
-            int dpx = x + ox;
-            int dpy = sy + oy;
-            if (dpx >= 1 && dpx < SCREEN_W - 1 && dpy >= 1 && dpy < SCREEN_H - 1) {
-                int abs_y = is_bottom ? (dpy + 192) : dpy;
-                stamp_ground_pixel(dpx, abs_y, COLOR_XENOS_GORE_DARK, TOP_COLOR_XENOS_GORE_DARK);
             }
         }
     }
@@ -524,8 +447,9 @@ void tiles_stamp_splatter_directional(int x, int y, int size, int bvx, int bvy, 
 // `half_width` its lateral spread at the tip. This is the primary ground stain
 // for enemy deaths (the compact splat is only the body pool).
 void tiles_stamp_death_cone(int x, int y, int bvx, int bvy, int length, int half_width) {
-    int is_bottom = (y >= 192);
-    int sy = is_bottom ? (y - 192) : y;
+    if (y < 192) return; // Strictly prohibit death cone on top screen
+    int is_bottom = 1;
+    int sy = y - 192;
     if (x < 3 || x >= SCREEN_W - 3 || sy < 3 || sy >= SCREEN_H - 3) return;
     if (length < 8) length = 8;
     if (half_width < 3) half_width = 3;
@@ -635,9 +559,10 @@ void tiles_stamp_death_cone(int x, int y, int bvx, int bvy, int length, int half
 }
 
 void tiles_stamp_particle_droplet(int x, int y, int size, uint16_t color) {
-    if (x < 1 || x >= SCREEN_W - 1 || y < 1 || y >= FIELD_H - 1) return;
-    int is_bot = (y >= 192);
-    int ly = is_bot ? (y - 192) : y;
+    if (y < 192) return; // Strictly prohibit blood stains on top screen
+    if (x < 1 || x >= SCREEN_W - 1 || y >= FIELD_H - 1) return;
+    int is_bot = 1;
+    int ly = y - 192;
     mark_ground_stamp(x - 1, ly - 1, x + 2, ly + 1, is_bot);
 
     if (size <= 0) {
