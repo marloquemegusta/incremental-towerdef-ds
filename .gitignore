@@ -10,6 +10,7 @@ images/*.tar
 # Build and project artifacts
 *.nds
 artifacts/
+.worktrees/
 .ds-game-dev/build/
 **/__pycache__/
 *.pyc

@@ -25,6 +25,14 @@ static int s_enemy_grid_heads[ENEMY_GRID_W * ENEMY_GRID_H];
 static int s_enemy_grid_next[MAX_ENEMIES];
 static int enemy_grid_collect(int x, int y, int radius, int *out);
 
+// Touch forgiveness (px) added around an enemy's rendered sprite box when
+// resolving a stylus tap to a target.
+#define TAP_HIT_MARGIN 6
+// Grace radius around the sprite centre: the hit region is the union of the
+// inflated sprite box and this circle, so small units are never harder to tap
+// than the old fixed 24 px circle, and every tap is anchored to what is drawn.
+#define TAP_HIT_RADIUS 24
+
 static void enemy_grid_build(void) {
     for (int cell = 0; cell < ENEMY_GRID_W * ENEMY_GRID_H; cell++) {
         s_enemy_grid_heads[cell] = -1;
@@ -494,10 +502,12 @@ void wall_init(void) {
     g_wall.screen_y = WALL_DEFAULT_Y; // 144
     g_wall.max_hp = g_balance.bunker_start_hp;
     g_wall.hp = (prev_hp > 0 && prev_hp <= g_wall.max_hp) ? prev_hp : g_balance.bunker_start_hp;
-    g_wall.turret_angles[0] = 0; // NW
-    g_wall.turret_angles[1] = 2; // N (forward facing)
-    g_wall.turret_angles[2] = 2; // N
-    g_wall.turret_angles[3] = 4; // NE
+    // Resting stance comes from the socket table (single source of truth) and is
+    // also the initial aim anchor the dome holds after its first shot.
+    for (int s = 0; s < WALL_SOCKET_COUNT; s++) {
+        g_wall.turret_angles[s] = c_wall_sockets[s].default_angle;
+        g_wall.last_aim_angle[s] = c_wall_sockets[s].default_angle;
+    }
     g_wall.reload_time = 90;
     g_wall.fire_cooldown = 0;
     g_wall.battery_fire_step = 0;
@@ -657,6 +667,7 @@ void wall_fire_at_target(int target_x, int target_y, int enemy_idx) {
     int angle = wall_angle_from_target(sx, sy, target_x, target_y);
     g_wall.turret_angles[s] = angle;
     g_wall.target_angles[s] = angle;
+    g_wall.last_aim_angle[s] = angle; // Hold this bearing once idle
 
     const TurretCalibratedPoints *pts = &c_turret_points[angle];
     int tx = sx - TURRET_PIVOT_X;
@@ -801,8 +812,8 @@ void wall_update(void) {
         int target_e = global_auto_target_e;
         g_wall.target_enemy_idx[s] = target_e;
 
-        // Desired angle towards target (or default stance if no target)
-        int desired_angle = c_wall_sockets[s].default_angle;
+        // Desired angle towards target, or hold the last fired bearing if idle
+        int desired_angle = g_wall.last_aim_angle[s];
         if (target_e >= 0) {
             int gx = FROM_FP(g_enemies[target_e].x);
             int local_gy = FROM_FP(g_enemies[target_e].y) - 192;
@@ -1867,18 +1878,30 @@ void game_handle_input_wave(touchPosition touch, int keys_down, int keys_held) {
         int can_trigger = touch_press || a1_active;
 
         if (can_trigger && g_wall.fire_cooldown == 0) {
-            // Find if touching near a specific enemy
+            // Resolve the tap against each enemy's rendered sprite box (its own
+            // offset_x/offset_y), inflated by a forgiveness margin, and snap to the
+            // nearest body so touching the visible silhouette always registers.
             int hit_enemy = -1;
-            int best_dsq = 24 * 24; // 24px proximity threshold
+            int best_dsq = 0x7FFFFFFF;
             for (int e = 0; e < MAX_ENEMIES; e++) {
                 if (!g_enemies[e].active || g_enemies[e].dying) continue;
-                int gy = FROM_FP(g_enemies[e].y);
-                if (gy < 192) continue;
-                int local_y = gy - 192;
                 int gx = FROM_FP(g_enemies[e].x);
-                int ddx = touch.px - gx;
-                int ddy = touch.py - local_y;
+                int ly = FROM_FP(g_enemies[e].y) - 192;
+                int bx, by, bw, bh;
+                enemy_get_frame_bounds(gx, ly, g_enemies[e].variant,
+                                       g_enemies[e].anim_frame, g_enemies[e].dir,
+                                       (g_enemies[e].biting_target == 99),
+                                       &bx, &by, &bw, &bh);
+                if (bw <= 0 || bh <= 0) continue;
+                if (by + bh <= 0 || by >= SCREEN_H) continue; // fully off the bottom screen
+                int ccx = bx + bw / 2;
+                int ccy = by + bh / 2;
+                int ddx = touch.px - ccx;
+                int ddy = touch.py - ccy;
                 int dsq = ddx * ddx + ddy * ddy;
+                int in_box = (touch.px >= bx - TAP_HIT_MARGIN && touch.px < bx + bw + TAP_HIT_MARGIN &&
+                              touch.py >= by - TAP_HIT_MARGIN && touch.py < by + bh + TAP_HIT_MARGIN);
+                if (!in_box && dsq > TAP_HIT_RADIUS * TAP_HIT_RADIUS) continue;
                 if (dsq < best_dsq) {
                     best_dsq = dsq;
                     hit_enemy = e;

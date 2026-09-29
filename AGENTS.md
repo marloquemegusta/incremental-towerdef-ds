@@ -92,14 +92,15 @@ Estas claves viven en `~/.commandcode/config.json`, **no** en este repo: aplican
    - `classic-towerdefense`: Rama histórica congelada preservando la primera implementación del Tower Defense tradicional.
    - Tag `archive/main-pre-citydefense`: Preservación inmutable del estado del antiguo `main` previo a la transición. (La rama `main` ha sido eliminada para evitar ambigüedades).
 3. **Uso Obligatorio de Git Worktrees para Aislamiento:**
-   - En cada nueva sesión, se debe instanciar obligatoriamente un worktree físico separado fuera del árbol principal para mantener el entorno aislado:
+   - En cada nueva sesión, se debe instanciar obligatoriamente un worktree físico separado **dentro del propio repo**, bajo `.worktrees/` (ignorado por git), de modo que la sesión nunca salga de la carpeta del proyecto:
      ```bash
-     git worktree add ../towerds-<feature> -b feat/<feature>
+     git worktree add .worktrees/<feature> -b feat/<feature>
      ```
    - Todo el trabajo de la sesión se desarrolla dentro de dicho worktree.
+   - **Los ficheros ignorados no viajan al worktree:** al ser un checkout limpio, `runtime/bin/` (runtime headless de DeSmuME) e `images/*.tar` (imagen BlocksDS) no existen en el worktree aunque sí en el árbol principal. Antes de correr escenarios, **copiar el runtime desde el árbol principal** (`runtime/bin/`), no re-descargarlo con `scripts/setup.ps1`. La imagen Docker de BlocksDS sí es global del daemon y se comparte.
    - Al concluir, ser aprobado y fusionar a `full-incremental`, el worktree se limpia:
      ```bash
-     git worktree remove ../towerds-<feature>
+     git worktree remove .worktrees/<feature>
      ```
 4. **Cierre y Entrega de Sesión:**
    - Compilación limpia con `scripts/build-project.ps1` (Docker BlocksDS). Todo prototipo o función implementada en `.c` debe declararse debidamente en su cabecera `.h` para evitar fallos de compilación `-Wimplicit-function-declaration`.

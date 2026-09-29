@@ -216,6 +216,7 @@ typedef struct {
     int active_turrets;  // 1..4 (number of active turrets / sockets)
     int turret_angles[4];// Current display angle (0..4) for each socket
     int target_angles[4];// Target angle (0..4) each turret wants to face
+    int last_aim_angle[4]; // Resting stance: last angle this socket fired at (0..4)
     int turret_cooldown[4]; // Independent cooldown for each turret socket
     int barrel_alt[4];   // 0 or 1 for left/right muzzle
     int muzzle_flash_timer[4];
