@@ -251,6 +251,30 @@ void wall_reload_socket(int socket_idx);
 void wall_fire_at_target(int target_x, int target_y, int enemy_idx);
 void wall_apply_balance_and_upgrades(void);
 
+#define GENERATOR_TIER_COUNT 7
+#define GENERATOR_TIER_MAX_HP 5
+
+typedef struct {
+    int hp;             // 0..5
+    int max_hp;         // 5
+    int active;         // 1 if intact, 0 if breached/offline
+    int damage_flash;   // visual flash timer on hit
+} GeneratorTier;
+
+typedef struct {
+    GeneratorTier tiers[GENERATOR_TIER_COUNT];
+    int active_tier;    // index of highest intact tier (0..6)
+    int total_hits;
+} Generator;
+
+extern Generator g_generator;
+
+void generator_init(void);
+void generator_take_hit(int enemy_tier);
+void generator_repair_tier(int tier_idx, int amount);
+void generator_draw_bays(uint16_t *buffer, int y);
+
+
 typedef enum {
     MODE_PREPARATION = 0,
     MODE_WAVE,
@@ -355,6 +379,12 @@ typedef struct {
     int enemies_alive;
     uint64_t enemies_killed;
     int spawn_timer;
+
+    // Stream Spawner (City Defense Incremental)
+    int spawn_rate_q8;       // Enemies per second in Q8
+    int spawn_budget_q8;     // Fractional accumulator
+    int dial_quantity;       // 0..10 enemies/s
+    int dial_max_tier;       // 1..4 max biocaste tier
 
     int fast_forward;
     int sim_ticks_elapsed;
