@@ -3,6 +3,7 @@
 
 #include <nds.h>
 #include "wall_data.h"
+#include "enemy_data.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -82,7 +83,7 @@ typedef struct {
     uint64_t incoming_damage; // Anti-overkill virtual health damage in flight
     int active;
     int speed;           // Integer pixels per second; converted to Q8 per simulation tick
-    int variant;         // 0..5 (Biocaste Tier)
+    int variant;         // 0..7 (enemy variant / species index)
     int dir;             // 8-way compass: N, NE, E, SE, S, SW, W, NW
     int anim_frame;
     int anim_distance;   // Q8 distance accumulated for the next walk pose
@@ -292,16 +293,14 @@ typedef enum {
 
 // Debug / Test Sandbox parameters state
 typedef struct {
-    int enemy_tier;       // 0..5 (Biocaste)
-    int enemy_hp;         // 1..99999
-    int enemy_speed;      // 0..120 px/s (0 = frozen dummy)
+    int enemy_tier;       // 0..7 (variant; hp/speed come from the master table)
     int turret_firerate;  // 1..30 frames fire interval
     int turret_damage;    // 1..999 damage per bullet
     int turret_infinite_ammo; // 1 = infinite ammo
     int run_sim;          // 0 = paused/step, 1 = live continuous
     int separation_enabled;
     int profiler_compact;
-    int edit_row;         // 0..4 for D-Pad parameter tuning
+    int edit_row;         // 0..2 for D-Pad parameter tuning
     int spawn_count;
     int last_keys_down;   // Diagnostic input trace for the sandbox profiler
     int last_keys_held;
@@ -324,13 +323,20 @@ typedef struct {
     int stage_reward_scrap;    // 8. Scrap reward upon completing the stage
 } StageConfig;
 
+// Master per-variant enemy stats: the single source of truth for spawning, scrap
+// on death, bite damage/cadence, the debug sandbox and the calibration menu.
+typedef struct {
+    uint8_t  tier;           // 1..4 threat tier (threat level grouping)
+    uint32_t hp;
+    int      speed;          // px/s
+    uint32_t scrap;
+    int      bite_damage;
+    int      bite_interval;  // frames
+} EnemyStatDef;
+
 typedef struct {
     StageConfig stages[STAGE_COUNT]; // 5 stages of 2 minutes each
-    uint32_t enemy_hp[8];            // Constant enemy stats across all stages
-    int enemy_speed[8];              // Constant enemy speed in px/s
-    uint32_t enemy_scrap[8];         // Constant scrap value
-    int enemy_bite_damage[8];        // Constant bite / impact damage to wall
-    int enemy_bite_interval[8];      // Constant bite cadence
+    EnemyStatDef enemy[ENEMY_VARIANT_COUNT]; // Master stats: tier + hp/speed/scrap/bite per variant
     uint64_t upgrade_costs[7][5];
     int turret_damage[5];
     int turret_fire_interval[5];
@@ -339,7 +345,7 @@ typedef struct {
     int bunker_start_hp;
     int conveyor_reload_interval[5];
     uint64_t range_upgrade_costs[5]; // Dormant: RANGE upgrade retired
-    uint32_t magic;                  // 0x544F5736 ("TOW6")
+    uint32_t magic;                  // 0x544F5737 ("TOW7")
 } GameBalanceConfig;
 
 extern GameBalanceConfig g_balance;

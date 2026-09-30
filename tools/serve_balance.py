@@ -16,7 +16,7 @@ def main():
     a = p.parse_args()
     directory = a.directory.resolve()
     if not (directory / 'towerds_balance.bin').is_file():
-        raise SystemExit('Falta towerds_balance.bin; ejecuta compile_balance.py primero')
+        raise SystemExit('Falta towerds_balance.bin; expórtalo desde CALIBRATION en la DS (se guarda en la microSD) o cópialo a --directory')
     class RootedHandler(Handler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(directory), **kwargs)

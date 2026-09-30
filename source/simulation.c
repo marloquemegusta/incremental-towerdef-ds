@@ -85,13 +85,19 @@ static const GameBalanceConfig s_default_balance = {
           .ultralisk_delay_peak = 450,
           .stage_reward_scrap = 500 },
     },
-    // Enemy stats (Constant across all stages):
+    // Master enemy stats, indexed by variant:
     // 0: Scourge, 1: Zergling, 2: Hydralisk, 3: Mutalisk, 4: Defiler, 5: Lurker, 6: Guardian, 7: Ultralisk
-    .enemy_hp = { 1, 3, 18, 40, 80, 120, 300, 500 },
-    .enemy_speed = { 70, 36, 24, 45, 22, 26, 18, 16 },
-    .enemy_scrap = { 2, 1, 8, 20, 45, 75, 180, 150 },
-    .enemy_bite_damage = { 12, 6, 10, 10, 15, 20, 30, 50 },
-    .enemy_bite_interval = { 1, 25, 90, 25, 35, 30, 45, 40 },
+    // { tier, hp, speed(px/s), scrap, bite_damage, bite_interval(frames) }
+    .enemy = {
+        { 1,   1, 120,   4, 12,  1 }, // 0 Scourge   (fragile flyer, triple speed)
+        { 1,   3,  40,   1,  6, 25 }, // 1 Zergling  (ground)
+        { 2,  15,  24,  15, 10, 90 }, // 2 Hydralisk (slow, tough ground)
+        { 2,   5,  72,  35, 10, 25 }, // 3 Mutalisk  (fragile fast flyer)
+        { 3,  45,  22,  70, 20, 30 }, // 4 Defiler
+        { 3,  45,  22,  70, 20, 30 }, // 5 Lurker
+        { 4, 135,  18, 250, 30, 45 }, // 6 Guardian
+        { 4, 135,  18, 250, 30, 45 }, // 7 Ultralisk
+    },
 
     .upgrade_costs = {
         { 15, 30, 60, 120, 240 },   // 0: Caliber Lv1..5 (Dmg 1 -> 2 -> 3 -> 5 -> 8)
@@ -110,7 +116,7 @@ static const GameBalanceConfig s_default_balance = {
     .bunker_start_hp = 100,
     .conveyor_reload_interval = { 9999, 60, 25, 12, 6 },
     .range_upgrade_costs = { 20, 50, 110, 220, 0 },
-    .magic = 0x544F5736 // "TOW6"
+    .magic = 0x544F5737 // "TOW7"
 };
 
 static int s_fat_available = 0;
@@ -139,7 +145,7 @@ void balance_config_load(void) {
         if (n == sizeof(GameBalanceConfig)) {
             GameBalanceConfig loaded;
             memcpy(&loaded, raw, sizeof(loaded));
-            if (loaded.magic == 0x544F5736) {
+            if (loaded.magic == 0x544F5737) {
                 memcpy(&g_balance, &loaded, sizeof(g_balance));
             }
         }
@@ -973,6 +979,7 @@ void wall_update(void) {
 #define DIAL_RATE_MAX_TICKS 200  // 200 * 0.05 = 10.00 enemies/s
 #define DIAL_TIER_MIN_TICKS 20   //  20 * 0.05 = T1.00
 #define DIAL_TIER_MAX_TICKS 80   //  80 * 0.05 = T4.00
+#define TIER_MAX 4               // Highest threat tier in the master enemy table
 
 static void dial_rate_sync(void) {
     if (g_game.dial_rate_ticks < 0) g_game.dial_rate_ticks = 0;
@@ -1036,8 +1043,6 @@ void game_init(void) {
 
     // Debug Sandbox test defaults
     g_game.sandbox.enemy_tier = 1;
-    g_game.sandbox.enemy_hp = 10;
-    g_game.sandbox.enemy_speed = 30;
     g_game.sandbox.turret_firerate = 10;
     g_game.sandbox.turret_damage = 5;
     g_game.sandbox.turret_infinite_ammo = 1;
@@ -1155,36 +1160,28 @@ void game_update_simulation(void) {
             while (g_game.spawn_budget_q8 >= 60 * 256) {
                 g_game.spawn_budget_q8 -= 60 * 256;
 
-                // Continuous threat tier interpolation:
+                // Continuous threat tier interpolation. The dial picks a threat
+                // tier (T1..T4) with a fractional chance of spilling into the next
+                // one; the variant is drawn from the master table entries sharing
+                // that tier, and hp/speed come straight from the table.
                 int base_tier = g_game.dial_tier_q8 >> 8;
                 int frac = g_game.dial_tier_q8 & 0xFF;
                 if (base_tier < 1) base_tier = 1;
+                if (base_tier > TIER_MAX) base_tier = TIER_MAX;
 
                 int tier_spawned = base_tier;
-                if (frac > 0 && (rand() & 0xFF) < frac) {
+                if (frac > 0 && (rand() & 0xFF) < frac && tier_spawned < TIER_MAX) {
                     tier_spawned = base_tier + 1;
                 }
 
-                int chosen_variant = 1; // T1 Zergling
-                uint64_t chosen_hp = 3;  // D-02: 3 HP
-                int chosen_spd = 40;
-
-                if (tier_spawned >= 2) {
-                    chosen_variant = (rand() & 1) ? 2 : 0; // T2 Scourge or Hydra
-                    chosen_hp = 15;                       // D-02: 15 HP
-                    chosen_spd = 32;
+                int cand[ENEMY_VARIANT_COUNT];
+                int ncand = 0;
+                for (int v = 0; v < ENEMY_VARIANT_COUNT; v++) {
+                    if (g_balance.enemy[v].tier == tier_spawned) cand[ncand++] = v;
                 }
-                if (tier_spawned >= 3) {
-                    chosen_variant = 3;                   // T3 Muta
-                    chosen_hp = 45;                       // D-02: 45 HP
-                    chosen_spd = 28;
-                }
-                if (tier_spawned >= 4) {
-                    chosen_variant = 4;                   // T4 Defiler
-                    chosen_hp = 120;
-                    chosen_spd = 22;
-                }
-                spawn_enemy(chosen_variant, chosen_hp, chosen_spd);
+                int chosen_variant = (ncand > 0) ? cand[rand() % ncand] : 0;
+                spawn_enemy(chosen_variant, g_balance.enemy[chosen_variant].hp,
+                            g_balance.enemy[chosen_variant].speed);
             }
         }
     }
@@ -1305,9 +1302,9 @@ void game_update_simulation(void) {
             int b_variant = g_enemies[i].variant;
             if (b_variant < 0) b_variant = 0;
             if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
-            if (g_enemies[i].bite_timer >= g_balance.enemy_bite_interval[b_variant]) {
+            if (g_enemies[i].bite_timer >= g_balance.enemy[b_variant].bite_interval) {
                 g_enemies[i].bite_timer = 0;
-                int bite_dmg = g_balance.enemy_bite_damage[b_variant];
+                int bite_dmg = g_balance.enemy[b_variant].bite_damage;
                 if (g_turrets[hitting_turret].hp > bite_dmg) {
                     g_turrets[hitting_turret].hp -= bite_dmg;
                 } else {
@@ -1422,11 +1419,11 @@ void game_update_simulation(void) {
             }
 
             // Attack cycle for wall biting
-            int b_interval = g_balance.enemy_bite_interval[b_variant];
+            int b_interval = g_balance.enemy[b_variant].bite_interval;
             if (b_interval < 1) b_interval = 25;
             if (g_enemies[i].bite_timer >= b_interval) {
                 g_enemies[i].bite_timer = 0;
-                uint64_t bite_dmg = g_balance.enemy_bite_damage[b_variant];
+                uint64_t bite_dmg = g_balance.enemy[b_variant].bite_damage;
                 if (bite_dmg < 1) bite_dmg = 1;
                 if (g_game.mode != MODE_DEBUG_SANDBOX) {
                     generator_take_hit(b_variant);
@@ -1718,7 +1715,7 @@ void game_update_simulation(void) {
                     g_game.enemies_alive--;
                     g_game.enemies_killed++;
 
-                    uint64_t base_scrap = g_balance.enemy_scrap[v];
+                    uint64_t base_scrap = g_balance.enemy[v].scrap;
                     uint64_t reward = base_scrap;
                     if (g_game.upgrades.bio_harvest_lvl == 1) {
                         reward = base_scrap + (base_scrap + 1) / 2; // +50% scrap
@@ -2115,7 +2112,7 @@ static void calib_commit_changes(void) {
         if (g_enemies[e].active) {
             int v = g_enemies[e].variant;
             if (v >= 0 && v < ENEMY_VARIANT_COUNT) {
-                g_enemies[e].speed = g_balance.enemy_speed[v];
+                g_enemies[e].speed = g_balance.enemy[v].speed;
             }
         }
     }
@@ -2190,11 +2187,11 @@ static void calib_modify_val(int delta) {
         if (enemy < 0) enemy = 0;
         if (enemy >= ENEMY_VARIANT_COUNT) enemy = ENEMY_VARIANT_COUNT - 1;
         switch (field) {
-            case 0: { int n = (int)g_balance.enemy_hp[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_hp[enemy] = (uint32_t)n; break; }
-            case 1: { int n = g_balance.enemy_speed[enemy] + delta; if (n < 5) n = 5; g_balance.enemy_speed[enemy] = n; break; }
-            case 2: { int n = (int)g_balance.enemy_scrap[enemy] + delta; if (n < 0) n = 0; g_balance.enemy_scrap[enemy] = (uint32_t)n; break; }
-            case 3: { int n = g_balance.enemy_bite_damage[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_bite_damage[enemy] = n; break; }
-            case 4: { int n = g_balance.enemy_bite_interval[enemy] + delta; if (n < 1) n = 1; g_balance.enemy_bite_interval[enemy] = n; break; }
+            case 0: { int n = (int)g_balance.enemy[enemy].hp + delta; if (n < 1) n = 1; g_balance.enemy[enemy].hp = (uint32_t)n; break; }
+            case 1: { int n = g_balance.enemy[enemy].speed + delta; if (n < 5) n = 5; g_balance.enemy[enemy].speed = n; break; }
+            case 2: { int n = (int)g_balance.enemy[enemy].scrap + delta; if (n < 0) n = 0; g_balance.enemy[enemy].scrap = (uint32_t)n; break; }
+            case 3: { int n = g_balance.enemy[enemy].bite_damage + delta; if (n < 1) n = 1; g_balance.enemy[enemy].bite_damage = n; break; }
+            case 4: { int n = g_balance.enemy[enemy].bite_interval + delta; if (n < 1) n = 1; g_balance.enemy[enemy].bite_interval = n; break; }
         }
         calib_commit_changes();
         return;
@@ -2423,12 +2420,15 @@ void game_sandbox_spawn_enemy(int x, int y) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (!g_enemies[i].active) {
             g_enemies[i].active = 1;
-            g_enemies[i].variant = g_game.sandbox.enemy_tier;
-            g_enemies[i].hp = g_game.sandbox.enemy_hp;
-            g_enemies[i].max_hp = g_game.sandbox.enemy_hp;
+            int sv = g_game.sandbox.enemy_tier;
+            if (sv < 0) sv = 0;
+            if (sv >= ENEMY_VARIANT_COUNT) sv = ENEMY_VARIANT_COUNT - 1;
+            g_enemies[i].variant = sv;
+            g_enemies[i].hp = g_balance.enemy[sv].hp;
+            g_enemies[i].max_hp = g_balance.enemy[sv].hp;
             g_enemies[i].x = TO_FP(x);
             g_enemies[i].y = TO_FP(y);
-            g_enemies[i].speed = g_game.sandbox.enemy_speed;
+            g_enemies[i].speed = g_balance.enemy[sv].speed;
             g_enemies[i].dir = 4; // South in the 8-way compass
             g_enemies[i].anim_frame = 0;
             g_enemies[i].biting_target = -1;
@@ -2537,11 +2537,11 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
         return;
     }
 
-    // D-Pad UP / DOWN selects parameter row (0..4)
+    // D-Pad UP / DOWN selects parameter row (0..2)
     if (keys_down & KEY_UP) {
-        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 4) % 5;
+        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 2) % 3;
     } else if (keys_down & KEY_DOWN) {
-        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 1) % 5;
+        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 1) % 3;
     }
 
     // D-Pad LEFT / RIGHT adjusts selected parameter
@@ -2551,38 +2551,14 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
 
     if (delta != 0) {
         switch (g_game.sandbox.edit_row) {
-            case 0: { // Enemy Tier (0..5)
+            case 0: { // Enemy species / variant (0..7)
                 int t = g_game.sandbox.enemy_tier + delta;
                 if (t < 0) t = 0;
                 if (t >= ENEMY_VARIANT_COUNT) t = ENEMY_VARIANT_COUNT - 1;
                 g_game.sandbox.enemy_tier = t;
                 break;
             }
-            case 1: { // Enemy HP
-                static const int s_hp_steps[] = { 1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000 };
-                int idx = 2;
-                for (int j = 0; j < 10; j++) {
-                    if (s_hp_steps[j] == g_game.sandbox.enemy_hp) { idx = j; break; }
-                }
-                idx += delta;
-                if (idx < 0) idx = 0;
-                if (idx > 9) idx = 9;
-                g_game.sandbox.enemy_hp = s_hp_steps[idx];
-                break;
-            }
-            case 2: { // Enemy Speed
-                static const int s_spd_steps[] = { 0, 15, 30, 45, 60, 90, 120, 180 };
-                int idx = 2;
-                for (int j = 0; j < 8; j++) {
-                    if (s_spd_steps[j] == g_game.sandbox.enemy_speed) { idx = j; break; }
-                }
-                idx += delta;
-                if (idx < 0) idx = 0;
-                if (idx > 7) idx = 7;
-                g_game.sandbox.enemy_speed = s_spd_steps[idx];
-                break;
-            }
-            case 3: { // Turret Fire Interval (cadence)
+            case 1: { // Turret Fire Interval (cadence)
                 static const int s_int_steps[] = { 1, 3, 5, 8, 12, 18, 25, 35 };
                 int idx = 4;
                 for (int j = 0; j < 8; j++) {
@@ -2594,7 +2570,7 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
                 g_game.sandbox.turret_firerate = s_int_steps[idx];
                 break;
             }
-            case 4: { // Turret Damage
+            case 2: { // Turret Damage
                 static const int s_dmg_steps[] = { 1, 2, 3, 5, 10, 20, 50, 100 };
                 int idx = 3;
                 for (int j = 0; j < 8; j++) {

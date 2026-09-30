@@ -120,16 +120,16 @@ def build_enemies():
     print("[2/3] Building Tyranid & StarCraft Enemy Sprites...")
     enemies_dir = "assets/sprites/enemies"
 
-    # Tuple: (name, walk_file, attack_file, num_walk_frames, num_attack_frames, hp, scrap, render_mode, is_flying, flight_altitude)
+    # Tuple: (name, walk_file, attack_file, num_walk_frames, num_attack_frames, render_mode, is_flying, flight_altitude)
     enemy_defs = [
-        ("t0_scourge", "t3_scourge_fly_strip_master_1x.png", None, 5, 0, 18, 4, 1, 1, 10),
-        ("t1_zergling", "t1_zergling_walk_strip_master_1x.png", "t1_zergling_attack_strip_master_1x.png", 7, 5, 25, 5, 1, 0, 0),
-        ("t2_hydralisk", "t2_hydralisk_walk_strip_master_1x.png", "t2_hydralisk_attack_strip_master_1x.png", 7, 5, 75, 15, 1, 0, 0),
-        ("t3_mutalisk", "sc_mutalisk_fly_strip_master_1x.png", None, 5, 0, 160, 35, 1, 1, 14),
-        ("t4_defiler", "sc_defiler_walk_strip_master_1x.png", None, 8, 0, 320, 70, 1, 0, 0),
-        ("t5_lurker", "sc_lurker_walk_strip_master_1x.png", None, 7, 0, 500, 120, 1, 0, 0),
-        ("t6_guardian", "sc_guardian_fly_strip_master_1x.png", None, 7, 0, 1100, 250, 1, 1, 16),
-        ("t7_ultralisk", "t4_ultralisk_walk_strip_master_1x.png", "t4_ultralisk_attack_strip_master_1x.png", 9, 6, 2600, 600, 1, 0, 0),
+        ("t0_scourge", "t3_scourge_fly_strip_master_1x.png", None, 5, 0, 1, 1, 10),
+        ("t1_zergling", "t1_zergling_walk_strip_master_1x.png", "t1_zergling_attack_strip_master_1x.png", 7, 5, 1, 0, 0),
+        ("t2_hydralisk", "t2_hydralisk_walk_strip_master_1x.png", "t2_hydralisk_attack_strip_master_1x.png", 7, 5, 1, 0, 0),
+        ("t3_mutalisk", "sc_mutalisk_fly_strip_master_1x.png", None, 5, 0, 1, 1, 14),
+        ("t4_defiler", "sc_defiler_walk_strip_master_1x.png", None, 8, 0, 1, 0, 0),
+        ("t5_lurker", "sc_lurker_walk_strip_master_1x.png", None, 7, 0, 1, 0, 0),
+        ("t6_guardian", "sc_guardian_fly_strip_master_1x.png", None, 7, 0, 1, 1, 16),
+        ("t7_ultralisk", "t4_ultralisk_walk_strip_master_1x.png", "t4_ultralisk_attack_strip_master_1x.png", 9, 6, 1, 0, 0),
     ]
 
     enemy_count = len(enemy_defs)
@@ -163,8 +163,6 @@ typedef struct {{
     uint8_t direction_count;
     uint8_t frame_count;
     uint8_t attack_frame_count;
-    uint32_t default_hp;
-    uint32_t scrap_value;
     EnemyFrameDef frames[ENEMY_MAX_DIRECTIONS][ENEMY_MAX_FRAMES];
     EnemyFrameDef attack_frames[ENEMY_MAX_DIRECTIONS][ENEMY_MAX_ATTACK_FRAMES];
 }} EnemyTypeDef;
@@ -183,7 +181,7 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
 
         enemies_meta = []
 
-        for name, walk_file, att_file, num_frames, num_att, hp, scrap, render_mode, is_flying, flight_alt in enemy_defs:
+        for name, walk_file, att_file, num_frames, num_att, render_mode, is_flying, flight_alt in enemy_defs:
             if render_mode != 1:
                 raise ValueError(f"{name} must provide pre-oriented directional frames")
             path = os.path.join(enemies_dir, walk_file)
@@ -296,13 +294,13 @@ void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, 
                             fc.write(line)
                         fc.write("\n};\n\n")
 
-            enemies_meta.append((name, num_frames, num_att, direction_count, direction_sizes, att_direction_sizes, hp, scrap, render_mode, is_flying, flight_alt))
+            enemies_meta.append((name, num_frames, num_att, direction_count, direction_sizes, att_direction_sizes, render_mode, is_flying, flight_alt))
 
         # Array of types
         fc.write("const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {\n")
-        for name, nframes, natt, ndirections, direction_sizes, att_direction_sizes, hp, scrap, render_mode, is_flying, flight_alt in enemies_meta:
+        for name, nframes, natt, ndirections, direction_sizes, att_direction_sizes, render_mode, is_flying, flight_alt in enemies_meta:
             fc.write(f"    {{ // {name}\n")
-            fc.write(f"        {render_mode}, {is_flying}, {flight_alt}, {ndirections}, {nframes}, {natt}, {hp}, {scrap},\n        {{\n")
+            fc.write(f"        {render_mode}, {is_flying}, {flight_alt}, {ndirections}, {nframes}, {natt},\n        {{\n")
             # Walk frames (5 directions: 0..4)
             for d_idx in range(5):
                 fc.write("            {\n")

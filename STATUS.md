@@ -131,6 +131,13 @@
   - [x] **Auditoría geométrica de la hitbox** (`tools/hitbox_geometry.py`): **8/8** variantes tienen píxeles del sprite fuera del círculo antiguo (Scourge variante 0: 7 px, distancia máx. 25.6 > 24; Ultralisk variante 7: 4.015 px, hasta 58.1). La nueva región (unión caja ∪ radio) nunca es más estricta que la anterior.
   - [x] **Límite honesto (sin adornos):** el A/B **funcional** con enemigos tempranos no discrimina, porque para la variante 0 el círculo antiguo ya cubría casi toda la silueta; la evidencia de esta hitbox es **geométrica**, no una captura diferencial. La sensación táctil final requiere validación en **DS física**.
 
+- [x] **Tabla Maestra Única de Enemigos y Calibración por Tier [COMPLETADA - rama `full-incremental`]:**
+  - [x] Unificadas las stats de enemigos en `GameBalanceConfig.enemy[]` (`EnemyStatDef` con `tier`): el spawn continuo, la recompensa de scrap al morir, el mordisco, el sandbox de debug y la página `ENEMY STATS` de calibración **leen de la tabla** (antes cada sistema tenía su copia o literales fijos).
+  - [x] Tiers **T1..T4** (dos especies por tier): T1 Scourge+Zergling, T2 Hydralisk+Mutalisk, T3 Defiler+Lurker, T4 Guardian+Ultralisk. El **volador del par** = ⅓ de HP y ×3 de velocidad.
+  - [x] Eliminados los duplicados muertos: `EnemyTypeDef.default_hp/scrap_value`, `config/balance/*.csv` + `tools/compile_balance.py`, `scripts/export_enemy_data.py` y los campos `sandbox.enemy_hp/enemy_speed`. Magic del balance `TOW6 → TOW7`.
+  - [x] Evidencia: build `DS_BUILD=PASS` y `scenarios/master_table_tier_check.json` (`DSM_SCENARIO_RESULT=PASS captures=5 events=61`); detalle y capturas en `walkthroughs/master-enemy-table/`.
+  - [ ] **Pendiente:** rebalancear velocidad/daño de mordisco (provisionales) y diferenciar T3/T4; validar la edición por cruceta + guardado en **DS física**.
+
 - [ ] **Bugs y Tareas Pendientes para Siguiente Agente:**
   - [x] **Tasa inicial de spawn del Atraedor:** arranca en $0.50$/s (`dial_rate_ticks = 10`) con paso fino de $0.05$.
   - [ ] **Interacción del Dial táctil (stylus):** implementar el arrastre analógico con stylus (arriba/abajo e izquierda/derecha); el control por cruceta con pasos de $0.05$ y autorepeat ya está resuelto.
