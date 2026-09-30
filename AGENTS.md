@@ -85,22 +85,29 @@ Estas claves viven en `~/.commandcode/config.json`, **no** en este repo: aplican
 
 ## Protocolo de Sesiones Atómicas, Ramas y Worktrees
 1. **Un Chat = Una Sesión Atómica (Feature-Scoped):** Cada nueva conversación con el asistente se dedica exclusivamente a una feature, fix o iteración concreta, evitando dispersión de contexto.
-2. **Estrategia de Ramas:**
-   - `full-incremental`: **Rama principal del repositorio y foco único de desarrollo activo**. Contiene la versión City Defense Incremental (stream continuo, generador de 7 automatizaciones, 1 torreta lógica / 4 visuales, economía de chatarra/vetas). Toda feature o fix se ramifica y se mergea aquí.
-   - `feat/<nombre-feature>`: Ramas de trabajo atómicas creadas en worktree para features o fixes antes de mergear en `full-incremental`.
-   - `hybrid-clicker-td`: Rama histórica congelada preservando el prototipo híbrido previo (batería balística, recarga diegética por stylus, gore con drag 3D, calibración y render 60 FPS fijos).
-   - `classic-towerdefense`: Rama histórica congelada preservando la primera implementación del Tower Defense tradicional.
-   - Tag `archive/main-pre-citydefense`: Preservación inmutable del estado del antiguo `main` previo a la transición. (La rama `main` ha sido eliminada para evitar ambigüedades).
+2. **Estrategia y Jerarquía de Ramas:**
+   - `full-incremental`: **Rama principal / trunk del repositorio y foco único de desarrollo activo**. Contiene la versión City Defense Incremental (stream continuo, generador de 7 automatizaciones, 1 torreta lógica / 4 visuales, economía de chatarra/vetas). Toda feature o fix se ramifica y se mergea aquí.
+   - `feat/<nombre-feature>` / `fix/<nombre-fix>`: Ramas de trabajo atómicas creadas en worktree para features o fixes antes de mergear en `full-incremental`.
+   - `hybrid-clicker-td`: Rama histórica congelada preservando el prototipo híbrido previo (batería balística, recarga diegética por stylus, gore con drag 3D, calibración y render 60 FPS fijos). Solo lectura/referencia.
+   - `classic-towerdefense`: Rama histórica congelada preservando la primera implementación del Tower Defense tradicional. Solo lectura/referencia.
+   - Tag `archive/main-pre-citydefense`: Preservación inmutable del estado del antiguo `main` previo a la transición. (La rama `main` local ha sido eliminada; en GitHub `full-incremental` es la Default Branch).
 3. **Uso Obligatorio de Git Worktrees para Aislamiento:**
    - En cada nueva sesión, se debe instanciar obligatoriamente un worktree físico separado **dentro del propio repo**, bajo `.worktrees/` (ignorado por git), de modo que la sesión nunca salga de la carpeta del proyecto:
      ```bash
+     git checkout full-incremental
+     git pull origin full-incremental
      git worktree add .worktrees/<feature> -b feat/<feature>
      ```
    - Todo el trabajo de la sesión se desarrolla dentro de dicho worktree.
-   - **Los ficheros ignorados no viajan al worktree:** al ser un checkout limpio, `runtime/bin/` (runtime headless de DeSmuME) e `images/*.tar` (imagen BlocksDS) no existen en el worktree aunque sí en el árbol principal. Antes de correr escenarios, **copiar el runtime desde el árbol principal** (`runtime/bin/`), no re-descargarlo con `scripts/setup.ps1`. La imagen Docker de BlocksDS sí es global del daemon y se comparte.
-   - Al concluir, ser aprobado y fusionar a `full-incremental`, el worktree se limpia:
+   - **Los ficheros ignorados no viajan al worktree:** al ser un checkout limpio, `runtime/bin/` (runtime headless de DeSmuME) e `images/*.tar` (imagen BlocksDS) no existen en el worktree aunque sí en el árbol principal. Antes de correr escenarios, **copiar el runtime desde el árbol principal** (`runtime/bin/`), no re-descargarlo con `scripts/setup.ps1`:
+     ```powershell
+     Copy-Item -Recurse -Force runtime\bin .worktrees\<feature>\runtime\bin
+     ```
+     La imagen Docker de BlocksDS sí es global del daemon de Docker y se comparte sin copiar nada.
+   - Al concluir, ser aprobado y fusionar a `full-incremental`, el worktree y la rama se limpian:
      ```bash
      git worktree remove .worktrees/<feature>
+     git branch -d feat/<feature>
      ```
 4. **Cierre y Entrega de Sesión:**
    - Compilación limpia con `scripts/build-project.ps1` (Docker BlocksDS). Todo prototipo o función implementada en `.c` debe declararse debidamente en su cabecera `.h` para evitar fallos de compilación `-Wimplicit-function-declaration`.
@@ -109,7 +116,7 @@ Estas claves viven en `~/.commandcode/config.json`, **no** en este repo: aplican
      - El archivo remoto canónico en la microSD de la DS es invariablemente **`towerdefense.nds`** (configurado en `$RemoteName = 'towerdefense.nds'`). Queda terminantemente prohibido subir con `game.nds` u otro nombre no canónico.
    - **Revisión de coherencia de los `.md`** (`DESIGN.md`, `TECHNICAL.md`, `STATUS.md`, `AGENTS.md`) según la regla 7 del flujo de trabajo, antes de dar la tarea por cerrada.
    - Commit semántico en la rama de la feature.
-   - Aprobación explícita del usuario antes de merge a `main` o tagging de versión (`v0.1`, `v0.2`, etc.).
+   - Aprobación explícita del usuario antes de merge a `full-incremental` o tagging de versión (`v0.1`, `v0.2`, etc.).
 5. **Regla Canónica de Incrustación de Media en Artefactos (`walkthrough.md`, reportes):**
    - Para que la UI de Antigravity renderice sin links rotos imágenes o animaciones GIF en los artefactos de `<appDataDir>\brain\<conversation-id>`, se debe cumplir estrictamente:
      1. Copiar los archivos a la raíz de `<appDataDir>\brain\<conversation-id>\`.
@@ -119,7 +126,7 @@ Estas claves viven en `~/.commandcode/config.json`, **no** en este repo: aplican
    - Esto garantiza que la batería de torretas descargue un torrente ininterrumpido de proyectiles, retroceso hidráulico visible y lluvia continua de casquillos de artillería pesada en el búnker sin detenerse por recarga ni por eliminación prematura de los objetivos.
 7. **Convención Canónica de Walkthroughs por Sesión (Resumen Acumulativo):**
    - El resumen de sesión (`walkthrough.md`) **nunca** se deja suelto en la raíz del repo. Se guarda en `walkthroughs/<nombre-sesion>/walkthrough.md`, dentro de una carpeta por sesión, con sus assets en `walkthroughs/<nombre-sesion>/assets/`. El nombre de la carpeta coincide con la rama `feat/<feature>`.
-   - Estos archivos **sí se versionan** (a diferencia de `artifacts/`, que está en `.gitignore`); al mergear la rama `feat/<feature>` a `main` los resúmenes se acumulan como histórico de sesiones.
+   - Estos archivos **sí se versionan** (a diferencia de `artifacts/`, que está en `.gitignore`); al mergear la rama `feat/<feature>` a `full-incremental` los resúmenes se acumulan como histórico de sesiones.
    - Las imágenes y anexos se referencian con **rutas relativas al propio `.md`** (p. ej. `assets/foo.png`): es lo que renderiza la UI para ficheros del repo. El formato absoluto POSIX de la regla 5 es **solo** para la media copiada a `<appDataDir>\brain\<conv_id>\`, no para los `.md` versionados.
    - `walkthroughs/README.md` es el índice acumulativo de sesiones; cada sesión nueva añade su fila.
    - La regla 5 (incrustación para la UI de Antigravity) sigue aplicando al renderizar allí: en ese caso la media se copia a `<appDataDir>\brain\<conv_id>\` con ruta absoluta POSIX.
