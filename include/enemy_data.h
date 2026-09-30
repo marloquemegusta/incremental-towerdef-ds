@@ -21,8 +21,6 @@ typedef struct {
     uint8_t direction_count;
     uint8_t frame_count;
     uint8_t attack_frame_count;
-    uint32_t default_hp;
-    uint32_t scrap_value;
     EnemyFrameDef frames[ENEMY_MAX_DIRECTIONS][ENEMY_MAX_FRAMES];
     EnemyFrameDef attack_frames[ENEMY_MAX_DIRECTIONS][ENEMY_MAX_ATTACK_FRAMES];
 } EnemyTypeDef;

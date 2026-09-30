@@ -1,54 +1,16 @@
-# Balance editable
+# Balance
 
-Los valores de balance viven en `config/balance/` y están pensados para editarse desde Excel y guardarse como CSV UTF-8.
+El balance numérico de enemigos vive ahora en una **tabla maestra única** en el código:
+`GameBalanceConfig.enemy[]` (un `EnemyStatDef` por variante, con su `tier`), documentado en
+`TECHNICAL.md`. Se edita desde el menú **CALIBRATION** de la DS (página *ENEMY STATS*) y se
+guarda en la microSD como `towerds_balance.bin` (magic "TOW7").
 
-- `waves.csv`: composición, intervalo, velocidad, vida y recompensa base de las 20 oleadas.
-- `enemies.csv`: vida y recompensa base constantes de cada tipo de enemigo.
-- `upgrades.csv`: costes y nivel máximo de cada mejora.
+Ya **no** se autoriza desde CSV: se retiró el pipeline legacy `config/balance/*.csv` +
+`tools/compile_balance.py` (y el generador obsoleto `scripts/export_enemy_data.py`) por ser
+una fuente de balance duplicada y muerta frente a la tabla del juego.
 
-Validación y generación del archivo que ya entiende la DS:
-
-```powershell
-python tools/compile_balance.py --output towerds_balance.bin
-```
-
-Servidor local para el futuro cliente Wi-Fi de desarrollo:
-
-```powershell
-python tools/serve_balance.py --directory artifacts --port 5000
-```
-
-La descarga por Wi-Fi requiere soporte `libnds/dswifi` enlazado al proyecto. El
-toolchain actual de esta rama no expone esa biblioteca en sus headers, por lo
-que no se debe simular ni declarar completada esa parte hasta añadirla al
-toolchain de BlocksDS.
-
-# Balance editable
-
-Los valores de balance viven en `config/balance/` y están pensados para editarse desde Excel y guardarse como CSV UTF-8.
-
-- `waves.csv`: composición, intervalo, velocidad, vida y recompensa base de las 20 oleadas.
-- `enemies.csv`: vida y recompensa base constantes de cada tipo de enemigo.
-- `upgrades.csv`: costes y nivel máximo de cada mejora.
-
-Validación y generación del archivo que ya entiende la DS:
-
-```powershell
-python tools/compile_balance.py --output towerds_balance.bin
-```
-
-Servidor local para el futuro cliente Wi-Fi de desarrollo:
-
-```powershell
-python tools/serve_balance.py --directory artifacts --port 5000
-```
-
-La descarga por Wi-Fi requiere soporte `libnds/dswifi` enlazado al proyecto. El
-toolchain actual de esta rama no expone esa biblioteca en sus headers, por lo
-que no se debe simular ni declarar completada esa parte hasta añadirla al
-toolchain de BlocksDS.
-
-El binario generado se copia a la raíz de la tarjeta SD como `towerds_balance.bin`. Si falta o no supera la validación de magia, el juego conserva sus valores por defecto.
+`tools/serve_balance.py` sigue disponible para servir por Wi-Fi, a un cliente de desarrollo
+local, el `towerds_balance.bin` que el juego escribe en la SD.
 
 ---
 
@@ -75,7 +37,7 @@ Para una etapa con $M$ especies de enemigos y duración $T$:
 $$\text{Scrap}_{\text{total}} = \sum_{i=1}^{M} \left( N_i \times V_i \right) \times \left(1 + \text{Nivel}_{\text{BioHarvest}}\right)$$
 
 * $N_i$: Número total de enemigos de la especie $i$ spawneados.
-* $V_i$: Valor de Chatarra base por baja de la especie $i$ (`enemy_scrap[i]`).
+* $V_i$: Valor de Chatarra base por baja de la especie $i$ (`enemy[i].scrap`).
 * **Presupuesto Pre-Pico ($\text{Scrap}_{\text{base}}$):** Chatarra obtenida en la fase tranquila inicial ($0:00 - 1:30$). Es el dinero real con el que el jugador cuenta para preparar sus defensas antes de la horda.
 
 ---

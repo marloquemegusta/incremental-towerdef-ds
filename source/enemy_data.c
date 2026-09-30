@@ -1466,8 +1466,6 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
         .direction_count = 5,
         .frame_count = 5,
         .attack_frame_count = 0,
-        .default_hp = 18,
-        .scrap_value = 4,
         .frames = {
             [0] = {
                 [0] = { .w = 24, .h = 24, .offset_x = -11, .offset_y = -12, .pixels = s_t0_scourge_d0_f0 },
@@ -1513,8 +1511,6 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
         .direction_count = 5,
         .frame_count = 7,
         .attack_frame_count = 5,
-        .default_hp = 25,
-        .scrap_value = 5,
         .frames = {
             [0] = {
                 [0] = { .w = 40, .h = 27, .offset_x = -19, .offset_y = -11, .pixels = s_t1_zergling_d0_f0 },
@@ -1607,8 +1603,6 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
         .direction_count = 5,
         .frame_count = 7,
         .attack_frame_count = 5,
-        .default_hp = 75,
-        .scrap_value = 15,
         .frames = {
             [0] = {
                 [0] = { .w = 40, .h = 35, .offset_x = -20, .offset_y = -19, .pixels = s_t2_hydralisk_d0_f0 },
@@ -1701,8 +1695,6 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
         .direction_count = 5,
         .frame_count = 5,
         .attack_frame_count = 0,
-        .default_hp = 160,
-        .scrap_value = 35,
         .frames = {
             [0] = {
                 [0] = { .w = 52, .h = 61, .offset_x = -27, .offset_y = -36, .pixels = s_t3_mutalisk_d0_f0 },
@@ -1748,8 +1740,6 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
         .direction_count = 5,
         .frame_count = 8,
         .attack_frame_count = 0,
-        .default_hp = 320,
-        .scrap_value = 70,
         .frames = {
             [0] = {
                 [0] = { .w = 68, .h = 37, .offset_x = -34, .offset_y = -17, .pixels = s_t4_defiler_d0_f0 },
@@ -1810,8 +1800,6 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
         .direction_count = 5,
         .frame_count = 7,
         .attack_frame_count = 0,
-        .default_hp = 500,
-        .scrap_value = 120,
         .frames = {
             [0] = {
                 [0] = { .w = 56, .h = 54, .offset_x = -30, .offset_y = -24, .pixels = s_t5_lurker_d0_f0 },
@@ -1867,8 +1855,6 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
         .direction_count = 5,
         .frame_count = 7,
         .attack_frame_count = 0,
-        .default_hp = 1100,
-        .scrap_value = 250,
         .frames = {
             [0] = {
                 [0] = { .w = 56, .h = 58, .offset_x = -24, .offset_y = -31, .pixels = s_t6_guardian_d0_f0 },
@@ -1924,8 +1910,6 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
         .direction_count = 5,
         .frame_count = 9,
         .attack_frame_count = 6,
-        .default_hp = 2600,
-        .scrap_value = 600,
         .frames = {
             [0] = {
                 [0] = { .w = 80, .h = 63, .offset_x = -41, .offset_y = -34, .pixels = s_t7_ultralisk_d0_f0 },

@@ -68,6 +68,12 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
   `dial_rate_sync()` / `dial_tier_sync()`. El acumulador de spawn corre en unidades de `rate_q8 * frames`
   (`spawn_budget_q8 += dial_rate_q8` por frame, umbral `60 * 256`), de modo que no trunca y tasas de
   hasta $0.05$/s siguen generando. Mezcla probabilística de biocastas entre tiers.
+- **Tabla maestra de enemigos (`GameBalanceConfig.enemy[]`, `EnemyStatDef`):** única fuente de verdad
+  de las stats por variante (`tier` 1..4, `hp`, `speed`, `scrap`, `bite_damage`, `bite_interval`).
+  La consumen el spawn continuo (toma el tier del dial $\to$ 50/50 entre las dos especies de ese tier
+  $\to$ `hp`/`speed` de la tabla), la recompensa de scrap al morir, el mordisco a muro/torreta, el
+  sandbox de debug y la página `ENEMY STATS` de calibración. **Prohibido** duplicar estas stats fuera
+  de la tabla (constantes literales, arrays paralelos o CSV); `EnemyTypeDef` sólo contiene datos de render.
 - **Compuerta del Hold-to-Fire (A1):** el disparo continuo exige `upgrades.continuous_fire` **y**
   `g_generator.tiers[0].active` (automatización erigida y viva). Erigir/reparar el Tier 1 por otras vías
   (reparación diegética, calibración) **no** habilita el Hold; si el Tier 1 cae, el Hold se degrada a tap.
@@ -110,11 +116,12 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
 | `CasingParticle` | Casquillos con rebote, giro y zumbido de vida |
 | `Bullet` / `BulletDart` | Balas de batería (`dist_remaining` + `target_enemy_idx`) |
 | `WallPlatform` | Batería unificada: sockets visuales, `turret_angles`/`target_angles`/`last_aim_angle` (0..4 por socket), munición global de batería, recarga diegética |
-| `GameState` / `GameBalanceConfig` | Modos de juego, telemetría y balance serializable (recableado a Atraedor/Generador/Costes) |
+| `EnemyStatDef` | Stats maestras por variante (`tier`, `hp`, `speed`, `scrap`, `bite_damage`, `bite_interval`); array `g_balance.enemy[ENEMY_VARIANT_COUNT]` |
+| `GameState` / `GameBalanceConfig` | Modos de juego, telemetría y balance serializable (tabla maestra de enemigos + Atraedor/Generador/Costes) |
 
 ## 7. Persistencia y configuración
 
-- Balance en `fat:/towerds_balance.bin` con `magic 0x544F5736` (`TOW6`); si el magic no coincide, los
+- Balance en `fat:/towerds_balance.bin` con `magic 0x544F5737` (`TOW7`); si el magic no coincide, los
   valores cargados **se ignoran** (evita reintroducir mecánicas retiradas desde un save antiguo).
 - **Ground cache:** la sangre acumulada es permanente durante la run; sólo se reconstruye en
   `tiles_init()`, es decir, al empezar partida nueva.

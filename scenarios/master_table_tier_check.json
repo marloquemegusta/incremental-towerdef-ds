@@ -1,0 +1,47 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 30, "capture": "01_boot"},
+    {"button_down": "SELECT", "frames": 5},
+    {"button_up": "SELECT", "frames": 20, "capture": "02_calib_page0"},
+    {"button_down": "Y", "frames": 5},
+    {"button_up": "Y", "frames": 20, "capture": "03_enemy_stats_t1"},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 6},
+    {"button_down": "DOWN", "frames": 4},
+    {"button_up": "DOWN", "frames": 20, "capture": "04_enemy_stats_t2"},
+    {"button_down": "START", "frames": 5},
+    {"button_up": "START", "frames": 240, "capture_sequence": "05_stream", "capture_every": 20, "capture": "05_stream_t1"}
+  ],
+  "assertions": {
+    "screen_changed": {
+      "from": "01_boot",
+      "to": "03_enemy_stats_t1",
+      "min_changed_pixels": 100
+    },
+    "screen_changes": [
+      {"from": "03_enemy_stats_t1", "to": "04_enemy_stats_t2", "min_changed_pixels": 100},
+      {"from": "04_enemy_stats_t2", "to": "05_stream_t1", "min_changed_pixels": 100}
+    ]
+  }
+}

@@ -121,18 +121,23 @@ graph TD
 
 ## 7. Plantel Canónico de Amenazas Xenos
 
-Ocho especies canónicas con siluetas, comportamientos y paletas estrictas:
+Ocho especies canónicas con siluetas, comportamientos y paletas estrictas, agrupadas en cuatro tiers de amenaza (dos especies por tier):
 
-| ID | Especie | Rol Táctico | Dimensiones | Comportamiento | Stats Base (HP / Scrap) |
-| :---: | :--- | :--- | :---: | :--- | :--- |
-| **0** | **Scourge** | Volador Kamikaze veloz | $31 \times 27$ px | Hostigador ultrarrápido con sombra dinámica | 18 HP \| 4 Chatarra |
-| **1** | **Zergling** | Vanguardia en masa | $40 \times 39$ px | Corredor ágil en enjambre, ataque doble | 25 HP \| 5 Chatarra |
-| **2** | **Hydralisk** | Asalto medio a distancia | $42 \times 55$ px | Infantería pesada erecta, andanadas de bio-espinas | 75 HP \| 15 Chatarra |
-| **3** | **Mutalisk** | Cazador alado de flanco | $64 \times 72$ px | Planeador ágil a cota superior con sombra proyectada | 160 HP \| 35 Chatarra |
-| **4** | **Defiler** | Caster biológico / Debilitador | $69 \times 59$ px | Gran resistencia, dispersa miasma que protege al enjambre | 320 HP \| 70 Chatarra |
-| **5** | **Lurker** | Ariete acorazado con espinas | $69 \times 64$ px | Rompe-líneas blindado de alta absorción de daño | 500 HP \| 120 Chatarra |
-| **6** | **Guardian** | Bombardero pesado de asedio | $78 \times 70$ px | Silueta colosal aérea, asedia a distancia extrema | 1.100 HP \| 250 Chatarra |
-| **7** | **Ultralisk** | Titán Coloso / Boss | $98 \times 105$ px | Apisonadora biológica con hojas Kaiser oscilantes | 2.600 HP \| 600 Chatarra |
+| ID | Tier | Especie | Rol Táctico | Dimensiones | Comportamiento | Stats Base (HP / Scrap) |
+| :---: | :---: | :--- | :--- | :---: | :--- | :--- |
+| **0** | **T1** | **Scourge** | Volador Kamikaze veloz | $31 \times 27$ px | Hostigador ultrarrápido con sombra dinámica | 1 HP \| 4 Chatarra |
+| **1** | **T1** | **Zergling** | Vanguardia en masa | $40 \times 39$ px | Corredor ágil en enjambre, ataque doble | 3 HP \| 1 Chatarra |
+| **2** | **T2** | **Hydralisk** | Asalto medio a distancia | $42 \times 55$ px | Infantería pesada erecta, andanadas de bio-espinas | 15 HP \| 15 Chatarra |
+| **3** | **T2** | **Mutalisk** | Cazador alado de flanco | $64 \times 72$ px | Planeador ágil a cota superior con sombra proyectada | 5 HP \| 35 Chatarra |
+| **4** | **T3** | **Defiler** | Caster biológico / Debilitador | $69 \times 59$ px | Gran resistencia, dispersa miasma que protege al enjambre | 45 HP \| 70 Chatarra |
+| **5** | **T3** | **Lurker** | Ariete acorazado con espinas | $69 \times 64$ px | Rompe-líneas blindado de alta absorción de daño | 45 HP \| 70 Chatarra |
+| **6** | **T4** | **Guardian** | Bombardero pesado de asedio | $78 \times 70$ px | Silueta colosal aérea, asedia a distancia extrema | 135 HP \| 250 Chatarra |
+| **7** | **T4** | **Ultralisk** | Titán Coloso / Boss | $98 \times 105$ px | Apisonadora biológica con hojas Kaiser oscilantes | 135 HP \| 250 Chatarra |
+
+### Regla de Tiers de Amenaza
+- El **tier** (T1..T4) agrupa dos especies y marca su **nivel de amenaza**. El dial del Atraedor selecciona el tier (con interpolación fraccionaria, `[OQ-03]`); dentro del tier el enjambre alterna al azar entre sus dos especies.
+- Los dos miembros de un tier comparten **HP base** (T1=3, T2=15, T3=45, T4=135). El **volador** del par desvía: es **más frágil** (⅓ de HP) y **más rápido** (×3 de velocidad), para seguir siendo amenaza por evasión en vez de por aguante (Scourge sobre Zergling; Mutalisk sobre Hydralisk).
+- La **velocidad** y el **daño de mordisco** no son stats de tier: los fija la tabla maestra por variante (ver `TECHNICAL.md`). Los valores de scrap de T3/T4 son provisionales hasta su rebalanceo.
 
 ### Regla Canónica de Exclusividad Cromática Xenos
 - La gama **púrpura / violeta / magenta** (`RGB 115, 35, 155` a `RGB 240, 150, 255`) y el blanco hueso quedan **estrictamente reservados para el enjambre xenos**.
@@ -143,8 +148,8 @@ Ocho especies canónicas con siluetas, comportamientos y paletas estrictas:
 
 ## 8. Sistema de Calibración en Hardware (`[CALIB]`)
 - Accesible en preparación mediante el botón táctil `[CALIB]`.
-- 4 páginas de calibración a 32 filas cada una (Spawn Rates, Stats de Enemigos, Muralla y Parámetros de Forja).
-- Persistencia binaria inmediata en MicroSD mediante `fat:/towerds_balance.bin`.
+- 4 páginas con scroll: `ATRAEDOR & GENERADOR`, `ENEMY STATS` (edita la tabla maestra: 8 especies × HP / Speed / Scrap / Bite Dmg / Bite Interval, con su tier mostrado), `BASE / STATS MEJORAS` y `COSTES TIENDA`.
+- Persistencia binaria inmediata en MicroSD mediante `fat:/towerds_balance.bin` (magic `0x544F5737`, `"TOW7"`).
 - Botones táctiles `[DEFAULTS]` para restaurar valores de fábrica y `[RESTART W1]` para reiniciar run al instante.
 
 ---

@@ -1081,16 +1081,8 @@ void renderer_draw_ui_calibration(void) {
         renderer_draw_text(190, 18, buf, COLOR_AMBER);
         int first = (g_game.calib_row / 10) * 10;
         int last = (g_game.calib_page == 1) ? 40 : ((g_game.calib_page == 2) ? 21 : 14);
-        static const char *enemy_labels[40] = {
-            "SCOURGE HP", "SCOURGE SPD", "SCOURGE SCRAP", "SCOURGE DMG", "SCOURGE FRM",
-            "ZERGLING HP", "ZERGLING SPD", "ZERGLING SCRAP", "ZERGLING DMG", "ZERGLING FRM",
-            "HYDRA HP", "HYDRA SPD", "HYDRA SCRAP", "HYDRA DMG", "HYDRA FRM",
-            "MUTA HP", "MUTA SPD", "MUTA SCRAP", "MUTA DMG", "MUTA FRM",
-            "DEFILER HP", "DEFILER SPD", "DEFILER SCRAP", "DEFILER DMG", "DEFILER FRM",
-            "LURKER HP", "LURKER SPD", "LURKER SCRAP", "LURKER DMG", "LURKER FRM",
-            "GUARDIAN HP", "GUARDIAN SPD", "GUARDIAN SCRAP", "GUARDIAN DMG", "GUARDIAN FRM",
-            "ULTRA HP", "ULTRA SPD", "ULTRA SCRAP", "ULTRA DMG", "ULTRA FRM"
-        };
+        static const char *enemy_names[8] = { "SCOURGE", "ZERGLING", "HYDRA", "MUTA", "DEFILER", "LURKER", "GUARDIAN", "ULTRA" };
+        static const char *enemy_fields[5] = { "HP", "SPD", "SCRAP", "DMG", "FRM" };
         static const char *base_labels[21] = {
             "BUNKER START HP",
             "DAMAGE LV0", "DAMAGE LV1", "DAMAGE LV2", "DAMAGE LV3", "DAMAGE LV4",
@@ -1109,7 +1101,7 @@ void renderer_draw_ui_calibration(void) {
             if (g_game.calib_page == 1) {
                 int e = r / 5, f = r % 5;
                 if (e >= 8) e = 7;
-                val = (f == 0) ? g_balance.enemy_hp[e] : (f == 1) ? g_balance.enemy_speed[e] : (f == 2) ? g_balance.enemy_scrap[e] : (f == 3) ? g_balance.enemy_bite_damage[e] : g_balance.enemy_bite_interval[e];
+                val = (f == 0) ? (int)g_balance.enemy[e].hp : (f == 1) ? g_balance.enemy[e].speed : (f == 2) ? (int)g_balance.enemy[e].scrap : (f == 3) ? g_balance.enemy[e].bite_damage : g_balance.enemy[e].bite_interval;
             } else if (g_game.calib_page == 2) {
                 if (r == 0) val = g_balance.bunker_start_hp;
                 else if (r <= 5) val = g_balance.turret_damage[r - 1];
@@ -1126,7 +1118,13 @@ void renderer_draw_ui_calibration(void) {
             int y = 32 + n * 13; int sel = (r == g_game.calib_row);
             renderer_fill_rect(6, y, 244, 12, sel ? COLOR_IRON_LIGHT : COLOR_IRON_PANEL);
             renderer_draw_rect(6, y, 244, 12, sel ? COLOR_AMBER : COLOR_IRON_BORDER);
-            if (g_game.calib_page == 1) renderer_draw_text(10, y + 2, enemy_labels[r], COLOR_WHITE);
+            if (g_game.calib_page == 1) {
+                int e = r / 5, f = r % 5;
+                if (e >= 8) e = 7;
+                char lbl[32];
+                snprintf(lbl, sizeof(lbl), "T%d %s %s", g_balance.enemy[e].tier, enemy_names[e], enemy_fields[f]);
+                renderer_draw_text(10, y + 2, lbl, COLOR_WHITE);
+            }
             else if (g_game.calib_page == 2) renderer_draw_text(10, y + 2, base_labels[r], COLOR_WHITE);
             else renderer_draw_text(10, y + 2, cost_labels[r], COLOR_WHITE);
             snprintf(buf, sizeof(buf), "%d  [-] [+]", val); renderer_draw_text(150, y + 2, buf, COLOR_PHOSPHOR_GREEN);
@@ -1245,10 +1243,12 @@ void renderer_draw_ui_sandbox(void) {
         return;
     }
 
-    // D-Pad adjustable parameters (Rows 0..4)
+    // D-Pad adjustable parameters (Rows 0..2). Enemy HP/speed are no longer
+    // sandbox knobs: they come from the master balance table (tune them in
+    // CALIBRATION), so the sandbox only picks the species and tunes the turret.
     static const char *s_tier_names[8] = { "SCOURGE", "ZERGLING", "HYDRALISK", "MUTALISK", "DEFILER", "LURKER", "GUARDIAN", "ULTRALISK" };
-    const char *labels[5] = { "ENEMY SPECIES", "ENEMY HP", "ENEMY SPEED", "FIRE CADENCE", "BULLET DMG" };
-    for (int r = 0; r < 5; r++) {
+    const char *labels[3] = { "ENEMY SPECIES", "FIRE CADENCE", "BULLET DMG" };
+    for (int r = 0; r < 3; r++) {
         int y = 26 + r * 14;
         int is_sel = (g_game.sandbox.edit_row == r);
         uint16_t row_col = is_sel ? COLOR_WHITE : COLOR_IRON_LIGHT;
@@ -1263,24 +1263,16 @@ void renderer_draw_ui_sandbox(void) {
 
         switch (r) {
             case 0:
-                snprintf(buf, sizeof(buf), "%s", s_tier_names[g_game.sandbox.enemy_tier]);
+                snprintf(buf, sizeof(buf), "%s [T%d]", s_tier_names[g_game.sandbox.enemy_tier],
+                         g_balance.enemy[g_game.sandbox.enemy_tier].tier);
                 break;
-            case 1:
-                snprintf(buf, sizeof(buf), "%d HP", g_game.sandbox.enemy_hp);
+            case 1: {
+                int fire_rate = g_game.sandbox.turret_firerate;
+                if (fire_rate < 1) fire_rate = 1;
+                snprintf(buf, sizeof(buf), "%d f (%d/s)", fire_rate, 60 / fire_rate);
                 break;
+            }
             case 2:
-                if (g_game.sandbox.enemy_speed == 0) {
-                    snprintf(buf, sizeof(buf), "0 px/s (FROZEN)");
-                } else {
-                    snprintf(buf, sizeof(buf), "%d px/s", g_game.sandbox.enemy_speed);
-                }
-                break;
-            case 3:
-                    int fire_rate = g_game.sandbox.turret_firerate;
-                    if (fire_rate < 1) fire_rate = 1;
-                    snprintf(buf, sizeof(buf), "%d f (%d/s)", fire_rate, 60 / fire_rate);
-                break;
-            case 4:
                 snprintf(buf, sizeof(buf), "%d DMG", g_game.sandbox.turret_damage);
                 break;
         }

@@ -1,9 +1,0 @@
-enemy_id,name,default_hp,scrap_value
-0,scourge,1,2
-1,zergling,3,1
-2,hydralisk,15,8
-3,mutalisk,40,20
-4,defiler,80,45
-5,lurker,120,75
-6,guardian,300,180
-7,ultralisk,800,500
