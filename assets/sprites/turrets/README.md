@@ -26,3 +26,4 @@ Los assets de colocación libre en 16 ángulos (32x32 px) de la versión tempran
 
 - Contiene las tiras de 16 ángulos (`heavy_bolter_16_angles_anim_1x.png`, `lascannon_...`), animaciones de retroceso libre, y la hoja original de 12 propuestas (`ds_turrets_12_proposals_1x.png`).
 - Se conservan exclusivamente como histórico y **no deben ser referenciados como assets activos** del modo Muralla/Arcade Incremental.
+- El módulo generado (`source/turret_data.c` / `include/turret_data.h`) y el paso `build_turrets()` del pipeline de assets se **eliminaron**: la entidad de torreta colocable ya no existe en el código; estos PNG quedan solo como histórico.

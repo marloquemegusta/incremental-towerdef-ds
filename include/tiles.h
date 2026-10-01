@@ -24,7 +24,6 @@ void tiles_stamp_death_cone(int x, int y, int bvx, int bvy, int length, int half
 void tiles_stamp_ground_dot(int x, int y, uint16_t color16);
 void tiles_stamp_particle_droplet(int x, int y, int size, uint16_t color);
 void tiles_draw_central_bunker(uint16_t *buffer, int cx, int cy, uint64_t hp, uint64_t max_hp);
-void tiles_draw_twin_bolters(int cx, int cy, int angle, int flash, int recoil_l, int recoil_r, int last_barrel);
 void tiles_draw_xenos_to_buffer(uint16_t *buffer, int cx, int cy, int dir, int anim_frame, int variant);
 
 #endif // TILES_H

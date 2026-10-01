@@ -54,7 +54,7 @@
     - Sincronización de daño de mordiscos de enjambre en tiempo real a las 32 lámparas catódicas del muro.
   - [x] **Sesión 3: Árbol Visual de Mejoras, Menús de Calibración y Render Dinámico [COMPLETADA]:**
     - Menús táctiles de calibración/tienda en pantalla inferior con tabs (`STATS`, `TIENDA`, `BALANCE`).
-    - Desbloqueo de sockets (1 a 4 torretas), automatización de gatillo y auto-aim.
+    - Automatización de gatillo (hold) y auto-aim (la batería unificada mantiene 4 cúpulas visuales desde el inicio de la partida).
     - Optimización de renderizado mediante Dirty Rects y caché de fondo en DMA para sostener 60 FPS.
     - Registro de Known Issues en `KNOWN_ISSUES.md` (pausa en hardware, estela residual, limpieza en reset, rendimiento en picos).
   - [x] **Sesión 4: Eliminación del Concepto de Rango (Fuego Total en Pantalla Inferior) [COMPLETADA - rama `feat/no-range`]:**
@@ -137,6 +137,15 @@
   - [x] Eliminados los duplicados muertos: `EnemyTypeDef.default_hp/scrap_value`, `config/balance/*.csv` + `tools/compile_balance.py`, `scripts/export_enemy_data.py` y los campos `sandbox.enemy_hp/enemy_speed`. Magic del balance `TOW6 → TOW7`.
   - [x] Evidencia: build `DS_BUILD=PASS` y `scenarios/master_table_tier_check.json` (`DSM_SCENARIO_RESULT=PASS captures=5 events=61`); detalle y capturas en `walkthroughs/master-enemy-table/`.
   - [ ] **Pendiente:** rebalancear velocidad/daño de mordisco (provisionales) y diferenciar T3/T4; validar la edición por cruceta + guardado en **DS física**.
+
+- [x] **Purga del Sistema Legacy de Torretas (Entidad `Turret`/`Bullet`) [COMPLETADA - rama `feat/purge-legacy-turrets`]:**
+  - [x] Eliminada la **entidad de torreta colocable** (código 100% inerte de una versión vieja: nada asignaba `placed = 1`): structs `Turret`/`Bullet`, `g_turrets[]`/`g_bullets[]`, `spawn_bullet`, `BULLET_SPEED`, `MAX_TURRETS`/`MAX_BULLETS`, el bucle de update/aim/fire de torretas, el bucle de colisión de balas, el bloque "enemy bites turret", `game_is_pos_valid` y todos sus resets/`memset`.
+  - [x] Eliminado su render muerto: `renderer_draw_turret`, `renderer_draw_bullets` (y su llamada), `tiles_draw_turret_base`, `tiles_draw_twin_bolters`, `C_SPARK_*` y colores `COLOR_TURRET_*`/`COLOR_BARREL_*`.
+  - [x] Retirado el módulo generado `source/turret_data.c` / `include/turret_data.h` y el paso `build_turrets()` de `scripts/build_assets.py` (ya roto: buscaba masters archivados); helper huérfano `rotsprite_pil` eliminado.
+  - [x] Sandbox limpiado: retirados los knobs inertes `turret_firerate`/`turret_damage` (editor a 1 fila: especie); se conserva `turret_infinite_ammo` (vivo, lo lee la muralla).
+  - [x] Escenarios: rótulos obsoletos `turret*` renombrados; `pause_and_turret_select_test.json` → `pause_and_wave_ui_test.json`.
+  - [x] **Se conserva intacta la muralla** (`WallPlatform`/`BulletDart`) y su nomenclatura interna `turret_*` (`turret_angles`, `c_turret_points`, `TURRET_PIVOT_X/Y`).
+  - [x] Evidencia: `DS_BUILD=PASS` (sin `turret_data.c`, 0 warnings) y regresión verde (`DSM_SCENARIO_RESULT=PASS`) en `city_defense_demo`, `session1_wall_ballistics`, `combat_and_kill_test`, `targeting_and_sprites_test`, `master_table_tier_check`. Detalle en `walkthroughs/purge-legacy-turrets/`.
 
 - [ ] **Bugs y Tareas Pendientes para Siguiente Agente:**
   - [x] **Tasa inicial de spawn del Atraedor:** arranca en $0.50$/s (`dial_rate_ticks = 10`) con paso fino de $0.05$.
