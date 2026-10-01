@@ -270,6 +270,23 @@ Leyenda de Estados:
 - **Estado:** `[DECIDIDO]`
 - **Decisión:** Cada cúpula de la batería **mantiene la dirección de su último disparo** como postura de reposo cuando no hay objetivo que batir; ya no vuelve a un ángulo fijo tras disparar. Mientras exista objetivo (auto-apuntado o fijado con el stylus) la cúpula apunta a él; al cesar, se queda en la última marcación. La postura inicial de fábrica de cada socket la define la tabla de sockets (`c_wall_sockets[].default_angle`), única fuente de verdad.
 
+### `[OQ-12]` Desmembramiento en vivo (estado de daño del xeno)
+- **Estado:** `[DECIDIDO]`
+- **Decisión:** El daño recibido se **lee en el cuerpo** del xeno. Cada impacto no letal le arranca una celda de la **silueta** (nunca del interior: el bicho se *pela* de fuera hacia dentro), con contorno irregular, y lanza ese mismo trozo como escombro sólido en paleta xenos.
+  1. **Lo arrancado muestra carne, no un agujero:** la zona mordida se repinta con la paleta **roja** de gore (§7), nunca con el púrpura reservado al enjambre. Lo que se ve no es un agujero sino el **caparazón arrancado**.
+  2. **Atado a la salud:** el cupo de trozos disponible es la **fracción de vida ya perdida**. Un xeno casi intacto no se destroza por muchos tiros que reciba, y el cupo completo sólo se alcanza al borde de la muerte. Un **golpe letal no genera herida**: de ese cuerpo ya se encarga el licuado (`[OQ-06].7`).
+  3. **Amputación opcional:** por defecto el destrozo **no rompe la silueta** (sólo se enrojece). Con el modo amputación activo se arrancan además los apéndices de **≤ 2 px** y todo lo que un corte deje desconectado, de modo que una amputación se lea como tal y **nunca quede un fragmento flotando**.
+  4. **Nunca mecánico:** es la representación del daño ya infligido; no altera HP, daño, velocidad ni colisión.
+
+### `[OQ-13]` Rango de HP por tier vs. legibilidad del daño
+- **Estado:** `[ABIERTO]`
+- **Dilema:** la escalera de HP de la tabla maestra va de **1** (Scourge) a **135** (Guardian/Ultralisk) con la batería a daño base 1. En los extremos el feedback de `[OQ-12]` no funciona: el **Scourge muere al primer impacto** sin mostrar nada y al **Ultralisk** apenas le entraña. Además sólo entran ~8-12 impactos en la ventana de fuego antes de que el xeno pase al otro lado de la muralla, así que la relación HP/cadencia decide por completo cuánto destrozo llega a verse.
+- **Alternativas en curso:**
+  1. **Comprimir la escalera de HP** por tier (p. ej. T1 ≈ 4-6, T2 ≈ 8-10, T3 ≈ 14-18, T4 ≈ 20-24), conservando el orden por tier y la regla del volador frágil (§7).
+  2. **Subir el daño base** de la batería proporcionalmente, sin tocar la escalera.
+  3. **No tocar nada** y aceptar que el desmembramiento sólo se lea en los tiers medios y altos.
+- **Nota:** las capturas de `walkthroughs/live-dismemberment/` usan una tabla de HP provisional **sólo para la grabación**; el balance del juego está intacto a propósito hasta resolver esta pregunta.
+
 ---
 
 ## 11. Lenguaje Visual Canónico y Assets
@@ -284,3 +301,8 @@ Leyenda de Estados:
 - **Muralla defensiva:** anclada en la cota canónica `WALL_DEFAULT_Y` (**Y = 144** de la pantalla inferior), sirve de anclaje a las torretas activas y a la línea de defensa (§3).
 - **Suelo isométrico 2:1** (`dx=2, dy=1`) con tiles maestros de 32×32 px (`assets/tiles/sector1/master/tile_061_cobblestone_1x.png`, `tile_062_irregular_1x.png`, `tile_063_flagstone_1x.png`), renderizados en modo bitmap / modo 5 paletizado con solapamiento *back-to-front*. Queda **prohibido** el uso de los tiles cenitales/ortogonales a 90° (archivados en `assets/tiles/sector1/archive/`).
 - **Sin rango:** la muralla bate toda la pantalla inferior; el stylus dispara a cualquier punto de esa superficie y fija como objetivo al enemigo cuya **silueta** toca (hitbox = caja del sprite ∪ radio de gracia de 24 px, `[OQ-06].4`). Queda prohibida cualquier franja o línea de demarcación de alcance sobre el empedrado.
+
+### C. Estado de daño del xeno (desmembramiento en vivo)
+- El **estado de daño se lee en el cuerpo**, no en una barra: lo que se arranca es el **caparazón** y bajo él se ve **carne roja** (`COLOR_XENOS_GORE_*`), nunca tonos púrpura reservados al enjambre (§7). La quitina desprendida sí conserva el púrpura xenos.
+- El destrozo va **atado a la vida perdida** del xeno (`[OQ-12]`), de modo que la silueta nunca contradiga su estado: un enemigo entero y funcional se ve entero, y sólo uno al borde de la muerte se ve hecho jirones.
+- **Prohibido** que un corte deje **fragmentos flotantes**: en el modo con amputación, todo lo que quede desconectado del cuerpo se desprende entero.
