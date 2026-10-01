@@ -14,7 +14,6 @@
 #define FIELD_H  384 // Vertical unified battlefield (256x384)
 
 #define MAX_ENEMIES 384
-#define MAX_BULLETS 64
 #define MAX_DEATH_PARTICLES 256
 #define ENEMY_DEATH_FRAMES 15 // Liquefaction animation length (~0.25 s @ 60 FPS)
 
@@ -22,7 +21,6 @@
 // implementation (tiles_stamp_death_cone) stays in place, so bringing it back is just
 // flipping this to 1 and rebuilding.
 #define DEATH_CONE_ENABLED 0
-#define MAX_TURRETS 4
 #define MAX_CASINGS 256
 #define MAX_BULLET_DARTS 64
 
@@ -48,11 +46,6 @@
 #define COLOR_BUNKER_CORE    (RGB15(18, 4, 4) | BIT(15))
 #define COLOR_BUNKER_LIGHT   (RGB15(0, 31, 10) | BIT(15))
 
-#define COLOR_TURRET_BASE    (RGB15(7, 7, 8) | BIT(15))
-#define COLOR_TURRET_RING    (RGB15(14, 14, 16) | BIT(15))
-#define COLOR_TURRET_CUPOLA  (RGB15(11, 11, 13) | BIT(15))
-#define COLOR_BARREL_STEEL   (RGB15(20, 20, 22) | BIT(15))
-#define COLOR_BARREL_TIP     (RGB15(28, 28, 30) | BIT(15))
 #define COLOR_MUZZLE_FLASH   (RGB15(31, 29, 8) | BIT(15))
 #define COLOR_BOLTER_TRACER  (RGB15(31, 27, 4) | BIT(15))
 
@@ -87,7 +80,7 @@ typedef struct {
     int dir;             // 8-way compass: N, NE, E, SE, S, SW, W, NW
     int anim_frame;
     int anim_distance;   // Q8 distance accumulated for the next walk pose
-    int biting_target;   // -1=None/Marching, 0..3=Turret ID, 99=Bunker Sanctum
+    int biting_target;   // -1=None/Marching, 99=Bunker Sanctum
     int bite_timer;
 
     // Death liquefaction: the sprite melts into a puddle over ENEMY_DEATH_FRAMES
@@ -101,55 +94,6 @@ typedef struct {
     int prev_bot_active;
     int prev_bot_x, prev_bot_y, prev_bot_w, prev_bot_h;
 } Enemy;
-
-typedef struct {
-    int id;
-    int type;            // 0=TURRET_TYPE_BOLTER, 1=TURRET_TYPE_LASCANNON
-    int x, y;            // Local screen coordinates in bottom screen [0..255, 0..191]
-    int current_angle;   // 0..255 angle
-    int target_angle;
-    int range;           // Circular omnidirectional radius in px
-    int active;
-    int placed;
-    
-    // Integrity
-    int hp;
-    int max_hp;
-
-    // Ammo & Logistics
-    int ammo;
-    int max_ammo;
-    int fire_cooldown;
-    int fire_interval;
-    int flash_timer;
-
-    // Recoil animation & sparks
-    int anim_frame;
-    int barrel_recoil_l;
-    int barrel_recoil_r;
-    int last_barrel;
-
-    // Manual targeting / locked enemy
-    int locked_enemy_idx;
-
-    // Metrics
-    uint64_t shots_fired;
-    uint64_t hits_confirmed;
-    uint64_t damage_dealt;
-    uint64_t kills;
-} Turret;
-
-typedef struct {
-    int x, y;   // Q8 fixed point (local bottom screen)
-    int vx, vy; // Q8 fixed point
-    int life;
-    int active;
-    int turret_idx;
-    uint64_t damage;
-
-    int prev_x, prev_y;
-    int prev_active;
-} Bullet;
 
 typedef struct {
     int x, y;       // Q8 global coordinates
@@ -294,8 +238,6 @@ typedef enum {
 // Debug / Test Sandbox parameters state
 typedef struct {
     int enemy_tier;       // 0..7 (variant; hp/speed come from the master table)
-    int turret_firerate;  // 1..30 frames fire interval
-    int turret_damage;    // 1..999 damage per bullet
     int turret_infinite_ammo; // 1 = infinite ammo
     int run_sim;          // 0 = paused/step, 1 = live continuous
     int separation_enabled;
@@ -370,7 +312,6 @@ typedef struct {
     int continuous_fire; // 0=Click per shot, 1=Continuous hold spray
     int auto_target;     // 0=Manual, 1=Nearest, 2=Strongest
     int conveyor_lvl;    // 0=Manual reload, 1=1/s, 2=3/s, 3=6/s
-    int extra_turrets;   // Extra unlocked turrets (0..3)
 } UpgradeTree;
 
 typedef struct {
@@ -407,12 +348,9 @@ typedef struct {
 
     // Stylus drag & reload state
     int is_dragging_ammo;
-    int is_dragging_turret;
-    int drag_turret_slot;
     int drag_x, drag_y;
     int prev_drag_x, prev_drag_y;
     int prev_drag_active;
-    int selected_turret;
     int upgrade_flash_timer;
     int upgrade_flash_idx;
 
@@ -458,10 +396,7 @@ void upgrade_purchase(int idx);
 
 // Global declarations
 extern GameContext g_game;
-extern Turret g_turrets[MAX_TURRETS];
-#define g_turret g_turrets[0]
 extern Enemy g_enemies[MAX_ENEMIES];
-extern Bullet g_bullets[MAX_BULLETS];
 extern DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
 extern GoreChunk g_gore_chunks[MAX_GORE_CHUNKS];
 extern WallPlatform g_wall;
@@ -502,7 +437,6 @@ void game_toggle_pause(void);
 void game_reset_to_prep(void);
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration);
 void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant);
-int game_is_pos_valid(int x, int y);
 
 // Helpers
 void format_number_compact(char *buf, size_t buf_size, uint64_t val);
@@ -520,10 +454,8 @@ void renderer_draw_text(int x, int y, const char *str, uint16_t color);
 void renderer_draw_battlefield_bottom(void);
 void renderer_draw_wall(void);
 void renderer_draw_battlefield_top(void);
-void renderer_draw_turret(const Turret *t, int is_selected);
 void renderer_draw_enemies_bottom(void);
 void renderer_draw_enemies_top(void);
-void renderer_draw_bullets(void);
 void renderer_draw_splatters_bottom(void);
 void renderer_draw_splatters_top(void);
 void renderer_draw_death_particles_bottom(void);

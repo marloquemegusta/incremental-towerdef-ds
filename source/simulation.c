@@ -1,13 +1,10 @@
 #include "game.h"
 #include "enemy_data.h"
 #include "tiles.h"
-#include "turret_data.h"
 #include "audio.h"
 
 GameContext g_game;
-Turret g_turrets[MAX_TURRETS];
 Enemy g_enemies[MAX_ENEMIES];
-Bullet g_bullets[MAX_BULLETS];
 DeathParticle g_death_particles[MAX_DEATH_PARTICLES];
 GoreChunk g_gore_chunks[MAX_GORE_CHUNKS];
 
@@ -159,26 +156,6 @@ void balance_config_init(void) {
     if (s_fat_available) {
         balance_config_load();
     }
-}
-
-int game_is_pos_valid(int x, int y) {
-    // Valid deployment area in bottom screen (local y: 20..150, x: 20..236)
-    if (x < 24 || x > 232) return 0;
-    if (y < 24 || y > 146) return 0;
-
-    // Do not overlap central bunker area (x: 96..160, y >= 148)
-    if (x >= 90 && x <= 166 && y >= 144) return 0;
-
-    // Check distance to other placed turrets (min 32px separation)
-    for (int t = 0; t < MAX_TURRETS; t++) {
-        if (g_turrets[t].placed) {
-            int dx = x - g_turrets[t].x;
-            int dy = y - g_turrets[t].y;
-            if (dx * dx + dy * dy < (32 * 32)) return 0;
-        }
-    }
-
-    return 1;
 }
 
 void game_add_splatter_ex(int x, int y, uint16_t color, int size, int duration) {
@@ -385,25 +362,6 @@ static void spawn_enemy_ex(int variant, uint64_t hp, int base_spd, int initial_y
 
 static void spawn_enemy(int variant, uint64_t hp, int base_spd) {
     spawn_enemy_ex(variant, hp, base_spd, 0);
-}
-
-#define BULLET_SPEED 12
-
-static void spawn_bullet(int x, int y, int angle, int turret_idx, uint64_t dmg) {
-    for (int i = 0; i < MAX_BULLETS; i++) {
-        if (!g_bullets[i].active) {
-            g_bullets[i].active = 1;
-            g_bullets[i].turret_idx = turret_idx;
-            g_bullets[i].x = TO_FP(x);
-            g_bullets[i].y = TO_FP(y);
-            // 12 px/frame high-velocity bolter tracers
-            g_bullets[i].vx = (fixed_cos(angle) * BULLET_SPEED);
-            g_bullets[i].vy = (fixed_sin(angle) * BULLET_SPEED);
-            g_bullets[i].life = 25;
-            g_bullets[i].damage = dmg;
-            break;
-        }
-    }
 }
 
 
@@ -1004,9 +962,7 @@ void game_init(void) {
     }
 
     memset(&g_game, 0, sizeof(g_game));
-    memset(g_turrets, 0, sizeof(g_turrets));
     memset(g_enemies, 0, sizeof(g_enemies));
-    memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_death_particles, 0, sizeof(g_death_particles));
     memset(g_gore_chunks, 0, sizeof(g_gore_chunks));
 
@@ -1039,34 +995,14 @@ void game_init(void) {
     g_game.upgrades.continuous_fire = 0;
     g_game.upgrades.auto_target = 0; // Starts requiring manual touch-targeting until upgrade purchased!
     g_game.upgrades.conveyor_lvl = 0; // Starts requiring manual ammo drag!
-    g_game.upgrades.extra_turrets = 0;
 
     // Debug Sandbox test defaults
     g_game.sandbox.enemy_tier = 1;
-    g_game.sandbox.turret_firerate = 10;
-    g_game.sandbox.turret_damage = 5;
     g_game.sandbox.turret_infinite_ammo = 1;
     g_game.sandbox.run_sim = 1;
     g_game.sandbox.separation_enabled = 1;
     g_game.sandbox.profiler_compact = 0;
     g_game.sandbox.edit_row = 0;
-
-    // WallPlatform handles all defenses; g_turrets[0].placed = 0;
-
-    for (int t = 1; t < MAX_TURRETS; t++) {
-        g_turrets[t].id = t;
-        g_turrets[t].current_angle = 192;
-        g_turrets[t].target_angle = 192;
-        g_turrets[t].range = 65;
-        g_turrets[t].placed = 0;
-        g_turrets[t].active = 0;
-        g_turrets[t].hp = 50;
-        g_turrets[t].max_hp = 50;
-        g_turrets[t].ammo = 20;
-        g_turrets[t].max_ammo = 20;
-        g_turrets[t].fire_interval = 18;
-        g_turrets[t].locked_enemy_idx = -1;
-    }
 
     // Rebuild the immutable ground layer so persistent blood is cleared only
     // when a new run starts, never as part of ordinary frame updates.
@@ -1085,15 +1021,9 @@ void game_start_wave(void) {
     g_game.spawn_timer_ultra = 0;
     g_game.stage_completed_flag = 0;
 
-    memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_death_particles, 0, sizeof(g_death_particles));
     memset(g_gore_chunks, 0, sizeof(g_gore_chunks));
-
-    // Reset locked targets
-    for (int t = 0; t < MAX_TURRETS; t++) {
-        g_turrets[t].locked_enemy_idx = -1;
-    }
 }
 
 void game_reset_to_prep(void) {
@@ -1108,21 +1038,9 @@ void game_reset_to_prep(void) {
     g_game.spawn_timer_scourge = 0;
     g_game.spawn_timer_hydra = 0;
     g_game.spawn_timer_ultra = 0;
-    memset(g_bullets, 0, sizeof(g_bullets));
     memset(g_enemies, 0, sizeof(g_enemies));
     memset(g_death_particles, 0, sizeof(g_death_particles));
     memset(g_gore_chunks, 0, sizeof(g_gore_chunks));
-
-    // Repair turrets back to full between waves
-    for (int t = 0; t < MAX_TURRETS; t++) {
-        g_turrets[t].hp = g_turrets[t].max_hp;
-        g_turrets[t].ammo = g_turrets[t].max_ammo;
-        g_turrets[t].fire_cooldown = 0;
-        g_turrets[t].flash_timer = 0;
-        g_turrets[t].barrel_recoil_l = 0;
-        g_turrets[t].barrel_recoil_r = 0;
-        g_turrets[t].locked_enemy_idx = -1;
-    }
 }
 
 void game_update_simulation(void) {
@@ -1276,47 +1194,6 @@ void game_update_simulation(void) {
         int old_y = ey;
         int px = FROM_FP(ex);
         int py = FROM_FP(ey);
-
-        // Check if hitting any placed turret (physical obstruction & biting!)
-        int hitting_turret = -1;
-        if (py >= 192) {
-            int local_y = py - 192;
-            for (int t = 0; t < MAX_TURRETS; t++) {
-                if (g_turrets[t].placed) {
-                    int tdx = px - g_turrets[t].x;
-                    if (tdx > 14 || tdx < -14) continue;
-                    int tdy = local_y - g_turrets[t].y;
-                    if (tdy > 14 || tdy < -14) continue;
-                    if (tdx * tdx + tdy * tdy < (14 * 14)) {
-                        hitting_turret = t;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (hitting_turret >= 0) {
-            // Bite Turret!
-            g_enemies[i].biting_target = hitting_turret;
-            g_enemies[i].bite_timer++;
-            int b_variant = g_enemies[i].variant;
-            if (b_variant < 0) b_variant = 0;
-            if (b_variant >= ENEMY_VARIANT_COUNT) b_variant = ENEMY_VARIANT_COUNT - 1;
-            if (g_enemies[i].bite_timer >= g_balance.enemy[b_variant].bite_interval) {
-                g_enemies[i].bite_timer = 0;
-                int bite_dmg = g_balance.enemy[b_variant].bite_damage;
-                if (g_turrets[hitting_turret].hp > bite_dmg) {
-                    g_turrets[hitting_turret].hp -= bite_dmg;
-                } else {
-                    // Turret destroyed!
-                    g_turrets[hitting_turret].hp = 0;
-                    g_turrets[hitting_turret].placed = 0;
-                    g_turrets[hitting_turret].active = 0;
-                    game_spawn_death_gore(g_turrets[hitting_turret].x, 192 + g_turrets[hitting_turret].y, 0, 0, 4);
-                }
-            }
-            continue; // Stop advancing while biting
-        }
 
         // Compute base movement speed (0 = stationary frozen dummy in sandbox)
         int spd = 0;
@@ -1486,261 +1363,6 @@ void game_update_simulation(void) {
     // Movement changed positions; refresh the broad-phase before queries.
     enemy_grid_build();
 
-    // 5. Update Turrets & Logistics (Factorio conveyors & reloading)
-    // 5. Update Turrets & Logistics
-    for (int t = 0; t < MAX_TURRETS; t++) {
-        Turret *tur = &g_turrets[t];
-        if (!tur->placed || !tur->active) continue;
-
-        if (tur->flash_timer > 0) tur->flash_timer--;
-        if (tur->barrel_recoil_l > 0) tur->barrel_recoil_l--;
-        if (tur->barrel_recoil_r > 0) tur->barrel_recoil_r--;
-
-        // Advance canonical firing animation frames (30 FPS visual tick)
-        if (tur->anim_frame > 0) {
-            if (g_game.sim_ticks_elapsed % 2 == 0) {
-                // Alternating barrels sequence: Left barrel is 1..4, Right barrel is 6..9
-                if (tur->anim_frame >= 1 && tur->anim_frame <= 4) {
-                    tur->anim_frame++;
-                    if (tur->anim_frame > 4) tur->anim_frame = 0; // Return to idle
-                } else if (tur->anim_frame >= 6 && tur->anim_frame <= 9) {
-                    tur->anim_frame++;
-                    if (tur->anim_frame > 9) tur->anim_frame = 0; // Return to idle
-                } else {
-                    tur->anim_frame = 0;
-                }
-            }
-        }
-
-        // Conveyor passive reloading (Branch C): 1/s, 3/s, 6/s
-        if (g_game.upgrades.conveyor_lvl > 0 && tur->ammo < tur->max_ammo) {
-            int rate = (g_game.upgrades.conveyor_lvl <= 3) ? g_balance.conveyor_reload_interval[g_game.upgrades.conveyor_lvl] : g_balance.conveyor_reload_interval[3];
-            if (g_game.sim_ticks_elapsed % rate == 0) {
-                tur->ammo++;
-            }
-        }
-
-        // Dead legacy turret path: no range concept. Sandbox still forces infinite ammo.
-        if (g_game.mode == MODE_DEBUG_SANDBOX && g_game.sandbox.turret_infinite_ammo) {
-            tur->ammo = tur->max_ammo;
-        }
-
-        // Target selection
-        int target_enemy = -1;
-
-        if (g_game.upgrades.auto_target) {
-            // Find closest active enemy in range
-            int closest_dist_sq = tur->range * tur->range;
-            int candidates[MAX_ENEMIES];
-            int candidate_count = enemy_grid_collect(tur->x, 192 + tur->y, tur->range, candidates);
-            for (int ci = 0; ci < candidate_count; ci++) {
-                int e = candidates[ci];
-                g_game.prof_target_candidates++;
-                if (!g_enemies[e].active || g_enemies[e].dying) continue;
-                int gy = FROM_FP(g_enemies[e].y);
-                if (gy < 192) continue; // Only shoot enemies on bottom screen
-                int local_y = gy - 192;
-                int gx = FROM_FP(g_enemies[e].x);
-
-                int dx = gx - tur->x;
-                int dy = local_y - tur->y;
-                int dsq = dx * dx + dy * dy;
-                if (dsq <= closest_dist_sq) {
-                    closest_dist_sq = dsq;
-                    target_enemy = e;
-                }
-            }
-        } else {
-            // Manual locked enemy from stylus tap
-            if (tur->locked_enemy_idx >= 0 && g_enemies[tur->locked_enemy_idx].active && !g_enemies[tur->locked_enemy_idx].dying) {
-                int gy = FROM_FP(g_enemies[tur->locked_enemy_idx].y);
-                if (gy >= 192) {
-                    int local_y = gy - 192;
-                    int gx = FROM_FP(g_enemies[tur->locked_enemy_idx].x);
-                    int dx = gx - tur->x;
-                    int dy = local_y - tur->y;
-                    if (dx * dx + dy * dy <= tur->range * tur->range) {
-                        target_enemy = tur->locked_enemy_idx;
-                    }
-                }
-            }
-        }
-
-        // In debug sandbox: auto-acquire closest enemy within range if none locked
-        if (target_enemy < 0 && g_game.mode == MODE_DEBUG_SANDBOX) {
-            int closest_dist_sq = tur->range * tur->range;
-            int candidates[MAX_ENEMIES];
-            int candidate_count = enemy_grid_collect(tur->x, 192 + tur->y, tur->range, candidates);
-            for (int ci = 0; ci < candidate_count; ci++) {
-                int e = candidates[ci];
-                g_game.prof_target_candidates++;
-                if (!g_enemies[e].active || g_enemies[e].dying) continue;
-                int gy = FROM_FP(g_enemies[e].y);
-                if (gy < 192) continue;
-                int local_y = gy - 192;
-                int gx = FROM_FP(g_enemies[e].x);
-                int dx = gx - tur->x;
-                int dy = local_y - tur->y;
-                int dsq = dx * dx + dy * dy;
-                if (dsq <= closest_dist_sq) {
-                    closest_dist_sq = dsq;
-                    target_enemy = e;
-                }
-            }
-        }
-
-        // Aim and fire
-        if (target_enemy >= 0) {
-            int gx = FROM_FP(g_enemies[target_enemy].x);
-            int local_y = FROM_FP(g_enemies[target_enemy].y) - 192;
-
-            // Lead target prediction: calculate future intercept point based on bullet flight time
-            int ddx = gx - tur->x;
-            int ddy = local_y - tur->y;
-            int dsq = ddx * ddx + ddy * ddy;
-            int dist = 0;
-            while ((dist + 1) * (dist + 1) <= dsq) dist++;
-
-            int t_frames = dist / BULLET_SPEED;
-            if (t_frames < 1) t_frames = 1;
-
-            int evx_px = FROM_FP(g_enemies[target_enemy].vx);
-            int evy_px = FROM_FP(g_enemies[target_enemy].vy);
-
-            int pred_x = gx + (evx_px * t_frames);
-            int pred_y = local_y + (evy_px * t_frames);
-
-            // Clamp predicted point inside valid battlefield bounds
-            if (pred_x < 8) pred_x = 8;
-            if (pred_x > 248) pred_x = 248;
-            if (pred_y < 0) pred_y = 0;
-            if (pred_y > 185) pred_y = 185;
-
-            tur->target_angle = fixed_atan2(pred_y - tur->y, pred_x - tur->x);
-            tur->current_angle = tur->target_angle;
-
-            // Firing strictly consumes ammo!
-            if (tur->ammo > 0) {
-                if (tur->fire_cooldown > 0) {
-                    tur->fire_cooldown--;
-                } else {
-                    int f_lvl = g_game.upgrades.firerate_lvl;
-                    int interval = (g_game.mode == MODE_DEBUG_SANDBOX) ? g_game.sandbox.turret_firerate :
-                                   ((f_lvl < 5) ? g_balance.turret_fire_interval[f_lvl] : g_balance.turret_fire_interval[4]);
-                    tur->fire_cooldown = interval;
-                    tur->flash_timer = 3;
-                    tur->ammo--;
-
-                    // Alternating barrels animation: Frame 1..4 (left) and 6..9 (right)
-                    tur->last_barrel = 1 - tur->last_barrel;
-                    if (tur->last_barrel == 0) {
-                        tur->anim_frame = 1;
-                        tur->barrel_recoil_l = 4;
-                    } else {
-                        tur->anim_frame = 6;
-                        tur->barrel_recoil_r = 4;
-                    }
-
-                    int ang = tur->current_angle & 0xFF;
-                    int perp_x = -fixed_sin(ang);
-                    int perp_y = fixed_cos(ang);
-                    int s = (tur->last_barrel == 0) ? -3 : 3;
-                    int bx = tur->x + ((perp_x * s) >> FP_SHIFT);
-                    int by = tur->y + ((perp_y * s) >> FP_SHIFT);
-
-                    // Dual barrel convergence directly towards predicted impact point
-                    int fire_angle = fixed_atan2(pred_y - by, pred_x - bx);
-
-                    // Multiplicative damage: Base 2 -> 3 -> 4 -> 6 -> 8
-                    int c_lvl = g_game.upgrades.caliber_lvl;
-                    uint64_t dmg = (g_game.mode == MODE_DEBUG_SANDBOX) ? (uint64_t)g_game.sandbox.turret_damage :
-                                   ((c_lvl < 5) ? g_balance.turret_damage[c_lvl] : g_balance.turret_damage[4]);
-
-                    spawn_bullet(bx, by, fire_angle, t, dmg);
-                    tur->shots_fired++;
-                }
-            } else {
-                // Out of ammo: reset firing frame
-                tur->anim_frame = 0;
-            }
-        } else {
-            tur->anim_frame = 0;
-        }
-    }
-
-    // 6. Update Bullets & Continuous Collisions
-    for (int b = 0; b < MAX_BULLETS; b++) {
-        if (!g_bullets[b].active) continue;
-        int prev_bx = FROM_FP(g_bullets[b].x);
-        int prev_by = FROM_FP(g_bullets[b].y);
-
-        g_bullets[b].x += g_bullets[b].vx;
-        g_bullets[b].y += g_bullets[b].vy;
-        g_bullets[b].life--;
-
-        int curr_bx = FROM_FP(g_bullets[b].x);
-        int curr_by = FROM_FP(g_bullets[b].y);
-        int mid_bx = (prev_bx + curr_bx) / 2;
-        int mid_by = (prev_by + curr_by) / 2;
-
-        int hit = 0;
-        int candidates[MAX_ENEMIES];
-        int candidate_count = enemy_grid_collect(curr_bx, 192 + curr_by, 22, candidates);
-        for (int ci = 0; ci < candidate_count; ci++) {
-            int e = candidates[ci];
-            g_game.prof_collision_candidates++;
-            if (!g_enemies[e].active || g_enemies[e].dying) continue;
-            int gy = FROM_FP(g_enemies[e].y);
-            if (gy < 192) continue; // Only collide in bottom screen
-            int local_y = gy - 192;
-            int gx = FROM_FP(g_enemies[e].x);
-
-            static const int s_hit_r[ENEMY_VARIANT_COUNT] = { 8, 7, 9, 12, 14, 14, 16, 22 };
-            int v = g_enemies[e].variant;
-            if (v < 0) v = 0;
-            if (v >= ENEMY_VARIANT_COUNT) v = ENEMY_VARIANT_COUNT - 1;
-            int r = s_hit_r[v];
-
-            // Check collision at both current position and midpoint to prevent tunneling
-            int hit_curr = (abs(curr_bx - gx) <= r && abs(curr_by - local_y) <= r);
-            int hit_mid = (abs(mid_bx - gx) <= r && abs(mid_by - local_y) <= r);
-
-            if (hit_curr || hit_mid) {
-                hit = 1;
-                uint64_t dmg = g_bullets[b].damage;
-                if (g_enemies[e].hp > dmg) {
-                    g_enemies[e].hp -= dmg;
-                } else {
-                    g_enemies[e].hp = 0;
-                    g_game.enemies_alive--;
-                    g_game.enemies_killed++;
-
-                    uint64_t base_scrap = g_balance.enemy[v].scrap;
-                    uint64_t reward = base_scrap;
-                    if (g_game.upgrades.bio_harvest_lvl == 1) {
-                        reward = base_scrap + (base_scrap + 1) / 2; // +50% scrap
-                    } else if (g_game.upgrades.bio_harvest_lvl >= 2) {
-                        reward = base_scrap * 2; // +100% scrap (x2)
-                    }
-                    g_game.scrap += reward;
-
-                    enemy_begin_death(e, g_bullets[b].vx, g_bullets[b].vy);
-                }
-
-                int tid = g_bullets[b].turret_idx;
-                if (tid >= 0 && tid < MAX_TURRETS) {
-                    g_turrets[tid].hits_confirmed++;
-                    g_turrets[tid].damage_dealt += dmg;
-                }
-                g_bullets[b].active = 0;
-                break;
-            }
-        }
-
-        if (!hit && (g_bullets[b].life <= 0 || curr_bx < 0 || curr_bx >= SCREEN_W || curr_by < 0 || curr_by >= SCREEN_H)) {
-            g_bullets[b].active = 0;
-        }
-    }
 }
 
 void game_toggle_pause(void) {
@@ -2472,16 +2094,8 @@ void game_sandbox_load_stress_profile(void) {
     // panel so the measured frame represents the game rather than the HUD.
     g_game.sandbox.profiler_compact = 1;
     memset(g_enemies, 0, sizeof(g_enemies));
-    memset(g_bullets, 0, sizeof(g_bullets));
     g_game.enemies_alive = 0;
     g_game.sandbox.spawn_count = 0;
-    // Keep the benchmark population fixed. The profiler must measure the
-    // requested render/simulation load, not turret kills followed by victory.
-    // Normal gameplay never enters this sandbox-only stress profile.
-    for (int t = 0; t < MAX_TURRETS; t++) {
-        g_turrets[t].active = 0;
-        g_turrets[t].placed = 0;
-    }
     for (int i = 0; i < MAX_ENEMIES; i++) {
         // Deterministic irregular swarm: jittered lanes and depth avoid the
         // artificial chessboard pattern while keeping before/after runs equal.
@@ -2532,57 +2146,21 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
     // X clears all battlefield entities
     if (keys_down & KEY_X) {
         memset(g_enemies, 0, sizeof(g_enemies));
-        memset(g_bullets, 0, sizeof(g_bullets));
         g_game.enemies_alive = 0;
         return;
     }
 
-    // D-Pad UP / DOWN selects parameter row (0..2)
-    if (keys_down & KEY_UP) {
-        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 2) % 3;
-    } else if (keys_down & KEY_DOWN) {
-        g_game.sandbox.edit_row = (g_game.sandbox.edit_row + 1) % 3;
-    }
-
-    // D-Pad LEFT / RIGHT adjusts selected parameter
+    // D-Pad LEFT / RIGHT adjusts the selected parameter
     int delta = 0;
     if (keys_down & KEY_LEFT) delta = -1;
     else if (keys_down & KEY_RIGHT) delta = 1;
 
     if (delta != 0) {
-        switch (g_game.sandbox.edit_row) {
-            case 0: { // Enemy species / variant (0..7)
-                int t = g_game.sandbox.enemy_tier + delta;
-                if (t < 0) t = 0;
-                if (t >= ENEMY_VARIANT_COUNT) t = ENEMY_VARIANT_COUNT - 1;
-                g_game.sandbox.enemy_tier = t;
-                break;
-            }
-            case 1: { // Turret Fire Interval (cadence)
-                static const int s_int_steps[] = { 1, 3, 5, 8, 12, 18, 25, 35 };
-                int idx = 4;
-                for (int j = 0; j < 8; j++) {
-                    if (s_int_steps[j] == g_game.sandbox.turret_firerate) { idx = j; break; }
-                }
-                idx += delta;
-                if (idx < 0) idx = 0;
-                if (idx > 7) idx = 7;
-                g_game.sandbox.turret_firerate = s_int_steps[idx];
-                break;
-            }
-            case 2: { // Turret Damage
-                static const int s_dmg_steps[] = { 1, 2, 3, 5, 10, 20, 50, 100 };
-                int idx = 3;
-                for (int j = 0; j < 8; j++) {
-                    if (s_dmg_steps[j] == g_game.sandbox.turret_damage) { idx = j; break; }
-                }
-                idx += delta;
-                if (idx < 0) idx = 0;
-                if (idx > 7) idx = 7;
-                g_game.sandbox.turret_damage = s_dmg_steps[idx];
-                break;
-            }
-        }
+        // Single tunable parameter: enemy species / variant (0..7)
+        int t = g_game.sandbox.enemy_tier + delta;
+        if (t < 0) t = 0;
+        if (t >= ENEMY_VARIANT_COUNT) t = ENEMY_VARIANT_COUNT - 1;
+        g_game.sandbox.enemy_tier = t;
     }
 
     // Touch handling
@@ -2597,7 +2175,6 @@ void game_handle_input_sandbox(touchPosition touch, int keys_down, int keys_held
             // [CLEAR] (6..50)
             if (touch.px >= 6 && touch.px <= 50) {
                 memset(g_enemies, 0, sizeof(g_enemies));
-                memset(g_bullets, 0, sizeof(g_bullets));
                 g_game.enemies_alive = 0;
                 return;
             }

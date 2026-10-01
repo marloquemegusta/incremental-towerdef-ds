@@ -13,8 +13,6 @@ static int s_top_bg = 0;
 
 
 
-#include "turret_data.h"
-
 void format_number_compact(char *buf, size_t buf_size, uint64_t val) {
     if (val >= 1000000000ULL) {
         snprintf(buf, buf_size, "%lluB", val / 1000000000ULL);
@@ -492,41 +490,6 @@ void renderer_draw_battlefield_bottom(void) {
     tiles_dirty_restore(g_backbuffer, 1, s_bot_fb_idx);
 }
 
-void renderer_draw_turret(const Turret *t, int is_selected) {
-    if (!t->placed) return;
-    
-    // Selected or target highlight
-    if (is_selected) {
-        renderer_draw_circle(t->x, t->y, 16, COLOR_AMBER, 0);
-        renderer_draw_circle(t->x, t->y, t->range, COLOR_AMBER, 0);
-    }
-
-    // Draw canonical 16-angle animated RotSprite turret
-    int angle_16 = ((t->current_angle + 8) >> 4) & 15;
-    turret_draw_frame_angle(t->x, t->y, t->type, t->anim_frame, angle_16, is_selected);
-
-    // Ammo bar above turret
-    int bar_w = 20;
-    int bar_x = t->x - bar_w / 2;
-    int bar_y = t->y - 18;
-    renderer_fill_rect(bar_x - 1, bar_y - 1, bar_w + 2, 4, COLOR_BLACK);
-    int ammo_fill = (t->max_ammo > 0) ? (t->ammo * bar_w / t->max_ammo) : 0;
-    uint16_t ammo_col = (t->ammo > t->max_ammo / 4) ? COLOR_AMBER : COLOR_LED_RED;
-    if (ammo_fill > 0) {
-        renderer_fill_rect(bar_x, bar_y, ammo_fill, 2, ammo_col);
-    }
-
-    // Health bar if damaged
-    if (t->hp < t->max_hp) {
-        int hp_y = t->y + 16;
-        renderer_fill_rect(bar_x - 1, hp_y - 1, bar_w + 2, 4, COLOR_BLACK);
-        int hp_fill = (t->max_hp > 0) ? (t->hp * bar_w / t->max_hp) : 0;
-        if (hp_fill > 0) {
-            renderer_fill_rect(bar_x, hp_y, hp_fill, 2, COLOR_LED_GREEN);
-        }
-    }
-}
-
 static int renderer_collect_sorted_enemies(int *out, int bottom_screen) {
     int heads[SCREEN_H];
     int next[MAX_ENEMIES];
@@ -625,22 +588,6 @@ void renderer_draw_enemies_bottom(void) {
             }
             tiles_dirty_mark_rect(bx - 1, by - 1, bw + 2, 3, 1, s_bot_fb_idx);
         }
-    }
-}
-
-void renderer_draw_bullets(void) {
-    for (int i = 0; i < MAX_BULLETS; i++) {
-        if (!g_bullets[i].active) continue;
-        int bx = FROM_FP(g_bullets[i].x);
-        int by = FROM_FP(g_bullets[i].y);
-        renderer_draw_pixel(bx, by, COLOR_BOLTER_TRACER);
-        renderer_draw_pixel(bx + 1, by, COLOR_WHITE);
-        renderer_draw_pixel(bx, by + 1, COLOR_WHITE);
-        tiles_dirty_mark_rect(bx, by, 2, 2, 1, s_bot_fb_idx);
-
-        g_bullets[i].prev_x = bx;
-        g_bullets[i].prev_y = by;
-        g_bullets[i].prev_active = 1;
     }
 }
 
@@ -1243,14 +1190,12 @@ void renderer_draw_ui_sandbox(void) {
         return;
     }
 
-    // D-Pad adjustable parameters (Rows 0..2). Enemy HP/speed are no longer
-    // sandbox knobs: they come from the master balance table (tune them in
-    // CALIBRATION), so the sandbox only picks the species and tunes the turret.
+    // Single D-Pad adjustable parameter: the spawned enemy species. Enemy
+    // HP/speed come from the master balance table (tune them in CALIBRATION).
     static const char *s_tier_names[8] = { "SCOURGE", "ZERGLING", "HYDRALISK", "MUTALISK", "DEFILER", "LURKER", "GUARDIAN", "ULTRALISK" };
-    const char *labels[3] = { "ENEMY SPECIES", "FIRE CADENCE", "BULLET DMG" };
-    for (int r = 0; r < 3; r++) {
-        int y = 26 + r * 14;
-        int is_sel = (g_game.sandbox.edit_row == r);
+    {
+        int y = 26;
+        int is_sel = (g_game.sandbox.edit_row == 0);
         uint16_t row_col = is_sel ? COLOR_WHITE : COLOR_IRON_LIGHT;
         uint16_t val_col = is_sel ? COLOR_AMBER : COLOR_PHOSPHOR_GREEN;
 
@@ -1259,23 +1204,9 @@ void renderer_draw_ui_sandbox(void) {
             top_draw_text(4, y + 2, ">", TOP_COLOR_AMBER);
         }
 
-        top_draw_text(12, y + 2, labels[r], row_col);
-
-        switch (r) {
-            case 0:
-                snprintf(buf, sizeof(buf), "%s [T%d]", s_tier_names[g_game.sandbox.enemy_tier],
-                         g_balance.enemy[g_game.sandbox.enemy_tier].tier);
-                break;
-            case 1: {
-                int fire_rate = g_game.sandbox.turret_firerate;
-                if (fire_rate < 1) fire_rate = 1;
-                snprintf(buf, sizeof(buf), "%d f (%d/s)", fire_rate, 60 / fire_rate);
-                break;
-            }
-            case 2:
-                snprintf(buf, sizeof(buf), "%d DMG", g_game.sandbox.turret_damage);
-                break;
-        }
+        top_draw_text(12, y + 2, "ENEMY SPECIES", row_col);
+        snprintf(buf, sizeof(buf), "%s [T%d]", s_tier_names[g_game.sandbox.enemy_tier],
+                 g_balance.enemy[g_game.sandbox.enemy_tier].tier);
         top_draw_text(120, y + 2, buf, val_col);
     }
 
