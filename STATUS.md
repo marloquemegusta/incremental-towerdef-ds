@@ -147,6 +147,16 @@
   - [x] **Se conserva intacta la muralla** (`WallPlatform`/`BulletDart`) y su nomenclatura interna `turret_*` (`turret_angles`, `c_turret_points`, `TURRET_PIVOT_X/Y`).
   - [x] Evidencia: `DS_BUILD=PASS` (sin `turret_data.c`, 0 warnings) y regresión verde (`DSM_SCENARIO_RESULT=PASS`) en `city_defense_demo`, `session1_wall_ballistics`, `combat_and_kill_test`, `targeting_and_sprites_test`, `master_table_tier_check`. Detalle en `walkthroughs/purge-legacy-turrets/`.
 
+- [x] **Desmembramiento en Vivo del Enemigo (feedback de daño) [COMPLETADA - rama `feat/live-dismemberment`, merge `7000e24`]:**
+  - [x] Cada impacto no letal **muerde una celda del borde de la silueta** (nunca del interior: el xeno se *pela* de fuera hacia dentro) y lanza **ese mismo trozo** como escombro sólido con los índices de paleta reales del sprite.
+  - [x] La mordida es **irregular** (patrón determinista sobre bloques de 2×2, compartido entre el dibujo y el escombro, de modo que el trozo que vuela es exactamente el que falta) y la zona mordida muestra **carne roja** de caparazón arrancado (paleta de gore, `DESIGN.md` §7), nunca púrpura.
+  - [x] **Presupuesto atado a la salud** (`WOUND_HP_TICKS`): sólo está disponible la fracción de vida ya perdida, así que un xeno casi intacto no se destroza por muchos tiros que reciba y el cupo completo sólo se alcanza al borde de la muerte. La herida se resuelve **después** de aplicar el daño y un **golpe letal no genera ninguna** (de ese cuerpo ya se encarga el licuado).
+  - [x] **Dos modos compilables** (`WOUND_AMPUTATE`): por defecto **sin amputación** (el caparazón se enrojece sin romper la silueta); con amputación se arrancan además los apéndices de ≤ 2 px y todo lo que un corte deje desconectado, sin dejar nunca fragmentos flotantes.
+  - [x] **Fast path de quads intacto** para enemigos sin heridas. Medido con `scenarios/perf_wound.json` (6 Ultralisks): `B` pasa de 553 a 565 ticks (**+12, ≈+2.2%**); el coste escala por **sprite herido**, no por celda mordida.
+  - [x] **Hallazgo colateral:** el sandbox de debug **sí entra** en DeSmuME headless; el fallo registrado en `KNOWN_ISSUES.md` era de **timing de captura**, no de input. `KNOWN_ISSUES.md` corregido.
+  - [x] **Nueva pregunta abierta `[OQ-13]`** en `DESIGN.md`: la escalera de HP (1→135) rompe la legibilidad del feedback en los extremos. **El balance del juego NO se ha tocado**; las capturas usan una tabla de HP provisional sólo para la grabación.
+  - [x] Evidencia: 8 GIF **A/B (con y sin amputación)** con un solo individuo, más el A/B de rendimiento, en `walkthroughs/live-dismemberment/`.
+
 - [ ] **Bugs y Tareas Pendientes para Siguiente Agente:**
   - [x] **Tasa inicial de spawn del Atraedor:** arranca en $0.50$/s (`dial_rate_ticks = 10`) con paso fino de $0.05$.
   - [ ] **Interacción del Dial táctil (stylus):** implementar el arrastre analógico con stylus (arriba/abajo e izquierda/derecha); el control por cruceta con pasos de $0.05$ y autorepeat ya está resuelto.

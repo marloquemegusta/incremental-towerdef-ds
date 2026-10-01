@@ -56,6 +56,10 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
 - Telemetría en el HUD superior: `FPS T B P S E` (`T` = render superior, `B` = render inferior,
   `P` = presentación, `S` = simulación, `E` = nº de enemigos activos).
 - Patrones y presupuestos detallados en la skill: `references/performance-architecture.md`.
+- **Medición de estrés (con el escenario `perf_wound`):** con **6 Ultralisks** (el sprite mayor, 98×105) en la zona
+  de fuego el HUD da `B:553` ticks, **por encima** del presupuesto ⇒ 30 FPS. Son las siluetas grandes
+  las que saturan la pantalla inferior por sí solas; el desmembramiento añade **+12 ticks** (≈+2.2%).
+  Escenario reproducible: `scenarios/perf_wound.json`.
 
 ## 5. Simulación
 
@@ -103,12 +107,27 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
   superior o sub-bancos.
 - **Sin rango (dormido):** `g_balance.turret_range[]` se conserva a `0` por reversibilidad; un valor
   `> 0` reintroduciría una línea de fuego (prohibida por diseño, `DESIGN.md` `[OQ-06]`).
+- **Desmembramiento en vivo (`DESIGN.md` `[OQ-12]`):** los enemigos llevan una máscara de celdas
+  mordidas (`Enemy.wound_bits`, **dos planos de bits**: celdas mordidas y celdas arrancadas enteras)
+  sobre una rejilla **normalizada al bounding box del frame** (`WOUND_GRID`), de modo que la herida no
+  salta al ciclar animación ni al cambiar de dirección. Las celdas se eligen **en la silueta**
+  (`wound_cell_edge`) y el cupo disponible es proporcional a la vida ya perdida (`WOUND_HP_TICKS`).
+  La máscara la aplican las **tres** rutas de blit de `source/enemy_data.c` (16-bit, 8-bit indexado y
+  licuado de muerte).
+  - **Se conserva el fast path de quads:** `wound_any()` corta antes de entrar al camino por píxel, así
+    que un enemigo **sin** heridas cuesta exactamente lo mismo que antes de la función.
+  - **Coste por sprite, no por celda herida:** en cuanto un enemigo tiene una sola herida, **todo** su
+    sprite baja al bucle por píxel. Medido: con 6 Ultralisks, `B` pasa de 553 a 565 ticks (+12, ≈+2.2%),
+    y el número es el mismo con muchas o pocas celdas mordidas. Mitigación pendiente: enmascarar por
+    **quad** de 4×4 en vez de por píxel.
+  - **Sin trabajo extra de dirty grid:** la herida cae dentro del bbox que el enemigo ya marca en ambos
+    buffers, así que no requiere `tiles_dirty_mark_rect` adicional.
 
 ## 6. Estructuras de datos principales (`include/game.h`)
 
 | Estructura | Notas |
 | :--- | :--- |
-| `Enemy` | `x,y` Q8 globales; `hp`/`max_hp`; `incoming_damage`; `dying` / `death_timer` / `death_dir_*`; dirty rects independientes por pantalla |
+| `Enemy` | `x,y` Q8 globales; `hp`/`max_hp`; `incoming_damage`; `dying` / `death_timer` / `death_dir_*`; máscara de desmembramiento `wound_bits[WOUND_MASK_WORDS]` + `wound_count`; dirty rects independientes por pantalla |
 | `GeneratorState` | `built_tiers` (0..7), `tier_hp[7]` (5 HP/tier), bombillas catódicas de estado, degradación de A1-A7 |
 | `AttractorState` | Diales en ticks de 0.05 (`rate_ticks`, `tier_ticks`) como fuente de verdad; vistas Q8 derivadas (`rate_q8`, `tier_q8`), acumulador fraccionario en unidades de `rate_q8*frames` |
 | `GoreChunk` | Trozos sólidos: bloque de índices de paleta (≤ 4×4), `x,y,z` Q8, vida |
