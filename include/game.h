@@ -26,6 +26,99 @@
 #define MAX_CASINGS 256
 #define MAX_BULLET_DARTS 64
 
+// Live dismemberment (cosmetic). Each impact tears one cell out of the living
+// sprite. The cell is a NORMALIZED grid over the sprite bounding box, not an
+// absolute pixel block, so the hole stays in place while the walk animation and
+// the facing direction change (see DESIGN.md [OQ-12]). Purely visual: it never
+// touches hp, damage, speed or collision.
+//
+// Tuning note: only ~8-12 impacts land inside the battery's firing window before
+// the xeno walks past the wall, so the CELL SIZE is what decides legibility.
+// 8x8 (64 cells) over a 69x59 Defiler tears ~8px cells and reads as no damage at
+// all; 4x4 (16 cells) erases the body. 6x6 with a 60% cap is the balance between
+// "visible mutilation" and "still a recognisable xeno".
+#define WOUND_GRID 6
+#define WOUND_CELLS (WOUND_GRID * WOUND_GRID)
+#define WOUND_WORDS ((WOUND_CELLS + 31) / 32)
+#define WOUND_MAX_PCT 60 // Cap: never tear more than this % of the grid cells
+// The body only pays for damage it has actually taken: the share of the wound
+// budget available is the share of health already lost, quantised into this many
+// health steps. A nearly intact xeno therefore stays nearly intact no matter how
+// many rounds it eats, and it never reaches the wall looking wrecked while it still
+// hits hard. WOUND_MAX_PCT is the budget at death's door.
+#define WOUND_HP_TICKS 8
+// 1 = amputation: what is only 2 px across is severed outright and whatever a bite
+//     disconnects falls off, so the xeno visibly loses limbs and never keeps a
+//     fragment floating.
+// 0 = no amputation: nothing is ever removed. A bitten cell simply reddens (the torn
+//     carapace read) and the silhouette never changes. This is the default: it reads
+//     as "the shell is being stripped off" without ever breaking the silhouette.
+#define WOUND_AMPUTATE 0
+#define LIVE_DISMEMBERMENT_ENABLED 1 // A/B switch: 0 restores pristine sprites
+// Per-pixel bite threshold (0..255). Within a torn cell only the pixels that pass
+// this test are actually gone, so the bite is ragged instead of a perfect square.
+// The same seed drives the hole and the flying debris, so the piece that spins
+// away is exactly the piece missing from the body.
+#define WOUND_DENSITY 176
+// 1 = torn carapace: the cell is repainted as exposed dark-red flesh (reads as
+//     "a chunk was ripped off", used for the outer shell).
+// 0 = see-through hole: the cell is skipped so the ground shows through.
+#define WOUND_STYLE 1
+// A pixel is severed outright (rather than repainted as exposed flesh) only when it
+// belongs to a genuinely skinny feature: its 3x3 neighbourhood is not fully solid,
+// i.e. the local limb is at most 2 px across. Anything bulkier keeps its mass and
+// just shows the torn carapace.
+#define WOUND_THIN_R 1
+
+// Deterministic per-pixel bite pattern, shared by the sprite draw and the debris
+// so both agree on the exact shape of the missing piece. The pattern is computed on
+// 2x2 blocks: pixels leave in clumps instead of as isolated speckles, so a bite
+// never scatters orphan dots around the wound.
+static inline int wound_pixel_gone(int cell_bit, int sx, int sy) {
+    int hsh = (((sx >> 1) * 73) ^ ((sy >> 1) * 151) ^ (cell_bit * 977)) & 255;
+    return hsh < WOUND_DENSITY;
+}
+
+// Per-pixel wound state.
+#define WOUND_NONE 0
+#define WOUND_FLESH 1    // carapace torn off: the dark flesh shows underneath
+#define WOUND_SEVERED 2  // gone outright: the ground shows through
+
+// The per-cell mask packs two bit planes in one array: [0, WOUND_WORDS) marks the
+// bitten cells, [WOUND_WORDS, WOUND_MASK_WORDS) marks the cells torn off whole
+// because a bite disconnected them from the body (no floating fragments).
+#define WOUND_MASK_WORDS (WOUND_WORDS * 2)
+
+static inline int wound_bit_get(const uint32_t *mask, int bit) {
+    return (mask[bit >> 5] >> (bit & 31)) & 1;
+}
+
+static inline void wound_bit_set(uint32_t *mask, int bit) {
+    mask[bit >> 5] |= 1u << (bit & 31);
+}
+
+static inline int wound_gone_get(const uint32_t *mask, int bit) {
+    return (mask[WOUND_WORDS + (bit >> 5)] >> (bit & 31)) & 1;
+}
+
+static inline void wound_gone_set(uint32_t *mask, int bit) {
+    mask[WOUND_WORDS + (bit >> 5)] |= 1u << (bit & 31);
+}
+
+// A pixel belongs to a skinny feature when its (2*WOUND_THIN_R+1)^2 neighbourhood is
+// not fully solid. Those are severed outright; everything else keeps mass.
+static inline int wound_pixel_is_thin(const uint8_t *src, int w, int h, int sx, int sy) {
+    for (int dy = -WOUND_THIN_R; dy <= WOUND_THIN_R; dy++) {
+        for (int dx = -WOUND_THIN_R; dx <= WOUND_THIN_R; dx++) {
+            int nx = sx + dx;
+            int ny = sy + dy;
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) return 1;
+            if (!src[ny * w + nx]) return 1;
+        }
+    }
+    return 0;
+}
+
 // Fixed point math: Q8 (256 = 1.0)
 #define FP_SHIFT 8
 #define FP_ONE (1 << FP_SHIFT)
@@ -94,6 +187,12 @@ typedef struct {
     int dying;
     int death_timer;
     int death_dir_x, death_dir_y; // Q8 unit vector of the killing blow (256 = 1.0)
+
+    // Live dismemberment: bitmask of the cells bitten while the xeno is still alive.
+    // Bit (cell_y * WOUND_GRID + cell_x) set => that normalized cell is bitten.
+    // See WOUND_MASK_WORDS: the second plane marks cells torn off whole.
+    uint32_t wound_bits[WOUND_MASK_WORDS];
+    uint8_t wound_count;
 
     // 60fps Dirty Rects tracking: independent for top and bottom screens
     int prev_top_active;

@@ -1,0 +1,38 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 90, "capture": "01_boot"},
+    {"button_down": "L", "frames": 2},
+    {"button_down": "SELECT", "frames": 6},
+    {"button_up": "SELECT", "frames": 2},
+    {"button_up": "L", "frames": 8},
+    {"button_down": "RIGHT", "frames": 3},
+    {"button_up": "RIGHT", "frames": 3},
+    {"button_down": "RIGHT", "frames": 3},
+    {"button_up": "RIGHT", "frames": 3},
+    {"button_down": "RIGHT", "frames": 3},
+    {"button_up": "RIGHT", "frames": 3},
+    {"button_down": "RIGHT", "frames": 3},
+    {"button_up": "RIGHT", "frames": 3},
+    {"button_down": "RIGHT", "frames": 3},
+    {"button_up": "RIGHT", "frames": 3},
+    {"button_down": "RIGHT", "frames": 3},
+    {"button_up": "RIGHT", "frames": 6, "capture": "02_species"},
+    {"tap": {"x": 76, "y": 16}, "frames": 3},
+    {"release": true, "frames": 3},
+    {"tap": {"x": 100, "y": 14}, "frames": 3},
+    {"release": true, "frames": 3},
+    {"tap": {"x": 124, "y": 18}, "frames": 3},
+    {"release": true, "frames": 3},
+    {"tap": {"x": 148, "y": 14}, "frames": 3},
+    {"release": true, "frames": 3},
+    {"tap": {"x": 172, "y": 16}, "frames": 3},
+    {"release": true, "frames": 3},
+    {"tap": {"x": 88, "y": 24}, "frames": 3},
+    {"release": true, "frames": 6, "capture": "03_spawned"},
+    {"frames": 600, "capture_sequence": "perf", "capture_every": 20, "capture": "04_end"}
+  ],
+  "assertions": {
+    "screen_changed": {"from": "01_boot", "to": "03_spawned", "min_changed_pixels": 10}
+  }
+}
