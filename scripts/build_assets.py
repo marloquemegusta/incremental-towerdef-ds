@@ -5,7 +5,6 @@ build_assets.py - Unified Nintendo DS Asset Pipeline for towerds.
 This script converts canonical master PNG assets into optimized C data arrays:
   1. Tileset: assets/tiles/sector1/T*_1x.png -> source/sector1_data.c
   2. Enemies: assets/sprites/enemies/*_strip_master_1x.png -> source/enemy_data.c & include/enemy_data.h
-  3. Turrets: assets/sprites/turrets/*_strip_master_1x.png -> source/turret_data.c & include/turret_data.h
 
 Usage:
   python scripts/build_assets.py            # Converts assets to C source
@@ -411,117 +410,6 @@ void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
 
     print(f"  -> Generated source/enemy_data.c and include/enemy_data.h ({enemy_count} biocasts)")
 
-def rotsprite_pil(img, angle):
-    """Applies RotSprite-like rotation using 8x nearest scaling, bicubic rotation, and nearest downscale."""
-    w, h = img.size
-    scaled = img.resize((w * 8, h * 8), Image.NEAREST)
-    rotated = scaled.rotate(angle, resample=Image.BICUBIC)
-    downscaled = rotated.resize((w, h), Image.NEAREST)
-    return downscaled
-
-def build_turrets():
-    print("[3/3] Building Turret Arsenal Sprites (16 Uniform Angles)...")
-    turrets_dir = "assets/sprites/turrets"
-
-    turret_defs = [
-        ("heavy_bolter", "heavy_bolter_strip_master_1x.png", 32, 32),
-        ("lascannon", "lascannon_strip_master_1x.png", 32, 32)
-    ]
-
-    # Write include/turret_data.h
-    with open("include/turret_data.h", "w") as fh:
-        fh.write('''#ifndef TURRET_DATA_H
-#define TURRET_DATA_H
-
-#include <nds.h>
-
-#define TURRET_TYPE_BOLTER    0
-#define TURRET_TYPE_LASCANNON 1
-#define TURRET_TYPE_COUNT     2
-
-#define TURRET_FRAME_SIZE 32
-#define TURRET_ANGLE_COUNT 16
-
-void turret_draw_frame_angle(int cx, int cy, int type, int frame_idx, int angle_16, int is_selected);
-
-#endif // TURRET_DATA_H
-''')
-
-    # Write source/turret_data.c
-    with open("source/turret_data.c", "w") as fc:
-        fc.write('#include "turret_data.h"\n#include "game.h"\n\n')
-
-        angles = [i * (360.0 / 16.0) for i in range(16)]
-
-        for name, strip_file, fw, fh in turret_defs:
-            path = os.path.join(turrets_dir, strip_file)
-            if not os.path.exists(path):
-                raise FileNotFoundError(f"Missing turret master strip: {path}")
-
-            im = Image.open(path).convert("RGBA")
-            num_frames = im.width // fw
-
-            fc.write(f"// {name}: {num_frames} frames x 16 angles\n")
-            fc.write(f"static const uint16_t s_{name}_anim[{num_frames}][16][1024] __attribute__((aligned(4))) = {{\n")
-
-            for f_idx in range(num_frames):
-                fc.write(f"  // Frame {f_idx}\n  {{\n")
-                crop = im.crop((f_idx * fw, 0, (f_idx + 1) * fw, fh))
-
-                for a_idx, ang in enumerate(angles):
-                    rot = rotsprite_pil(crop, -ang)
-                    pixels = [to_bgr555(*p) for p in get_image_pixels(rot)]
-                    fc.write(f"    // Angle {a_idx} ({ang:.1f} deg)\n    {{\n")
-                    for y in range(fh):
-                        line = "      " + ", ".join(f"0x{p:04X}" for p in pixels[y * fw : (y + 1) * fw]) + ",\n"
-                        fc.write(line)
-                    fc.write("    },\n")
-                fc.write("  },\n")
-
-            fc.write("};\n\n")
-
-        # Turret drawing function
-        fc.write('''void turret_draw_frame_angle(int cx, int cy, int type, int frame_idx, int angle_16, int is_selected) {
-    if (type < 0 || type >= TURRET_TYPE_COUNT) type = 0;
-    angle_16 = angle_16 & 15;
-
-    const uint16_t *src;
-    if (type == TURRET_TYPE_LASCANNON) {
-        if (frame_idx < 0 || frame_idx >= 6) frame_idx = 0;
-        src = s_lascannon_anim[frame_idx][angle_16];
-    } else {
-        if (frame_idx < 0 || frame_idx >= 11) frame_idx = 0;
-        src = s_heavy_bolter_anim[frame_idx][angle_16];
-    }
-
-    int ox = cx - 16;
-    int oy = cy - 16;
-
-    for (int y = 0; y < 32; y++) {
-        int dst_y = oy + y;
-        if (dst_y < 0 || dst_y >= SCREEN_H) continue;
-        int row_idx = dst_y * SCREEN_W;
-        int src_idx = y * 32;
-
-        for (int x = 0; x < 32; x++) {
-            int dst_x = ox + x;
-            if (dst_x < 0 || dst_x >= SCREEN_W) continue;
-
-            uint16_t col = src[src_idx + x];
-            if (col & 0x8000) {
-                g_backbuffer[row_idx + dst_x] = col;
-            }
-        }
-    }
-
-    if (is_selected) {
-        renderer_draw_rect(ox - 1, oy - 1, 34, 34, COLOR_HAZARD_YELLOW);
-    }
-}
-''')
-
-    print(f"  -> Generated source/turret_data.c and include/turret_data.h ({len(turret_defs)} turret types, 16 uniform angles)")
-
 def main():
     parser = argparse.ArgumentParser(description="Build Nintendo DS assets from PNG files.")
     parser.add_argument("--rebuild", action="store_true", help="Re-build ROM game.nds after converting assets")
@@ -533,7 +421,6 @@ def main():
     
     build_tiles()
     build_enemies()
-    build_turrets()
 
     print("\n[OK] All assets successfully converted to C source code!")
 

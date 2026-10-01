@@ -106,7 +106,7 @@ Mejora                   Nivel 1    Nivel 2    Nivel 3    Nivel 4    Efecto Prin
 3: Bio-Cosecha (Scrap)     12         35          -          -       Multiplicador de chatarra x2, x3
 4: Conveyor (Auto-ammo)    25         50        120        250       Recarga pasiva de munición
 5: Auto-Fire               20         80          -          -       Lv1 = Gatillo Continuo (Hold), Lv2 = Auto-Target
-6: Torretas Extra         150        400          -          -       Desbloqueo de Sockets laterales
+6: Extra Socket (Fase 2) 1000         -          -          -       Nodo bloqueado (Fase 2), sin efecto
 ```
 
 ---

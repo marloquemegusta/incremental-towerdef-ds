@@ -114,7 +114,7 @@ se ve está en `DESIGN.md`; el proceso de trabajo del agente, en `AGENTS.md`.
 | `GoreChunk` | Trozos sólidos: bloque de índices de paleta (≤ 4×4), `x,y,z` Q8, vida |
 | `DeathParticle` | Gotas/partículas 3D con `z`; al aterrizar estampan en el suelo |
 | `CasingParticle` | Casquillos con rebote, giro y zumbido de vida |
-| `Bullet` / `BulletDart` | Balas de batería (`dist_remaining` + `target_enemy_idx`) |
+| `BulletDart` | Balas de batería (`dist_remaining` + `target_enemy_idx`) |
 | `WallPlatform` | Batería unificada: sockets visuales, `turret_angles`/`target_angles`/`last_aim_angle` (0..4 por socket), munición global de batería, recarga diegética |
 | `EnemyStatDef` | Stats maestras por variante (`tier`, `hp`, `speed`, `scrap`, `bite_damage`, `bite_interval`); array `g_balance.enemy[ENEMY_VARIANT_COUNT]` |
 | `GameState` / `GameBalanceConfig` | Modos de juego, telemetría y balance serializable (tabla maestra de enemigos + Atraedor/Generador/Costes) |
