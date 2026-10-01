@@ -564,6 +564,7 @@ void renderer_draw_enemies_top(void) {
         enemy_draw_sprite_to_buffer8(g_top_backbuffer, gx, gy, g_enemies[i].variant,
                                     g_enemies[i].anim_frame, g_enemies[i].dir,
                                     (g_enemies[i].biting_target == 99),
+                                    g_enemies[i].wound_bits,
                                     &g_enemies[i].prev_top_x, &g_enemies[i].prev_top_y,
                                     &g_enemies[i].prev_top_w, &g_enemies[i].prev_top_h);
         g_enemies[i].prev_top_active = 1;
@@ -605,11 +606,13 @@ void renderer_draw_enemies_bottom(void) {
             enemy_draw_melting_sprite(g_backbuffer, gx, ly, g_enemies[i].variant,
                                       g_enemies[i].anim_frame, g_enemies[i].dir, prog,
                                       g_enemies[i].death_dir_x, g_enemies[i].death_dir_y,
+                                      g_enemies[i].wound_bits,
                                       &ex, &ey, &ew, &eh);
         } else {
             enemy_draw_sprite_to_buffer(g_backbuffer, gx, ly, g_enemies[i].variant,
                                        g_enemies[i].anim_frame, g_enemies[i].dir,
                                        (g_enemies[i].biting_target == 99),
+                                       g_enemies[i].wound_bits,
                                        &ex, &ey, &ew, &eh);
         }
         tiles_dirty_mark_rect(ex, ey, ew, eh, 1, s_bot_fb_idx);

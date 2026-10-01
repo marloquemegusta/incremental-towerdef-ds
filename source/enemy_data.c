@@ -2,6 +2,32 @@
 #include "game.h"
 #include "tiles.h"
 
+// Live dismemberment: the wound bitmask indexes a WOUND_GRID x WOUND_GRID grid
+// normalized over the frame bounding box, so a torn cell stays put across walk
+// frames and facing directions even though the underlying pixel size changes.
+static inline int wound_any(const uint32_t *wounds) {
+    if (!wounds) return 0;
+    uint32_t acc = 0;
+    for (int i = 0; i < WOUND_WORDS; i++) acc |= wounds[i];
+    return acc != 0;
+}
+
+static inline int wound_pixel_state(const uint8_t *src, const uint32_t *wounds, int sx, int sy, int w, int h) {
+    if (!wounds || !src || w < 1 || h < 1) return WOUND_NONE;
+    int cx = (sx * WOUND_GRID) / w;
+    int cy = (sy * WOUND_GRID) / h;
+    int bit = cy * WOUND_GRID + cx;
+    if (!wound_bit_get(wounds, bit)) return WOUND_NONE;
+    // Amputation: a bitten cell that lost its connection to the body is torn off
+    // whole, and a skinny pixel (2 px or less) inside a normal bite is severed too.
+    // Without it nothing is ever removed: every bitten cell merely reddens.
+#if WOUND_AMPUTATE
+    if (wound_gone_get(wounds, bit)) return WOUND_SEVERED;
+    if (wound_pixel_is_thin(src, w, h, sx, sy)) return WOUND_SEVERED;
+#endif
+    return wound_pixel_gone(bit, sx, sy) ? WOUND_FLESH : WOUND_NONE;
+}
+
 // 8-bit indexed palette in ultra-fast zero-wait-state DTCM memory
 DTCM_DATA uint16_t g_enemy_palette[256] = {
     0x0000, 0x8002, 0x8004, 0x8006, 0x8009, 0x800C, 0x8010, 0x8040, 
@@ -2012,7 +2038,7 @@ const EnemyTypeDef g_enemy_types[ENEMY_VARIANT_COUNT] = {
     },
 };
 
-ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking, int *out_bx, int *out_by, int *out_bw, int *out_bh) {
+ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer(uint16_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking, const uint32_t *wounds, int *out_bx, int *out_by, int *out_bw, int *out_bh) {
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT || !buffer) return;
     const EnemyTypeDef *type = &g_enemy_types[variant];
 
@@ -2097,6 +2123,37 @@ ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer(uint16
         *out_bh = b_max_y - b_min_y + 1;
     }
 
+    // Live dismemberment: a wounded sprite drops to a clipped per-pixel path that
+    // skips its torn cells, so the hole shows the restored ground beneath. Only
+    // wounded enemies pay this; pristine sprites keep the quad fast path below.
+    if (wound_any(wounds)) {
+        int x_min = 0, x_max = w;
+        if (ox < 0) x_min = -ox;
+        if (ox + w > SCREEN_W) x_max = SCREEN_W - ox;
+        for (int y = 0; y < h; y++) {
+            int dst_y = oy + y;
+            if (dst_y < 0 || dst_y >= SCREEN_H) continue;
+            uint16_t *dst_row = &buffer[dst_y * SCREEN_W + ox];
+            const uint8_t *row_src = &src[y * w];
+            for (int x = x_min; x < x_max; x++) {
+                uint8_t idx = row_src[x];
+                if (!idx) continue;
+                int ws = wound_pixel_state(src, wounds, x, y, w, h);
+                if (ws == WOUND_SEVERED) continue;
+                if (ws == WOUND_FLESH) {
+                    // Torn carapace: expose the dark flesh, or (WOUND_STYLE 0) let
+                    // the ground show through the hole.
+#if WOUND_STYLE
+                    dst_row[x] = COLOR_XENOS_GORE_DARK;
+#endif
+                    continue;
+                }
+                dst_row[x] = g_enemy_palette[idx];
+            }
+        }
+        return;
+    }
+
     int quads = w >> 2;
 
     // Fast path: fully on-screen interior sprite
@@ -2177,7 +2234,7 @@ ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer(uint16
 ITCM_CODE __attribute__((target("arm"))) void enemy_draw_melting_sprite(
     uint16_t *buffer, int cx, int cy, int variant, int frame, int dir,
     int progress, int dir_x, int dir_y,
-    int *out_bx, int *out_by, int *out_bw, int *out_bh)
+    const uint32_t *wounds, int *out_bx, int *out_by, int *out_bw, int *out_bh)
 {
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT || !buffer) return;
     const EnemyTypeDef *type = &g_enemy_types[variant];
@@ -2213,6 +2270,8 @@ ITCM_CODE __attribute__((target("arm"))) void enemy_draw_melting_sprite(
         for (int sx = 0; sx < w; sx++) {
             uint8_t idx = row[sx];
             if (!idx) continue;
+            // Already torn off while alive: it is not part of the corpse anymore.
+            if (wound_pixel_state(src, wounds, sx, sy, w, h) != WOUND_NONE) continue;
 
             int px = ox + sx;
             int py = row_y;
@@ -2273,7 +2332,7 @@ ITCM_CODE __attribute__((target("arm"))) void enemy_draw_melting_sprite(
 
 ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer8(
     uint8_t *buffer, int cx, int cy, int variant, int frame, int dir, int is_attacking,
-    int *out_bx, int *out_by, int *out_bw, int *out_bh)
+    const uint32_t *wounds, int *out_bx, int *out_by, int *out_bw, int *out_bh)
 {
     if (!buffer || variant < 0 || variant >= ENEMY_VARIANT_COUNT) return;
     const EnemyTypeDef *type = &g_enemy_types[variant];
@@ -2352,6 +2411,34 @@ ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer8(
         *out_bh = b_max_y - b_min_y + 1;
     }
 
+    // Live dismemberment: same normalized cell mask as the 16-bit path, so the
+    // hole is identical on the upper (8-bit indexed) screen.
+    if (wound_any(wounds)) {
+        int x_min = 0, x_max = w;
+        if (ox < 0) x_min = -ox;
+        if (ox + w > SCREEN_W) x_max = SCREEN_W - ox;
+        for (int y = 0; y < h; y++) {
+            int dst_y = oy + y;
+            if (dst_y < 0 || dst_y >= SCREEN_H) continue;
+            uint8_t *dst_row = &buffer[dst_y * SCREEN_W + ox];
+            const uint8_t *row_src = &src[y * w];
+            for (int x = x_min; x < x_max; x++) {
+                uint8_t idx = row_src[x];
+                if (!idx) continue;
+                int ws = wound_pixel_state(src, wounds, x, y, w, h);
+                if (ws == WOUND_SEVERED) continue;
+                if (ws == WOUND_FLESH) {
+#if WOUND_STYLE
+                    dst_row[x] = TOP_COLOR_XENOS_GORE_DARK;
+#endif
+                    continue;
+                }
+                dst_row[x] = idx;
+            }
+        }
+        return;
+    }
+
     int quads = w >> 2;
 
     // Fast path: fully on-screen interior sprite
@@ -2420,7 +2507,7 @@ ITCM_CODE __attribute__((target("arm"))) void enemy_draw_sprite_to_buffer8(
 }
 
 void enemy_draw_sprite(int cx, int cy, int variant, int frame, int dir) {
-    enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir, 0, NULL, NULL, NULL, NULL);
+    enemy_draw_sprite_to_buffer(g_backbuffer, cx, cy, variant, frame, dir, 0, NULL, NULL, NULL, NULL, NULL);
 }
 
 // Computes the on-screen bounding box of the sprite that WOULD be drawn for the

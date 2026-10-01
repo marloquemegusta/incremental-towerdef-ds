@@ -209,7 +209,7 @@ void game_spawn_death_gore(int x, int y, int bvx, int bvy, int variant) {
 
 // Cut a few small blocks straight out of the enemy sprite and throw them: solid
 // xeno debris (real sprite pixels, not recoloured dots) tumbling to the ground.
-static void spawn_gore_chunks(int gx, int gy, int variant, int anim_frame, int dir, int bvy) {
+static void spawn_gore_chunks(int gx, int gy, int variant, int anim_frame, int dir, int bvy, const uint32_t *wounds) {
     if (variant < 0 || variant >= ENEMY_VARIANT_COUNT) return;
     const EnemyTypeDef *type = &g_enemy_types[variant];
     if (type->frame_count == 0) return;
@@ -244,6 +244,14 @@ static void spawn_gore_chunks(int gx, int gy, int variant, int anim_frame, int d
                 }
             }
             if (opaque < 3) continue; // skip near-empty corners
+            // Skip cells already torn off while alive: the death only blows away
+            // what is actually left of the corpse.
+            if (wounds) {
+                int cell_cx = ((sx0 + bs / 2) * WOUND_GRID) / fw;
+                int cell_cy = ((sy0 + bs / 2) * WOUND_GRID) / fh;
+                int cell_bit = cell_cy * WOUND_GRID + cell_cx;
+                if (wounds[cell_bit >> 5] & (1u << (cell_bit & 31))) continue;
+            }
 
             int slot = -1;
             for (int k = 0; k < MAX_GORE_CHUNKS; k++) {
@@ -275,6 +283,276 @@ static void spawn_gore_chunks(int gx, int gy, int variant, int anim_frame, int d
     }
 }
 
+#if LIVE_DISMEMBERMENT_ENABLED
+// ---- Live dismemberment (cosmetic) -----------------------------------------
+// The wound mask is a WOUND_GRID x WOUND_GRID grid normalized over the sprite
+// bounding box. Each impact bites the cell nearest the hit point that is still on
+// the silhouette, so the xeno peels from the outside in instead of getting holes
+// punched through its middle. Nothing here touches hp, damage, speed or collision:
+// it is the visual read of damage already dealt.
+
+static int wound_cell_solid(const uint8_t *src, int w, int h, int cell_x, int cell_y) {
+    int px0 = (cell_x * w) / WOUND_GRID;
+    int px1 = ((cell_x + 1) * w) / WOUND_GRID;
+    int py0 = (cell_y * h) / WOUND_GRID;
+    int py1 = ((cell_y + 1) * h) / WOUND_GRID;
+    int solid = 0;
+    for (int y = py0; y < py1 && y < h; y++) {
+        for (int x = px0; x < px1 && x < w; x++) {
+            if (src[y * w + x]) solid++;
+        }
+    }
+    return solid >= 2;
+}
+
+// A cell sits on the current silhouette when it has body pixels and any of its
+// four neighbours is empty, already bitten, or off-grid. Restricting wounds to
+// these cells is what makes the erosion read as peeling rather than as interior
+// holes.
+static int wound_cell_edge(const Enemy *e, const uint8_t *src, int w, int h, int cell_x, int cell_y) {
+    if (!wound_cell_solid(src, w, h, cell_x, cell_y)) return 0;
+    static const int8_t dx[4] = { 1, -1, 0, 0 };
+    static const int8_t dy[4] = { 0, 0, 1, -1 };
+    for (int k = 0; k < 4; k++) {
+        int nx = cell_x + dx[k];
+        int ny = cell_y + dy[k];
+        if (nx < 0 || nx >= WOUND_GRID || ny < 0 || ny >= WOUND_GRID) return 1;
+        int nbit = ny * WOUND_GRID + nx;
+        if (wound_bit_get(e->wound_bits, nbit)) return 1;
+        if (!wound_cell_solid(src, w, h, nx, ny)) return 1;
+    }
+    return 0;
+}
+
+// Nearest biteable cell to (want_x, want_y), searched as a growing ring so the
+// tear reads as landing where the shot hit.
+static int wound_find_cell(const Enemy *e, const uint8_t *src, int w, int h,
+                           int want_x, int want_y, int require_edge) {
+    for (int r = 0; r < WOUND_GRID; r++) {
+        for (int oy = -r; oy <= r; oy++) {
+            for (int ox = -r; ox <= r; ox++) {
+                if (r > 0 && ox > -r && ox < r && oy > -r && oy < r) continue;
+                int cx = want_x + ox;
+                int cy = want_y + oy;
+                if (cx < 0 || cx >= WOUND_GRID || cy < 0 || cy >= WOUND_GRID) continue;
+                int bit = cy * WOUND_GRID + cx;
+                if (wound_bit_get(e->wound_bits, bit)) continue;
+                if (require_edge) {
+                    if (!wound_cell_edge(e, src, w, h, cx, cy)) continue;
+                } else if (!wound_cell_solid(src, w, h, cx, cy)) {
+                    continue;
+                }
+                return bit;
+            }
+        }
+    }
+    return -1;
+}
+
+static void spawn_wound_debris(int ex, int ey, const EnemyFrameDef *fd, int cell_x, int cell_y, int bit) {
+    const uint8_t *src = fd->pixels;
+    int w = fd->w;
+    int h = fd->h;
+
+    int px0 = (cell_x * w) / WOUND_GRID;
+    int px1 = ((cell_x + 1) * w) / WOUND_GRID;
+    int py0 = (cell_y * h) / WOUND_GRID;
+    int py1 = ((cell_y + 1) * h) / WOUND_GRID;
+    if (px1 <= px0) px1 = px0 + 1;
+    if (py1 <= py0) py1 = py0 + 1;
+
+    int bw = px1 - px0;
+    if (bw > 4) bw = 4;
+    int bh = py1 - py0;
+    if (bh > 4) bh = 4;
+
+    int slot = -1;
+    for (int k = 0; k < MAX_GORE_CHUNKS; k++) {
+        if (!g_gore_chunks[k].active) { slot = k; break; }
+    }
+    if (slot < 0) return; // pool busy: the hole still shows, the debris is skipped
+
+    GoreChunk *c = &g_gore_chunks[slot];
+    c->active = 1;
+    c->w = bw;
+    c->h = bh;
+    for (int yy = 0; yy < bh; yy++) {
+        for (int xx = 0; xx < bw; xx++) {
+            int sx = px0 + xx;
+            int sy = py0 + yy;
+            uint8_t idx = src[sy * w + sx];
+            // Same bite shape as the wound, so the flying piece is exactly the piece
+            // missing from the body.
+#if WOUND_AMPUTATE
+            // A severed appendage flies off whole; a bulky pixel only leaves when the
+            // bite pattern says so.
+            if (idx && !wound_pixel_is_thin(src, w, h, sx, sy) && !wound_pixel_gone(bit, sx, sy)) {
+                idx = 0;
+            }
+#else
+            if (idx && !wound_pixel_gone(bit, sx, sy)) idx = 0;
+#endif
+            c->idx[yy * bw + xx] = idx;
+        }
+    }
+
+    c->x = TO_FP(ex + fd->offset_x + px0 + (px1 - px0) / 2);
+    c->y = TO_FP(ey + fd->offset_y + py0 + (py1 - py0) / 2);
+    c->z = TO_FP(2 + (rand() % 4));
+    c->vx = ((rand() % 5) - 2) << (FP_SHIFT - 2);
+    c->vy = ((rand() % 5) - 2) << (FP_SHIFT - 2);
+    c->vz = TO_FP(2) + (rand() % (FP_ONE * 3 / 2));
+    c->life = 40 + (rand() % 25);
+    c->prev_bot_active = 0;
+}
+
+#if WOUND_AMPUTATE
+// After a bite, any part of the sprite that lost its connection to the main mass is
+// torn off whole, so the xeno never keeps a limb floating in mid-air. Runs on the
+// cell grid (cheap) once per impact, not per frame.
+static void wound_detach_islands(Enemy *e, const uint8_t *src, int w, int h, int bitten_bit) {
+    if (bitten_bit < 0 || bitten_bit >= WOUND_CELLS) return;
+
+    uint8_t solid[WOUND_CELLS];
+    uint8_t body[WOUND_CELLS];
+    uint8_t seen[WOUND_CELLS];
+    int label[WOUND_CELLS];
+    int stack[WOUND_CELLS];
+    static const int8_t dx[4] = { 1, -1, 0, 0 };
+    static const int8_t dy[4] = { 0, 0, 1, -1 };
+
+    for (int i = 0; i < WOUND_CELLS; i++) {
+        solid[i] = (uint8_t)wound_cell_solid(src, w, h, i % WOUND_GRID, i / WOUND_GRID);
+        body[i] = 0;
+        seen[i] = 0;
+        label[i] = -1;
+    }
+    if (!solid[bitten_bit]) return;
+
+    // 1. The body as it was an instant ago: everything reachable from the bitten cell,
+    //    passing through cells that are bitten now (they were attached back then).
+    int sp = 0;
+    stack[sp++] = bitten_bit;
+    body[bitten_bit] = 1;
+    while (sp > 0) {
+        int c = stack[--sp];
+        int cx = c % WOUND_GRID;
+        int cy = c / WOUND_GRID;
+        for (int k = 0; k < 4; k++) {
+            int nx = cx + dx[k];
+            int ny = cy + dy[k];
+            if (nx < 0 || nx >= WOUND_GRID || ny < 0 || ny >= WOUND_GRID) continue;
+            int n = ny * WOUND_GRID + nx;
+            if (body[n] || !solid[n]) continue;
+            body[n] = 1;
+            stack[sp++] = n;
+        }
+    }
+
+    // 2. What is left of that body now that the bite has cut through it.
+    int best_size = 0;
+    int best_label = -1;
+    int nlab = 0;
+    for (int i = 0; i < WOUND_CELLS; i++) {
+        if (!body[i] || seen[i] || !solid[i] || wound_bit_get(e->wound_bits, i)) continue;
+        int size = 0;
+        sp = 0;
+        stack[sp++] = i;
+        seen[i] = 1;
+        label[i] = nlab;
+        while (sp > 0) {
+            int c = stack[--sp];
+            size++;
+            int cx = c % WOUND_GRID;
+            int cy = c / WOUND_GRID;
+            for (int k = 0; k < 4; k++) {
+                int nx = cx + dx[k];
+                int ny = cy + dy[k];
+                if (nx < 0 || nx >= WOUND_GRID || ny < 0 || ny >= WOUND_GRID) continue;
+                int n = ny * WOUND_GRID + nx;
+                if (!body[n] || seen[n] || !solid[n]) continue;
+                if (wound_bit_get(e->wound_bits, n)) { seen[n] = 1; continue; }
+                seen[n] = 1;
+                label[n] = nlab;
+                stack[sp++] = n;
+            }
+        }
+        if (size > best_size) {
+            best_size = size;
+            best_label = nlab;
+        }
+        nlab++;
+    }
+    if (nlab <= 1) return; // the bite did not split anything off
+
+    // 3. Anything left over is an island: torn off whole, never left floating.
+    for (int i = 0; i < WOUND_CELLS; i++) {
+        if (!body[i] || !solid[i] || wound_bit_get(e->wound_bits, i)) continue;
+        if (label[i] == best_label) continue;
+        wound_bit_set(e->wound_bits, i);
+        wound_gone_set(e->wound_bits, i);
+        e->wound_count++;
+    }
+}
+#endif // WOUND_AMPUTATE
+
+static void enemy_wound_from_impact(Enemy *e, int hit_gx, int hit_gy) {
+    if (!e->active || e->dying) return;
+
+    // Health-driven budget: the share of the wound allowance the body has paid for
+    // is the share of health it has already lost, quantised into WOUND_HP_TICKS
+    // steps. So a xeno that still has most of its health stays almost whole however
+    // many rounds it absorbs, and only a nearly dead one looks torn apart.
+    uint64_t max_hp = e->max_hp ? e->max_hp : 1;
+    uint64_t lost = (e->hp < max_hp) ? (max_hp - e->hp) : 0;
+    int budget = (WOUND_CELLS * WOUND_MAX_PCT) / 100;
+    int lost_ticks = (int)((lost * WOUND_HP_TICKS) / max_hp);
+    int allowed = (budget * lost_ticks) / WOUND_HP_TICKS;
+    if (e->wound_count >= allowed) return;
+
+    const EnemyTypeDef *type = &g_enemy_types[e->variant];
+    if (type->frame_count == 0) return;
+
+    int sd = (e->dir & 7) - 2;
+    if (sd < 0) sd = 0;
+    if (sd > 4) sd = 4;
+    int f = e->anim_frame;
+    if (f < 0) f = 0;
+    if (f >= type->frame_count) f %= type->frame_count;
+    const EnemyFrameDef *fd = &type->frames[sd][f];
+    const uint8_t *src = fd->pixels;
+    int w = fd->w;
+    int h = fd->h;
+    if (!src || w < 2 || h < 2) return;
+
+    int ex = FROM_FP(e->x);
+    int ey = FROM_FP(e->y);
+    int lx = hit_gx - (ex + fd->offset_x);
+    int ly = hit_gy - (ey + fd->offset_y);
+    if (lx < 0) lx = 0; else if (lx >= w) lx = w - 1;
+    if (ly < 0) ly = 0; else if (ly >= h) ly = h - 1;
+    int want_x = (lx * WOUND_GRID) / w;
+    int want_y = (ly * WOUND_GRID) / h;
+
+    // Peel from the outside in: prefer the boundary cell nearest the hit point, and
+    // only concede an interior cell if the silhouette has no biteable edge left.
+    int chosen = wound_find_cell(e, src, w, h, want_x, want_y, 1);
+    if (chosen < 0) chosen = wound_find_cell(e, src, w, h, want_x, want_y, 0);
+    if (chosen < 0) return;
+
+    int cell_x = chosen % WOUND_GRID;
+    int cell_y = chosen / WOUND_GRID;
+    wound_bit_set(e->wound_bits, chosen);
+    e->wound_count++;
+    spawn_wound_debris(ex, ey, fd, cell_x, cell_y, chosen);
+#if WOUND_AMPUTATE
+    // Whatever this bite just cut loose falls off entirely (no floating fragments).
+    wound_detach_islands(e, src, w, h, chosen);
+#endif
+}
+
+#endif // LIVE_DISMEMBERMENT_ENABLED
+
 // Begin the liquefaction death: the enemy stays alive (rendered) for
 // ENEMY_DEATH_FRAMES while its sprite melts into the growing puddle.
 static void enemy_begin_death(int idx, int bvx, int bvy) {
@@ -299,7 +577,7 @@ static void enemy_begin_death(int idx, int bvx, int bvy) {
     // The ground splash lands on impact, exactly like the bullet splash; solid
     // chunks are thrown and the body then crumples on top of it.
     game_stamp_death_puddle(FROM_FP(e->x), FROM_FP(e->y), bvx, bvy, e->variant);
-    spawn_gore_chunks(FROM_FP(e->x), FROM_FP(e->y), e->variant, e->anim_frame, e->dir, bvy);
+    spawn_gore_chunks(FROM_FP(e->x), FROM_FP(e->y), e->variant, e->anim_frame, e->dir, bvy, e->wound_bits);
 }
 
 // Advance a dying enemy: liquid keeps landing while the body dissolves; the full
@@ -862,6 +1140,7 @@ void wall_update(void) {
 
         int hit_enemy = 0;
         int hit_e_idx = -1;
+        int hit_x = 0, hit_y = 0;
 
         // 2 sub-steps of 8 px per frame (16 px/frame bullet velocity)
         for (int step = 0; step < 2; step++) {
@@ -887,6 +1166,8 @@ void wall_update(void) {
                 if (ddx * ddx + ddy * ddy <= 14 * 14 || g_bullet_darts[i].dist_remaining <= 0) {
                     hit_enemy = 1;
                     hit_e_idx = target_e;
+                    hit_x = cur_x;
+                    hit_y = gy;
                     break;
                 }
             } else {
@@ -902,6 +1183,8 @@ void wall_update(void) {
                     if (ddx * ddx + ddy * ddy <= 12 * 12) {
                         hit_enemy = 1;
                         hit_e_idx = e;
+                        hit_x = cur_x;
+                        hit_y = gy;
                         break;
                     }
                 }
@@ -918,6 +1201,15 @@ void wall_update(void) {
 
             if (g_enemies[hit_e_idx].hp > (uint64_t)g_bullet_darts[i].damage) {
                 g_enemies[hit_e_idx].hp -= g_bullet_darts[i].damage;
+                // Live dismemberment, driven by the health actually lost. Applied
+                // after the hit so the budget reflects the damage just taken; a
+                // lethal hit needs no wound, the liquefaction takes that body.
+#if LIVE_DISMEMBERMENT_ENABLED
+                enemy_wound_from_impact(&g_enemies[hit_e_idx], hit_x, hit_y);
+#else
+                (void)hit_x;
+                (void)hit_y;
+#endif
             } else {
                 g_enemies[hit_e_idx].hp = 0;
                 g_game.enemies_killed++;

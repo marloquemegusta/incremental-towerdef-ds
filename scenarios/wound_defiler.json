@@ -1,0 +1,24 @@
+{
+  "rom": "game.nds",
+  "steps": [
+    {"frames": 90, "capture": "01_boot"},
+    {"button_down": "L", "frames": 2},
+    {"button_down": "SELECT", "frames": 6},
+    {"button_up": "SELECT", "frames": 2},
+    {"button_up": "L", "frames": 8},
+    {"button_down": "RIGHT", "frames": 3},
+    {"button_up": "RIGHT", "frames": 3},
+    {"button_down": "RIGHT", "frames": 3},
+    {"button_up": "RIGHT", "frames": 3},
+    {"button_down": "RIGHT", "frames": 3},
+    {"button_up": "RIGHT", "frames": 6, "capture": "02_species"},
+    {"tap": {"x": 128, "y": 24}, "frames": 5, "capture": "03_spawned"},
+    {"release": true, "frames": 4},
+    {"tap": {"x": 76, "y": 30}, "frames": 5},
+    {"release": true, "frames": 4},
+    {"frames": 420, "capture_sequence": "defiler", "capture_every": 2, "capture": "04_end"}
+  ],
+  "assertions": {
+    "screen_changed": {"from": "01_boot", "to": "02_species", "min_changed_pixels": 10}
+  }
+}
